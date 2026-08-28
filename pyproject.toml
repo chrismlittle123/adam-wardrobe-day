@@ -1,0 +1,20 @@
+[project]
+name = "adam-wardrobe-day"
+version = "0.1.0"
+description = "Helping Adam level up his wardrobe, with a bit of Gemini image generation."
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0.0",
+    "google-auth>=2.30.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.scripts]
+gemini-image = "wardrobe.gemini_image:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/wardrobe"]
