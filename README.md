@@ -39,8 +39,11 @@ Six tabs, in the order the work happens.
    That allocation becomes the tie-breaker whenever two recommendations
    conflict. Answers land in `style-answers.toml` and synthesise into
    `STYLE-GUIDE.md`.
-2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos,
-   size labels and finished garment measurements. Photograph anything words
+2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
+   and sizes in whatever scheme that garment actually uses: a collar for a
+   shirt, chest and a length letter for a jacket, waist and leg for trousers,
+   three disagreeing national systems for a shoe. Only wanted pieces carry a
+   price, since what an owned garment cost is sunk. Photograph anything words
    cannot pin down: "green jacket" gives a different jacket every time.
 3. **Principles** — a dozen short checkable rules, generated from the answers
    and hand-editable. Fed into every generated look.

@@ -20,8 +20,8 @@ from wardrobe import fitspec, inventory as inv_mod, principles as prin_mod, shop
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
-    ASPIRATIONAL, CATEGORIES, FIT_VERDICTS, GARMENTS, OWNED, RETIRED,
-    STATUSES, TRACKED_DIMENSIONS, Inventory, Item,
+    ASPIRATIONAL, CATEGORIES, GARMENTS, NONE, OWNED, RETIRED, STATUSES,
+    Inventory, Item, size_scheme,
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.philosophy import DEFAULT_GUIDE_PATH, Answers, build_guide_prompt, synthesise_guide
@@ -272,52 +272,69 @@ def points_warning(question: Question, answer: str) -> str:
 
 # --- 2. inventory -------------------------------------------------------------
 
-def item_fields(item: Item, key: str, inventory: Inventory) -> Item:
+def shape_row(item: Item, key: str) -> tuple[str, str]:
+    """Garment and status, chosen outside the form.
+
+    Both change the shape of the form beneath: the garment decides which size
+    boxes exist, the status decides whether a price is asked for. Inside a
+    Streamlit form neither would take effect until submit, so they sit above it.
+    """
+    c1, c2 = st.columns(2)
+    garment = c1.selectbox(
+        "Garment", GARMENTS,
+        index=GARMENTS.index(item.garment) if item.garment in GARMENTS else 0,
+        key=f"{key}-garment")
+    status = c2.selectbox(
+        "Status", STATUSES, index=STATUSES.index(item.status), key=f"{key}-status",
+        help="Wanted pieces behave like owned ones in the generator, and are what "
+             "the shopping plan spends money on.")
+    return garment, status
+
+
+def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     """The shared add/edit form body. Returns the item with form values applied."""
+    item.garment = garment
+    item.status = status
+    item.category = inv_mod.category_for(garment)
+
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
                               placeholder="Cream camp-collar shirt")
-    c1, c2, c3 = st.columns(3)
-    item.garment = c1.selectbox("Garment", GARMENTS, index=GARMENTS.index(item.garment)
-                                if item.garment in GARMENTS else 0, key=f"{key}-garment")
-    item.category = inv_mod.category_for(item.garment)
-    item.status = c2.selectbox("Status", STATUSES, index=STATUSES.index(item.status),
-                               key=f"{key}-status")
-    item.price = c3.number_input("Price £", 0.0, 100000.0, float(item.price), step=5.0,
-                                 key=f"{key}-price",
-                                 help="What you paid, or what you expect it to cost.")
-    c4, c5, c6 = st.columns([2, 1, 2])
-    item.colour = c4.text_input("Colour", item.colour, key=f"{key}-colour",
+    c1, c2, c3 = st.columns([2, 1, 2])
+    item.colour = c1.text_input("Colour", item.colour, key=f"{key}-colour",
                                 placeholder="chocolate brown")
-    item.colour_hex = c5.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
-    item.fabric = c6.text_input("Fabric", item.fabric, key=f"{key}-fabric",
+    item.colour_hex = c2.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
+    item.fabric = c3.text_input("Fabric", item.fabric, key=f"{key}-fabric",
                                 placeholder="brushed cotton twill")
-    c7, c8, c9 = st.columns(3)
-    item.pattern = c7.text_input("Pattern", item.pattern, key=f"{key}-pattern")
-    item.brand = c8.text_input("Brand", item.brand, key=f"{key}-brand")
-    item.size_label = c9.text_input("Size label", item.size_label, key=f"{key}-size",
-                                    help="What the tag says. Meaningless across brands, "
-                                         "which is why the measurements below matter.")
+    c4, c5 = st.columns([1, 1])
+    item.pattern = c4.text_input("Pattern", item.pattern, key=f"{key}-pattern")
+    if status == ASPIRATIONAL:
+        item.price = c5.number_input(
+            "Estimated price £", 0.0, 100000.0, float(item.price), step=10.0,
+            key=f"{key}-price",
+            help="What you expect to pay. The shopping plan spends this number.")
+    else:
+        item.price = 0.0
+
+    scheme = size_scheme(garment)
+    if scheme:
+        st.markdown(f'<div class="look-cap">Sizes, as {garment.lower()} are actually '
+                    f'sized</div>', unsafe_allow_html=True)
+        cols = st.columns(min(len(scheme), 4))
+        for n, field in enumerate(scheme):
+            col = cols[n % len(cols)]
+            current = item.sizes.get(field.key, "")
+            if field.options:
+                index = field.options.index(current) if current in field.options else 0
+                item.sizes[field.key] = col.selectbox(
+                    field.label, field.options, index=index,
+                    help=field.help or None, key=f"{key}-s-{field.key}")
+            else:
+                item.sizes[field.key] = col.text_input(
+                    field.label, current, help=field.help or None, key=f"{key}-s-{field.key}")
+
     item.description = st.text_area(
         "Description for the image model", item.description, key=f"{key}-desc", height=68,
         help="Only what a photograph would not show. Drape, weight, how it sits.")
-    c10, c11 = st.columns([1, 2])
-    item.fit_verdict = c10.selectbox("Fit", FIT_VERDICTS, index=FIT_VERDICTS.index(item.fit_verdict)
-                                     if item.fit_verdict in FIT_VERDICTS else len(FIT_VERDICTS) - 1,
-                                     key=f"{key}-verdict")
-    item.fit_note = c11.text_input("Fit note", item.fit_note, key=f"{key}-fitnote",
-                                   placeholder="Shoulders right, sleeves 2 cm long")
-    tags = st.text_input("Tags, comma separated", ", ".join(item.tags), key=f"{key}-tags")
-    item.tags = [t.strip() for t in tags.split(",") if t.strip()]
-
-    dims = TRACKED_DIMENSIONS.get(item.garment, ())
-    if dims:
-        st.markdown('<div class="look-cap">Measured flat or round, in cm. '
-                    'Leave at 0 if not measured.</div>', unsafe_allow_html=True)
-        cols = st.columns(min(len(dims), 4))
-        for n, dim in enumerate(dims):
-            item.measurements[dim] = cols[n % len(cols)].number_input(
-                fitspec.LABELS.get(dim, dim.title()), 0.0, 300.0,
-                float(item.measurements.get(dim, 0)), step=0.5, key=f"{key}-m-{dim}")
     return item
 
 
@@ -338,8 +355,9 @@ def inventory_tab(profile: Profile, inventory: Inventory) -> None:
     )
 
     with st.expander("Add an item", expanded=not inventory.items):
+        garment, status = shape_row(Item(), "new")
         with st.form("add-item", clear_on_submit=True):
-            draft = item_fields(Item(), "new", inventory)
+            draft = item_fields(Item(), "new", garment, status)
             photo = st.file_uploader("Photo", type=["png", "jpg", "jpeg", "webp"], key="new-photo")
             if st.form_submit_button("Add to wardrobe"):
                 if not draft.name.strip():
@@ -390,25 +408,21 @@ def item_card(item: Item, inventory: Inventory) -> None:
 
     badge = {OWNED: "", ASPIRATIONAL: '<span class="badge want">wanted</span>',
              RETIRED: '<span class="badge">retired</span>'}[item.status]
-    verdict = ""
-    if item.fit_verdict in ("Perfect", "Good"):
-        verdict = f'<span class="badge ok">{item.fit_verdict.lower()}</span>'
-    elif item.fit_verdict in ("Too big", "Too small", "Wrong shape"):
-        verdict = f'<span class="badge no">{item.fit_verdict.lower()}</span>'
-
-    meta = " · ".join(b for b in [item.brand, item.size_label, item.fabric] if b)
+    detail = " · ".join(b for b in [item.garment, item.colour, item.fabric] if b)
+    sizes = item.size_line()
+    price = (f'<br><span class="price">{ui.money(item.price)}</span> estimated'
+             if item.status == ASPIRATIONAL and item.price else "")
     st.markdown(
         f'<div class="item"><div class="top"><div class="nm">{item.name or item.garment}</div>'
-        f'{badge}{verdict}</div>'
-        f'<div class="meta">{item.garment}{" · " + meta if meta else ""}<br>'
-        f'<span class="price">{ui.money(item.price) if item.price else "no price"}</span>'
-        f'{" · " + item.fit_note if item.fit_note else ""}</div></div>',
+        f'{badge}</div><div class="meta">{detail}'
+        f'{"<br>" + sizes if sizes else ""}{price}</div></div>',
         unsafe_allow_html=True,
     )
 
     with st.expander("Edit"):
+        garment, status = shape_row(item, f"e-{item.id}")
         with st.form(f"edit-{item.id}"):
-            edited = item_fields(item, f"e-{item.id}", inventory)
+            edited = item_fields(item, f"e-{item.id}", garment, status)
             new_photo = st.file_uploader("Replace photo", type=["png", "jpg", "jpeg", "webp"],
                                          key=f"ph-{item.id}")
             c1, c2 = st.columns(2)
@@ -515,7 +529,8 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             c1, c2, c3 = st.columns([3, 2, 1])
             name = c1.text_input("Name", placeholder="Camel wool overcoat")
             garment = c2.selectbox("Garment", GARMENTS, key="asp-garment")
-            price = c3.number_input("Price £", 0.0, 100000.0, 0.0, step=10.0, key="asp-price")
+            price = c3.number_input("Estimated price £", 0.0, 100000.0, 0.0, step=10.0,
+                                    key="asp-price")
             c4, c5, c6 = st.columns([2, 1, 2])
             colour = c4.text_input("Colour", placeholder="camel")
             colour_hex = c5.color_picker("Swatch", "#C19A6B", key="asp-hex")
