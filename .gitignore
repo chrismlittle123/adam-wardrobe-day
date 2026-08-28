@@ -20,3 +20,6 @@ generated/
 
 # macOS
 .DS_Store
+
+# Test snapshots
+.wardrobe-backups/

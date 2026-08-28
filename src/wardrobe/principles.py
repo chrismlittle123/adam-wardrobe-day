@@ -14,12 +14,12 @@ from pathlib import Path
 
 import tomli_w
 
+from . import paths
+
 from .gemini_text import generate_text
 from .philosophy import Answers, transcript
 from .profile import Profile
 from .prompts import appearance, physique
-
-DEFAULT_PATH = Path("principles.toml")
 
 GROUPS: tuple[str, ...] = ("Silhouette", "Colour", "Fabric", "Proportion", "Restraint", "Occasion")
 
@@ -54,11 +54,11 @@ class Principle:
 @dataclass
 class Principles:
     principles: list[Principle] = field(default_factory=list)
-    path: Path = DEFAULT_PATH
+    path: Path = field(default_factory=paths.principles)
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_PATH) -> "Principles":
-        path = Path(path)
+    def load(cls, path: Path | str | None = None) -> "Principles":
+        path = Path(path) if path else paths.principles()
         if not path.is_file():
             return cls(path=path)
         raw = tomllib.loads(path.read_text())

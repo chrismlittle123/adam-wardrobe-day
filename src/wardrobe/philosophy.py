@@ -13,13 +13,11 @@ from pathlib import Path
 
 import tomli_w
 
+from . import paths
 from .gemini_text import generate_text
 from .profile import Profile
 from .prompts import appearance, physique
 from .questions import ALL_QUESTIONS, SECTIONS, Question
-
-DEFAULT_ANSWERS_PATH = Path("style-answers.toml")
-DEFAULT_GUIDE_PATH = Path("STYLE-GUIDE.md")
 
 SYSTEM = """You are a personal stylist writing a wardrobe style guide for one man.
 
@@ -97,11 +95,11 @@ What you still need to know, and why each one would change the guide."""
 @dataclass
 class Answers:
     values: dict[str, str] = field(default_factory=dict)
-    path: Path = DEFAULT_ANSWERS_PATH
+    path: Path = field(default_factory=paths.answers)
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_ANSWERS_PATH) -> "Answers":
-        path = Path(path)
+    def load(cls, path: Path | str | None = None) -> "Answers":
+        path = Path(path) if path else paths.answers()
         if not path.is_file():
             return cls(path=path)
         raw = tomllib.loads(path.read_text())
@@ -179,10 +177,11 @@ def synthesise_guide(
     profile: Profile,
     answers: Answers,
     *,
-    out_path: Path = DEFAULT_GUIDE_PATH,
+    out_path: Path | None = None,
     temperature: float = 0.6,
 ) -> tuple[Path, str]:
     """Generate the guide and write it to disk. Returns (path, markdown)."""
+    out_path = Path(out_path) if out_path else paths.guide()
     markdown = generate_text(
         build_guide_prompt(profile, answers), system=SYSTEM, temperature=temperature
     )

@@ -20,8 +20,7 @@ from pathlib import Path
 
 import tomli_w
 
-DEFAULT_PATH = Path("wardrobe.toml")
-PHOTO_DIR = Path("inventory/photos")
+from . import paths
 
 OWNED, ASPIRATIONAL, RETIRED = "owned", "aspirational", "retired"
 STATUSES: tuple[str, ...] = (OWNED, ASPIRATIONAL, RETIRED)
@@ -184,11 +183,11 @@ class Item:
 @dataclass
 class Inventory:
     items: list[Item] = field(default_factory=list)
-    path: Path = DEFAULT_PATH
+    path: Path = field(default_factory=paths.inventory)
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_PATH) -> "Inventory":
-        path = Path(path)
+    def load(cls, path: Path | str | None = None) -> "Inventory":
+        path = Path(path) if path else paths.inventory()
         if not path.is_file():
             return cls(path=path)
         raw = tomllib.loads(path.read_text())
@@ -263,8 +262,9 @@ class Inventory:
         return f"{base}-{n}"
 
 
-def save_photo(item_id: str, uploaded, photo_dir: Path = PHOTO_DIR) -> str:
+def save_photo(item_id: str, uploaded, photo_dir: Path | None = None) -> str:
     """Write an uploaded photo next to the inventory. Returns the stored path."""
+    photo_dir = Path(photo_dir) if photo_dir else paths.photos()
     photo_dir.mkdir(parents=True, exist_ok=True)
     suffix = Path(getattr(uploaded, "name", "photo.png")).suffix.lower() or ".png"
     if suffix not in (".png", ".jpg", ".jpeg", ".webp"):

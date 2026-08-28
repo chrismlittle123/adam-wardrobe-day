@@ -78,6 +78,29 @@ estimates.
 
 Who he is lives in `profile.toml` and feeds every prompt.
 
+## Checking it works
+
+```bash
+uv run wardrobe-check              # 29 checks, about a second
+uv run wardrobe-check --live       # plus two real Vertex AI calls
+uv run pytest                      # the same checks, from CI
+uv run wardrobe-reset --yes        # clear the data, snapshot taken first
+uv run wardrobe-reset --yes --seed # clear, then refill with sample data
+```
+
+Or the **Diagnostics** tab in the app: run the checks, fill the wardrobe with
+realistic sample data, then clear it and put everything back.
+
+Every check runs inside a throwaway `WARDROBE_HOME`, so running the suite cannot
+touch the real wardrobe even if a check is wrong. `WARDROBE_HOME` is what makes
+that possible: every path in the app resolves through `paths.py`, which resolves
+through that variable.
+
+Clearing is reversible. Anything deleted is copied into
+`.wardrobe-backups/<timestamp>/` first, and any snapshot can be restored whole.
+The subject profile is left out of the default selection, because his height and
+skin tone are not test data.
+
 ## Status
 
 🚧 Early. The app runs; the wardrobe is empty until someone fills it in.

@@ -16,7 +16,10 @@ from pathlib import Path
 
 import streamlit as st
 
-from wardrobe import fitspec, inventory as inv_mod, principles as prin_mod, shopping, ui
+from wardrobe import (
+    checks as check_mod, fitspec, inventory as inv_mod, paths,
+    principles as prin_mod, reset as reset_mod, seed as seed_mod, shopping, ui,
+)
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
@@ -24,13 +27,12 @@ from wardrobe.inventory import (
     Inventory, Item, size_scheme,
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
-from wardrobe.philosophy import DEFAULT_GUIDE_PATH, Answers, build_guide_prompt, synthesise_guide
+from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import GROUPS, Principle, Principles
 from wardrobe.profile import Profile
 from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
 from wardrobe.questions import POINTS, SECTIONS, Question, format_points, parse_points
 
-LOOKS_DIR = Path("out/looks")
 GEMINI_ERRORS = (GeminiImageError, GeminiTextError)
 
 
@@ -67,6 +69,7 @@ def render() -> None:
     tabs = st.tabs([
         "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles",
         "4 · Outfit Generator", "5 · Outfit Gallery", "6 · Shopping Guide",
+        "⚙ Diagnostics",
     ])
     with tabs[0]:
         style_guide_tab(profile, answers)
@@ -80,6 +83,8 @@ def render() -> None:
         gallery_tab(inventory, outfits)
     with tabs[5]:
         shopping_tab(profile, inventory, outfits)
+    with tabs[6]:
+        diagnostics_tab()
 
 
 def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
@@ -211,13 +216,13 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
                 return
         st.rerun()
 
-    if DEFAULT_GUIDE_PATH.is_file():
-        markdown = DEFAULT_GUIDE_PATH.read_text()
-        when = dt.datetime.fromtimestamp(DEFAULT_GUIDE_PATH.stat().st_mtime)
+    if paths.guide().is_file():
+        markdown = paths.guide().read_text()
+        when = dt.datetime.fromtimestamp(paths.guide().stat().st_mtime)
         st.markdown(
-            f'<div class="look-cap">{DEFAULT_GUIDE_PATH} &middot; {when:%d %b %H:%M} '
+            f'<div class="look-cap">{paths.guide()} &middot; {when:%d %b %H:%M} '
             f'&middot; {len(markdown.split())} words</div>', unsafe_allow_html=True)
-        st.download_button("Download markdown", markdown, DEFAULT_GUIDE_PATH.name, "text/markdown")
+        st.download_button("Download markdown", markdown, paths.guide().name, "text/markdown")
         st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>', unsafe_allow_html=True)
 
 
@@ -464,7 +469,7 @@ def principles_tab(profile: Profile, answers: Answers, principles: Principles) -
                      "or write them by hand below.")
 
     if generate:
-        guide = DEFAULT_GUIDE_PATH.read_text() if DEFAULT_GUIDE_PATH.is_file() else ""
+        guide = paths.guide().read_text() if paths.guide().is_file() else ""
         with st.spinner("Thinking…"):
             try:
                 fresh = prin_mod.generate(profile, answers, guide, int(count))
@@ -603,7 +608,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             try:
                 paths = generate_images(
                     prompt,
-                    out_prefix=LOOKS_DIR / f"{stamp}-{slug(title)}",
+                    out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
                     reference_images=[portrait, *photos[:4]],
                     count=int(count),
                     settings=Settings.from_env(),
@@ -848,7 +853,14 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
             f'{step.cumulative_unlocked} outfit(s), {ui.money(step.cost_per_outfit or 0)} each'
             f'</div></div>', unsafe_allow_html=True)
 
-    if plan.skipped_for_budget:
+    if plan.shortfall_items:
+        pieces = " + ".join(i.name or i.garment for i in plan.shortfall_items)
+        st.info(
+            f"Nothing completes an outfit within this budget. The cheapest that would is "
+            f"**{pieces}** at {ui.money(plan.shortfall_cost)}, so you are "
+            f"{ui.money(plan.shortfall)} short."
+        )
+    elif plan.skipped_for_budget:
         st.info(f"Out of budget: {', '.join(o.name for o in plan.skipped_for_budget)}.")
     elif plan.still_blocked:
         st.info(f"Still blocked: {', '.join(o.name for o in plan.still_blocked)}.")
@@ -899,6 +911,143 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
     if starred_total:
         st.markdown(f'<div class="look-cap">Starred total: '
                     f'<b>{ui.money(starred_total)}</b></div>', unsafe_allow_html=True)
+
+
+# --- diagnostics --------------------------------------------------------------
+
+def diagnostics_tab() -> None:
+    ui.blurb(
+        "Prove it works, fill it with something realistic to play with, then put it "
+        "back exactly as it was. Every check runs in a throwaway directory of its own, "
+        "so running them cannot touch this wardrobe even if a check is wrong."
+    )
+    where = paths.home().resolve()
+    st.markdown(
+        f'<div class="look-cap">Data lives in <b>{where}</b>'
+        f'{" · scratch directory" if paths.is_scratch() else ""}</div>',
+        unsafe_allow_html=True)
+
+    checks_panel()
+    sample_panel()
+    reset_panel()
+    snapshots_panel()
+
+
+def checks_panel() -> None:
+    ui.eyebrow("Checks")
+    offline = [g for g in check_mod.GROUPS if g != check_mod.LIVE]
+    c1, c2 = st.columns([3, 1])
+    groups = c1.multiselect("Groups", offline, default=offline, key="chk-groups")
+    live = c2.toggle("Include live Gemini", key="chk-live",
+                     help="Two real calls to Vertex AI: one for text, one for an image. "
+                          "Slow, and it costs money.")
+    if st.button("Run checks", type="primary"):
+        wanted = list(groups) + ([check_mod.LIVE] if live else [])
+        with st.spinner("Running…"):
+            st.session_state["check_result"] = check_mod.run(wanted, live=live)
+
+    result = st.session_state.get("check_result")
+    if not result:
+        return
+
+    ui.stats([
+        ("Passed", f"{result.passed}/{len(result.checks)}"),
+        ("Failed", str(len(result.failed))),
+        ("Seconds", f"{result.seconds:g}"),
+    ], brass_first=result.ok)
+    if result.ok:
+        st.success(f"All {len(result.checks)} checks passed.")
+    else:
+        st.error(f"{len(result.failed)} check(s) failed.")
+
+    for group, group_checks in result.by_group().items():
+        rows = [{
+            "": '<span class="badge ok">pass</span>' if c.passed
+                else '<span class="badge no">fail</span>',
+            "Check": c.name,
+            "Result": c.detail,
+            "Time": f"{c.seconds:.2f}s",
+        } for c in group_checks]
+        st.markdown(f'<div class="look-cap">{group}</div>', unsafe_allow_html=True)
+        ui.table(rows, numeric=("Time",))
+
+    for failure in result.failed:
+        with st.expander(f"Traceback · {failure.name}"):
+            st.code(failure.trace or failure.detail, language=None)
+
+
+def sample_panel() -> None:
+    ui.eyebrow("Sample data")
+    counts = (f"{len(seed_mod.ITEMS)} items, {len(seed_mod.LOOKS)} outfits, "
+              f"{len(seed_mod.ANSWERS)} answers, {len(seed_mod.PRINCIPLES)} principles")
+    ui.blurb(
+        f"Fills the wardrobe with {counts}, arranged so the shopping maths has "
+        "something real to chew on: three outfits blocked by the same two garments, "
+        "one blocked by a single expensive coat. A snapshot is taken first."
+    )
+    if st.button("Fill with sample data"):
+        reset_mod.snapshot()
+        added = seed_mod.seed_all()
+        st.success("Added " + ", ".join(f"{v} {k}" for k, v in added.items())
+                   + ". A snapshot was taken first.")
+        st.rerun()
+
+
+def reset_panel() -> None:
+    ui.eyebrow("Clear the data")
+    here = reset_mod.present()
+    if not here:
+        ui.empty("Nothing stored. Already back where you started.")
+        return
+
+    ui.blurb(
+        "Everything selected is copied into a snapshot before it is deleted, so this "
+        "is reversible. The subject profile is unticked by default: his height and "
+        "skin tone are not test data."
+    )
+    chosen: list[str] = []
+    columns = st.columns(3)
+    for n, (key, label) in enumerate(paths.DATA.items()):
+        summary = here.get(key)
+        with columns[n % 3]:
+            ticked = st.checkbox(
+                f"{label}" + (f" · {summary}" if summary else " · empty"),
+                value=key in paths.DEFAULT_CLEAR and bool(summary),
+                disabled=not summary, key=f"clr-{key}")
+        if ticked and summary:
+            chosen.append(key)
+
+    c1, c2 = st.columns([1, 2])
+    confirmed = c1.checkbox("I am sure", key="clr-confirm")
+    if c2.button("Clear selected", type="primary", disabled=not (chosen and confirmed)):
+        snap, removed = reset_mod.wipe(chosen)
+        st.success(
+            f"Cleared {', '.join(paths.DATA[k].lower() for k in removed)}. "
+            + (f"Snapshot {snap.label} kept, restore it below." if snap else ""))
+        st.rerun()
+    if chosen and not confirmed:
+        st.caption("Tick “I am sure” to enable the button.")
+
+
+def snapshots_panel() -> None:
+    ui.eyebrow("Snapshots")
+    taken = reset_mod.snapshots()
+    if not taken:
+        ui.empty("No snapshots yet. One is taken automatically before anything is cleared.")
+        return
+    for snap in taken[:12]:
+        c1, c2, c3 = st.columns([4, 1, 1])
+        c1.markdown(
+            f'<div class="look-cap">{snap.label} &middot; {snap.size} &middot; '
+            f'{", ".join(paths.DATA.get(k, k).lower() for k in snap.keys)}</div>',
+            unsafe_allow_html=True)
+        if c2.button("Restore", key=f"res-{snap.path.name}", type="secondary"):
+            restored = reset_mod.restore(snap)
+            st.success(f"Restored {len(restored)} item(s) from {snap.label}.")
+            st.rerun()
+        if c3.button("Delete", key=f"del-{snap.path.name}", type="secondary"):
+            reset_mod.forget(snap)
+            st.rerun()
 
 
 def main() -> int:

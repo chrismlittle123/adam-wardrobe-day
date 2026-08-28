@@ -19,7 +19,9 @@ that is counted.
 
 A budget does not stop the plan, it filters it: unaffordable bundles are skipped
 and the next best affordable one is taken, so a small budget still returns the
-best thing it can actually buy.
+best thing it can actually buy. When the budget cannot reach any bundle at all,
+an empty plan would read as a crash, so the plan instead reports the cheapest
+bundle it could not afford and how far short the money fell.
 """
 
 from __future__ import annotations
@@ -83,6 +85,17 @@ class Plan:
     leverage: list[Leverage] = field(default_factory=list)
     budget: float | None = None
     skipped_for_budget: list[Outfit] = field(default_factory=list)
+    # Set only when the budget could not reach a single bundle: the cheapest one
+    # available, so the answer is "you are £70 short of X" and not silence.
+    shortfall_items: list[Item] = field(default_factory=list)
+    shortfall_cost: float = 0.0
+
+    @property
+    def shortfall(self) -> float:
+        """How much more money the cheapest reachable bundle needs."""
+        if not self.shortfall_items or self.budget is None:
+            return 0.0
+        return round(max(0.0, self.shortfall_cost - (self.budget - self.total_cost)), 2)
 
     @property
     def total_cost(self) -> float:
@@ -181,8 +194,20 @@ def purchase_plan(
                 best = (ratio, cost, outfit, bundle, unlocked)
 
         if best is None:
-            # Everything left is out of budget.
+            # Everything left is out of budget. Say by how much, rather than
+            # returning an empty plan that reads as a failure.
             plan.skipped_for_budget = list(remaining)
+            cheapest: tuple[float, list[Item]] | None = None
+            for outfit in remaining:
+                bundle = _missing_ids(outfit, inventory, acquired)
+                if not bundle:
+                    continue
+                cost = round(sum(_price(inventory, i) for i in bundle), 2)
+                if cheapest is None or cost < cheapest[0]:
+                    items = [i for i in (inventory.by_id(x) for x in bundle) if i]
+                    cheapest = (cost, sorted(items, key=lambda i: -i.price))
+            if cheapest:
+                plan.shortfall_cost, plan.shortfall_items = cheapest
             break
 
         _, cost, target, bundle, unlocked = best

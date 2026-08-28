@@ -15,9 +15,9 @@ from pathlib import Path
 
 import tomli_w
 
-from .inventory import ASPIRATIONAL, Inventory, Item
+from . import paths
 
-DEFAULT_PATH = Path("outfits.toml")
+from .inventory import ASPIRATIONAL, Inventory, Item
 
 # Starting tags. Anything typed in the gallery joins the list for next time.
 SEED_TAGS: tuple[str, ...] = (
@@ -59,11 +59,11 @@ class Wearability:
 @dataclass
 class Outfits:
     outfits: list[Outfit] = field(default_factory=list)
-    path: Path = DEFAULT_PATH
+    path: Path = field(default_factory=paths.outfits)
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_PATH) -> "Outfits":
-        path = Path(path)
+    def load(cls, path: Path | str | None = None) -> "Outfits":
+        path = Path(path) if path else paths.outfits()
         if not path.is_file():
             return cls(path=path)
         raw = tomllib.loads(path.read_text())

@@ -15,6 +15,11 @@ dependencies = [
 [project.scripts]
 gemini-image = "wardrobe.gemini_image:main"
 wardrobe-app = "wardrobe.app:main"
+wardrobe-check = "wardrobe.cli:check"
+wardrobe-reset = "wardrobe.cli:clear"
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["hatchling"]

@@ -16,9 +16,8 @@ from pathlib import Path
 
 import tomli_w
 
+from . import paths
 from .fitspec import Body
-
-DEFAULT_PROFILE_PATH = Path("profile.toml")
 
 CM_PER_INCH = 2.54
 
@@ -61,11 +60,11 @@ class Profile:
     photos: dict[str, str] = field(default_factory=dict)
     measurements: Body = field(default_factory=Body)
     style: Style = field(default_factory=Style)
-    path: Path = DEFAULT_PROFILE_PATH
+    path: Path = field(default_factory=paths.profile)
 
     @classmethod
-    def load(cls, path: Path | str = DEFAULT_PROFILE_PATH) -> "Profile":
-        path = Path(path)
+    def load(cls, path: Path | str | None = None) -> "Profile":
+        path = Path(path) if path else paths.profile()
         if not path.is_file():
             raise FileNotFoundError(
                 f"No subject profile at {path}. Copy profile.toml from the repo root, "
