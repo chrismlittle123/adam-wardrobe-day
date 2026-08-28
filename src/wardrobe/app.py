@@ -19,8 +19,16 @@ import streamlit as st
 from PIL import Image
 
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
+from wardrobe.gemini_text import GeminiTextError
+from wardrobe.philosophy import (
+    DEFAULT_GUIDE_PATH,
+    Answers,
+    build_guide_prompt,
+    synthesise_guide,
+)
 from wardrobe.profile import Profile
 from wardrobe.prompts import BACKGROUNDS, SHOTS, build_prompt
+from wardrobe.questions import SECTIONS
 
 LOOKS_DIR = Path("out/looks")
 
@@ -158,6 +166,53 @@ label, .stSlider label, .stSelectbox label {
   color: var(--muted); font-size: .9rem;
 }
 
+
+/* Tabs -------------------------------------------------------------------- */
+.stTabs [data-baseweb="tab-list"] { gap: 2rem; border-bottom: 1px solid var(--line); }
+.stTabs [data-baseweb="tab"] {
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--muted); background: transparent;
+  padding: .3rem 0 .8rem;
+}
+.stTabs [aria-selected="true"] { color: var(--brass) !important; }
+.stTabs [data-baseweb="tab-highlight"] { background: var(--brass); }
+
+/* Progress meter ---------------------------------------------------------- */
+.meter { margin: 0 0 1.8rem; }
+.meter .track { height: 2px; background: rgba(240,230,219,.12); position: relative; }
+.meter .fill { height: 2px; background: var(--brass); }
+.meter .read {
+  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); display: flex;
+  justify-content: space-between; padding-bottom: .5rem;
+}
+.meter .read b { color: var(--cream); font-weight: 500; }
+
+/* Questionnaire ----------------------------------------------------------- */
+.sec-blurb { color: var(--muted); font-size: .86rem; line-height: 1.6; margin: 0 0 1.4rem; }
+.q-mark {
+  font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--brass); border: 1px solid var(--line);
+  padding: .12rem .45rem; margin-left: .6rem; vertical-align: 2px;
+}
+.sec-count {
+  font-family: 'IBM Plex Mono', monospace; font-size: .66rem; color: var(--muted);
+  letter-spacing: .14em;
+}
+.guide-body { background: var(--panel); border: 1px solid var(--line); padding: 1.8rem 2rem; }
+.guide-body h1 {
+  font-family: 'Bodoni Moda', Georgia, serif; font-weight: 400; font-size: 2.1rem;
+  margin: 0 0 1.2rem;
+}
+.guide-body h2 {
+  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; letter-spacing: .2em;
+  text-transform: uppercase; color: var(--brass); margin: 2rem 0 .8rem;
+}
+.guide-body table { border-collapse: collapse; width: 100%; font-size: .86rem; }
+.guide-body th, .guide-body td {
+  border-bottom: 1px solid var(--line); padding: .5rem .6rem; text-align: left;
+}
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 """
@@ -241,6 +296,16 @@ def saved_looks() -> list[Path]:
 
 # --- the page ----------------------------------------------------------------
 
+def meter(done: int, total: int, label: str) -> None:
+    pct = round(100 * done / total) if total else 0
+    st.markdown(
+        f'<div class="meter"><div class="read"><span>{label}</span>'
+        f'<span><b>{done}</b> of {total}</span></div>'
+        f'<div class="track"><div class="fill" style="width:{pct}%"></div></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def render() -> None:
     st.set_page_config(page_title="Wardrobe Studio", page_icon="👔", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
@@ -250,13 +315,25 @@ def render() -> None:
     except FileNotFoundError as exc:
         st.error(str(exc))
         st.stop()
+    answers = Answers.load()
 
     st.markdown(
         '<div class="masthead"><h1>Wardrobe <em>Studio</em></h1>'
-        '<div class="sub">Describe a look &middot; see it on him &middot; keep the ones that work</div></div>',
+        '<div class="sub">Answer the questions &middot; build the guide &middot; '
+        'see it on him</div></div>',
         unsafe_allow_html=True,
     )
 
+    studio, philosophy, guide = st.tabs(["Studio", "Philosophy", "Style guide"])
+    with studio:
+        studio_tab(profile)
+    with philosophy:
+        philosophy_tab(answers)
+    with guide:
+        guide_tab(profile, answers)
+
+
+def studio_tab(profile: Profile) -> None:
     left, right = st.columns([5, 7], gap="large")
 
     with left:
@@ -279,6 +356,94 @@ def render() -> None:
     st.write("")
     st.markdown('<div class="eyebrow">Looks</div>', unsafe_allow_html=True)
     gallery()
+
+
+def philosophy_tab(answers: Answers) -> None:
+    st.markdown('<div class="eyebrow">Philosophy</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<p class="sec-blurb">Everything here feeds the style guide. Nothing is '
+        'compulsory; the guide names its own gaps. Answer in full sentences, and be '
+        'specific: "the three black going-out shirts" is worth more than "some shirts". '
+        'Each section saves on its own.</p>',
+        unsafe_allow_html=True,
+    )
+
+    core_only = st.toggle(
+        "Core questions only", value=answers.is_empty(),
+        help="The shorter path: 28 questions instead of 40. The rest deepen the guide.",
+    )
+    done, total = answers.progress(core_only=core_only)
+    meter(done, total, "Core answered" if core_only else "Answered")
+
+    for section in SECTIONS:
+        questions = [q for q in section.questions if q.core or not core_only]
+        if not questions:
+            continue
+        filled = sum(1 for q in questions if answers.get(q.id))
+        mark = "✓" if filled == len(questions) else f"{filled}/{len(questions)}"
+        with st.expander(f"{section.title}  ·  {mark}", expanded=filled == 0):
+            st.markdown(f'<p class="sec-blurb">{section.blurb}</p>', unsafe_allow_html=True)
+            with st.form(f"sec-{section.id}"):
+                draft: dict[str, str] = {}
+                for q in questions:
+                    label = q.prompt + ("  ⟡ core five" if q.spine else "")
+                    draft[q.id] = st.text_area(
+                        label,
+                        value=answers.get(q.id),
+                        placeholder=q.placeholder,
+                        help=q.help or None,
+                        height=max(68, q.lines * 27),
+                        key=f"a-{q.id}",
+                    )
+                if st.form_submit_button(f"Save {section.title.lower()}"):
+                    answers.values.update(draft)
+                    answers.save()
+                    st.success(f"Saved to {answers.path}")
+                    st.rerun()
+
+
+def guide_tab(profile: Profile, answers: Answers) -> None:
+    st.markdown('<div class="eyebrow">Style guide</div>', unsafe_allow_html=True)
+    done, total = answers.progress()
+    meter(done, total, "Built from")
+
+    left, right = st.columns([3, 1], gap="large")
+    with left:
+        if done == 0:
+            st.markdown(
+                '<div class="empty">Nothing to build from yet. Answer a few questions '
+                'in Philosophy first.</div>', unsafe_allow_html=True)
+        elif done < 8:
+            st.warning(
+                f"Only {done} answers so far. The guide will be thin and will spend most "
+                "of its length listing what it still needs to know."
+            )
+    with right:
+        build = st.button("Build style guide", type="primary", disabled=done == 0)
+
+    with st.expander("Prompt sent to Gemini"):
+        st.code(build_guide_prompt(profile, answers), language=None)
+
+    if build:
+        with st.spinner("Writing the guide…"):
+            try:
+                path, markdown = synthesise_guide(profile, answers)
+            except (GeminiTextError, GeminiImageError) as exc:
+                st.error(str(exc))
+                return
+        st.success(f"Written to {path}")
+        st.rerun()
+
+    if DEFAULT_GUIDE_PATH.is_file():
+        markdown = DEFAULT_GUIDE_PATH.read_text()
+        when = dt.datetime.fromtimestamp(DEFAULT_GUIDE_PATH.stat().st_mtime)
+        st.markdown(
+            f'<div class="look-cap">{DEFAULT_GUIDE_PATH} &middot; '
+            f'{when:%d %b %H:%M} &middot; {len(markdown.split())} words</div>',
+            unsafe_allow_html=True,
+        )
+        st.download_button("Download markdown", markdown, DEFAULT_GUIDE_PATH.name, "text/markdown")
+        st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>', unsafe_allow_html=True)
 
 
 def edit_panel(profile: Profile) -> None:
