@@ -74,7 +74,7 @@ def render() -> None:
     with tabs[0]:
         style_guide_tab(profile, answers)
     with tabs[1]:
-        inventory_tab(profile, inventory)
+        inventory_tab(profile, inventory, outfits)
     with tabs[2]:
         principles_tab(profile, answers, principles)
     with tabs[3]:
@@ -340,7 +340,7 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     return item
 
 
-def inventory_tab(profile: Profile, inventory: Inventory) -> None:
+def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
     counts = inventory.counts()
     value = shopping.wardrobe_value(inventory)
     ui.stats([
@@ -398,10 +398,10 @@ def inventory_tab(profile: Profile, inventory: Inventory) -> None:
     for chunk in (found[i:i + 3] for i in range(0, len(found), 3)):
         for col, item in zip(st.columns(3, gap="medium"), chunk):
             with col:
-                item_card(item, inventory)
+                item_card(item, inventory, outfits)
 
 
-def item_card(item: Item, inventory: Inventory) -> None:
+def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
     if item.has_photo:
         ui.plate(Path(item.photo), width=420)
     else:
@@ -422,6 +422,11 @@ def item_card(item: Item, inventory: Inventory) -> None:
     )
 
     with st.expander("Edit"):
+        used = outfits.using(item.id)
+        if used:
+            st.caption(f"Worn in {len(used)} outfit(s): "
+                       f"{', '.join(o.name for o in used[:3])}"
+                       f"{'…' if len(used) > 3 else ''}. Deleting takes it out of them.")
         garment, status = shape_row(item, f"e-{item.id}")
         with st.form(f"edit-{item.id}"):
             edited = item_fields(item, f"e-{item.id}", garment, status)
@@ -440,6 +445,10 @@ def item_card(item: Item, inventory: Inventory) -> None:
                 inventory.save()
                 st.rerun()
             if delete:
+                # Cascade, or the outfits keep an id that resolves to nothing and
+                # quietly report themselves as wearable.
+                if outfits.forget_item(item.id):
+                    outfits.save()
                 inv_mod.drop_photo(item)
                 inventory.remove(item.id)
                 inventory.save()
@@ -673,8 +682,12 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
         ui.empty("No image")
 
     w = wearability(outfit, inventory)
-    badge = ('<span class="badge ok">wearable now</span>' if w.wearable
-             else f'<span class="badge want">{len(w.missing)} to buy</span>')
+    if w.broken:
+        badge = '<span class="badge no">broken</span>'
+    elif w.wearable:
+        badge = '<span class="badge ok">wearable now</span>'
+    else:
+        badge = f'<span class="badge want">{len(w.missing)} to buy</span>'
     pieces = ", ".join(i.name or i.garment for i in inventory.resolve(outfit.item_ids))
     tag_line = " ".join(f'<span class="badge">{t}</span>' for t in outfit.tags)
     st.markdown(
@@ -714,6 +727,9 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
                 outfits.save()
                 st.rerun()
 
+    if w.broken:
+        st.markdown(f'<div class="look-cap">Cannot be worn: {w.fault}. Edit it to swap '
+                    f'the piece out.</div>', unsafe_allow_html=True)
     if w.missing:
         st.markdown(
             '<div class="look-cap">Missing: ' +
@@ -827,6 +843,12 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
                              key="sh-budget") if use_budget else None
 
     plan = shopping.purchase_plan(outfits, inventory, loved_only=loved_only, budget=budget)
+    if plan.broken:
+        st.warning(
+            f"{len(plan.broken)} outfit(s) left out of the plan because money cannot fix "
+            "them: " + "; ".join(f"**{o.name}** ({shopping.wearability(o, inventory).fault})"
+                                 for o in plan.broken[:4]) + "."
+        )
     if not plan.blocked:
         ui.empty("Every outfit under consideration is already wearable. "
                  "Nothing to buy, which is the best possible answer.")

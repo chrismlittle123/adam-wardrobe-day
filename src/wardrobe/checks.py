@@ -207,6 +207,25 @@ def check_break_and_flat() -> str:
     return f"no break {no_break['inseam']}, full {full['inseam']}; flat = round / 2"
 
 
+def check_build_matching() -> str:
+    """A build reading "very lean and athletic" must not be treated as plain lean.
+
+    The two rows differ by 3 cm of chest, which is most of a jacket size.
+    """
+    from .fitspec import BUILD_FACTORS, _build_key, estimate
+    assert _build_key("very lean and athletic, narrow waist") == "lean athletic", \
+        "'lean and athletic' fell through to a single-word row"
+    assert _build_key("lean") == "lean" and _build_key("athletic") == "athletic"
+    assert _build_key("solid") == "solid" and _build_key("") == "athletic"
+    for key in ("lean", "lean athletic", "athletic", "average", "solid"):
+        assert key in BUILD_FACTORS, f"{key} has no factors"
+    both = estimate(176, "very lean and athletic")
+    just_lean = estimate(176, "lean")
+    assert both["chest"] > just_lean["chest"], "athletic chest not applied"
+    assert _near(both["waist"], just_lean["waist"]), "lean waist not applied"
+    return f"lean-athletic chest {both['chest']} with a lean waist {both['waist']}"
+
+
 def check_estimated_flag() -> str:
     from .fitspec import Body, target_spec
     body = Body(chest=96)   # chest measured, everything else not
@@ -241,6 +260,65 @@ def check_size_schemes() -> str:
     assert {"uk", "eu", "us"} <= set(keyed["Loafers"]), "shoes need all three systems"
     assert keyed["Bag"] == [], "a bag has no size"
     return "shirt/blazer/trouser/shoe schemes all distinct"
+
+
+def check_size_pruning() -> str:
+    """Re-classifying a garment must not leave the old scheme's sizes behind."""
+    from .inventory import Inventory, Item
+    inventory = Inventory.load()
+    item = inventory.add(Item(name="Was a shirt", garment="Shirt",
+                              sizes={"collar": '15.5"', "alpha": "M", "cut": "—"}))
+    inventory.save()
+    assert "cut" not in Inventory.load().by_id(item.id).sizes, "placeholder value kept"
+
+    item.garment = "Trousers"
+    item.sizes["waist"] = '31"'
+    inventory.update(item)
+    inventory.save()
+    after = Inventory.load().by_id(item.id)
+    assert "collar" not in after.sizes, f"stale shirt sizes survived: {after.sizes}"
+    assert after.sizes.get("waist") == '31"', "the new size was lost"
+    return f"collar dropped on re-classification, left with {after.sizes}"
+
+
+def check_photo_limits() -> str:
+    """Uploads are bounded and re-encoded, or a phone photo ends up in the repo."""
+    import io as _io
+
+    from PIL import Image
+
+    from .inventory import MAX_UPLOAD_BYTES, save_photo
+
+    class Upload:
+        def __init__(self, name, data):
+            self.name, self._data = name, data
+
+        def getvalue(self):
+            return self._data
+
+    buffer = _io.BytesIO()
+    Image.new("RGB", (4000, 3000), (200, 120, 90)).save(buffer, "PNG")
+    stored = Path(save_photo("huge", Upload("huge.png", buffer.getvalue())))
+    assert stored.is_file(), "nothing written"
+    assert stored.stat().st_size < 1_000_000, \
+        f"stored photo is {stored.stat().st_size / 1024:.0f} KB, not downscaled"
+    with Image.open(stored) as written:
+        assert max(written.size) <= 1600, f"not resized: {written.size}"
+
+    try:
+        save_photo("bomb", Upload("bomb.png", b"\x89PNG" + b"\x00" * (MAX_UPLOAD_BYTES + 1)))
+    except ValueError as exc:
+        assert "limit" in str(exc).lower(), f"unhelpful refusal: {exc}"
+    else:
+        raise AssertionError("an oversized upload was accepted")
+
+    try:
+        save_photo("junk", Upload("junk.png", b"this is not an image"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a non-image was accepted")
+    return f"4000px re-encoded to {stored.stat().st_size // 1024} KB; oversize and junk refused"
 
 
 def check_size_line_and_category() -> str:
@@ -366,6 +444,69 @@ def check_leverage() -> str:
     return f"coat finishes 1 alone; flannels block 3 but finish none"
 
 
+def check_deleted_garment_breaks_outfit() -> str:
+    """Deleting a garment must break its outfits loudly, not silently.
+
+    Resolving a dangling id away would make an outfit report itself wearable the
+    moment one of its pieces was deleted, which is the opposite of true.
+    """
+    from .inventory import Inventory
+    from .outfits import Outfits, wearability
+    inventory, outfits = _seeded()
+    rain = next(o for o in outfits.outfits if o.name.startswith("Rain"))
+    coat = next(i for i in inventory.items if i.name == "Camel wool overcoat")
+    assert not wearability(rain, inventory).wearable, "fixture outfit should start blocked"
+
+    inventory.remove(coat.id)
+    inventory.save()
+    after = wearability(rain, Inventory.load())
+    assert not after.wearable, "outfit became wearable when its coat was deleted"
+    assert after.dangling == [coat.id], f"dangling id not reported: {after.dangling}"
+    assert after.broken and "deleted" in after.fault, "fault not explained"
+
+    touched = outfits.forget_item(coat.id)
+    assert rain.id in {o.id for o in touched}, "cascade missed the outfit"
+    assert coat.id not in rain.item_ids, "id survived the cascade"
+    return f"deletion detected, {len(touched)} outfit(s) cleaned up"
+
+
+def check_retired_never_bought() -> str:
+    """A retired garment is not owned, but nobody should be told to buy it back."""
+    from .inventory import Inventory, RETIRED
+    from .shopping import item_leverage, purchase_plan
+    inventory, outfits = _seeded()
+    loafers = next(i for i in inventory.items if i.name == "Brown suede loafers")
+    loafers.status = RETIRED
+    inventory.update(loafers)
+    inventory.save()
+
+    inventory, outfits = Inventory.load(), outfits
+    plan = purchase_plan(outfits, inventory)
+    names = {i.name for i in plan.items_to_buy}
+    assert "Brown suede loafers" not in names, "plan wants to re-buy a retired garment"
+    assert plan.broken, "outfits containing a retired piece were not flagged"
+    assert all(r.item.status != RETIRED for r in plan.leverage), "retired piece in the leverage table"
+    assert all(o not in plan.blocked for o in plan.broken), "a broken outfit is also counted as blocked"
+    return f"{len(plan.broken)} outfit(s) flagged as broken, none plan a retired piece"
+
+
+def check_empty_outfit_not_wearable() -> str:
+    """An outfit with nothing in it must not count towards "wearable now"."""
+    from .inventory import Inventory
+    from .outfits import Outfit, Outfits, wearability
+    from .shopping import purchase_plan
+    inventory, outfits = _seeded()
+    blank = outfits.add(Outfit(name="Nothing at all", item_ids=[], loved=True))
+    outfits.save()
+    w = wearability(blank, inventory)
+    assert not w.wearable, "an empty outfit reported itself wearable"
+    assert w.broken and "no garments" in w.fault, "empty outfit not explained"
+    plan = purchase_plan(Outfits.load(), inventory)
+    assert blank.id not in {o.id for o in plan.wearable_now}, "empty outfit inflated the count"
+    assert blank.id in {o.id for o in plan.broken}, "empty outfit not flagged as broken"
+    return "empty outfit excluded from wearable and flagged"
+
+
 def check_wearability() -> str:
     from .outfits import wearability
     inventory, outfits = _seeded()
@@ -471,6 +612,19 @@ def check_diagnostics_renders() -> str:
     return f"{len(labels)} reset checkboxes, confirmation and restore present"
 
 
+def check_snapshots_do_not_collide() -> str:
+    """Two wipes inside the same second must not share a directory."""
+    from . import reset
+    _seeded()
+    first = reset.snapshot(["inventory"])
+    second = reset.snapshot(["outfits"])
+    assert first and second, "snapshot returned nothing"
+    assert first.path != second.path, "the second snapshot overwrote the first"
+    assert len(reset.snapshots()) >= 2, "only one snapshot is listed"
+    assert first.keys == ["inventory"] and second.keys == ["outfits"], "keys got mixed up"
+    return f"{first.path.name} and {second.path.name} kept apart"
+
+
 def check_reset_round_trip() -> str:
     from .inventory import Inventory
     from . import reset
@@ -526,9 +680,12 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (FIT, "Blazer sleeve leaves cuff showing", check_cuff_allowance),
     (FIT, "Trouser break and flat measurements", check_break_and_flat),
     (FIT, "Estimated and measured told apart", check_estimated_flag),
+    (FIT, "Lean and athletic is not read as lean", check_build_matching),
     (INVENTORY, "Garments and categories alphabetical", check_alphabetical),
     (INVENTORY, "Each garment has its own size scheme", check_size_schemes),
     (INVENTORY, "Size line hides blanks and junk", check_size_line_and_category),
+    (INVENTORY, "Stale sizes pruned on re-classification", check_size_pruning),
+    (INVENTORY, "Photo uploads are bounded and downscaled", check_photo_limits),
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
@@ -537,6 +694,9 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (MATHS, "A budget filters rather than halts", check_budget_filters_not_halts),
     (MATHS, "Leverage counts appearances and solo unlocks", check_leverage),
     (MATHS, "Wearability splits owned from to-buy", check_wearability),
+    (MATHS, "An empty outfit is not wearable", check_empty_outfit_not_wearable),
+    (MATHS, "Deleting a garment breaks its outfits", check_deleted_garment_breaks_outfit),
+    (MATHS, "Retired pieces are never bought back", check_retired_never_bought),
     (PROMPTS, "Subject reaches the image prompt", check_subject_in_prompt),
     (PROMPTS, "Outfit prompt carries garments and photo roles", check_outfit_prompt),
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
@@ -544,6 +704,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
     (APP, "Wipe and restore round trip", check_reset_round_trip),
+    (APP, "Snapshots in the same second stay apart", check_snapshots_do_not_collide),
     (LIVE, "Gemini returns text", check_live_text),
     (LIVE, "Gemini returns an image", check_live_image),
 )

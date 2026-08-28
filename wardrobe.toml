@@ -1,0 +1,294 @@
+[[items]]
+id = "white-cotton-tee"
+name = "White cotton tee"
+category = "Top"
+garment = "T-shirt"
+colour = "white"
+colour_hex = "#F4F2ED"
+fabric = "heavy jersey"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+alpha = "M"
+cut = "Regular"
+
+[[items]]
+id = "cream-camp-collar-shirt"
+name = "Cream camp-collar shirt"
+category = "Top"
+garment = "Shirt"
+colour = "cream"
+colour_hex = "#F2E9D8"
+fabric = "cotton"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+collar = "15.5\""
+alpha = "M"
+cut = "Regular"
+
+[[items]]
+id = "pale-blue-oxford"
+name = "Pale blue oxford"
+category = "Top"
+garment = "Shirt"
+colour = "pale blue"
+colour_hex = "#BFD3E6"
+fabric = "oxford cotton"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+collar = "15.5\""
+alpha = "M"
+cut = "Regular"
+
+[[items]]
+id = "dark-indigo-jeans"
+name = "Dark indigo jeans"
+category = "Bottom"
+garment = "Jeans"
+colour = "indigo"
+colour_hex = "#2B3A4F"
+fabric = "13oz denim"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+waist = "31\""
+leg = "32\""
+cut = "Slim"
+
+[[items]]
+id = "navy-merino-crewneck"
+name = "Navy merino crewneck"
+category = "Top"
+garment = "Knitwear"
+colour = "navy"
+colour_hex = "#26303F"
+fabric = "merino wool"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+alpha = "M"
+cut = "Regular"
+
+[[items]]
+id = "white-leather-trainers"
+name = "White leather trainers"
+category = "Shoes"
+garment = "Trainers"
+colour = "white"
+colour_hex = "#EDEAE3"
+fabric = "leather"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+uk = "9"
+eu = "43"
+width = "Standard"
+
+[[items]]
+id = "black-chelsea-boots"
+name = "Black Chelsea boots"
+category = "Shoes"
+garment = "Boots"
+colour = "black"
+colour_hex = "#1B1918"
+fabric = "calf leather"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+uk = "9"
+eu = "43"
+width = "Standard"
+
+[[items]]
+id = "navy-hopsack-blazer"
+name = "Navy hopsack blazer"
+category = "Outerwear"
+garment = "Blazer"
+colour = "navy"
+colour_hex = "#232C3B"
+fabric = "wool hopsack"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+chest = "38\""
+length = "Regular"
+eu = "48"
+cut = "Slim"
+
+[[items]]
+id = "steel-dive-watch"
+name = "Steel dive watch"
+category = "Accessory"
+garment = "Watch"
+colour = "steel"
+colour_hex = "#9AA0A6"
+fabric = "steel"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+case = "40mm"
+
+[[items]]
+id = "brown-leather-belt"
+name = "Brown leather belt"
+category = "Accessory"
+garment = "Belt"
+colour = "chocolate"
+colour_hex = "#5A3A22"
+fabric = "leather"
+pattern = "Solid"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+price = 0.0
+
+[items.sizes]
+waist = "32\""
+alpha = "M"
+
+[[items]]
+id = "grey-flannel-trousers"
+name = "Grey flannel trousers"
+category = "Bottom"
+garment = "Trousers"
+colour = "mid grey"
+colour_hex = "#7A7A78"
+fabric = "wool flannel"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 150.0
+
+[items.sizes]
+waist = "31\""
+leg = "32\""
+cut = "Regular"
+
+[[items]]
+id = "brown-suede-loafers"
+name = "Brown suede loafers"
+category = "Shoes"
+garment = "Loafers"
+colour = "chocolate"
+colour_hex = "#6B4426"
+fabric = "suede"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 220.0
+
+[items.sizes]
+uk = "9"
+eu = "43"
+width = "Standard"
+
+[[items]]
+id = "camel-wool-overcoat"
+name = "Camel wool overcoat"
+category = "Outerwear"
+garment = "Overcoat"
+colour = "camel"
+colour_hex = "#C19A6B"
+fabric = "wool melton"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 420.0
+
+[items.sizes]
+chest = "38\""
+length = "Regular"
+eu = "48"
+cut = "Regular"
+
+[[items]]
+id = "olive-linen-overshirt"
+name = "Olive linen overshirt"
+category = "Outerwear"
+garment = "Overshirt"
+colour = "olive"
+colour_hex = "#6B6B47"
+fabric = "linen"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 110.0
+
+[items.sizes]
+alpha = "M"
+cut = "Relaxed"
+
+[[items]]
+id = "ecru-knit-polo"
+name = "Ecru knit polo"
+category = "Top"
+garment = "Polo"
+colour = "ecru"
+colour_hex = "#E8DFC8"
+fabric = "cotton knit"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 95.0
+
+[items.sizes]
+alpha = "M"
+cut = "Regular"

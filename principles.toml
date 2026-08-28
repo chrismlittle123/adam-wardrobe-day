@@ -33,3 +33,51 @@ id = "for-any-occasion-include-at-least-on"
 text = "For any occasion, include at least one structured garment."
 reason = "A structured piece sharpens your look and makes the most of your defined shoulders."
 group = "Occasion"
+
+[[principles]]
+id = "keep-the-volume-in-one-place-only"
+text = "Keep the volume in one place only."
+reason = "At 1.76 m, loose on top and loose below reads as swamped rather than relaxed."
+group = "Silhouette"
+
+[[principles]]
+id = "buy-the-shoulder-alter-everything-el"
+text = "Buy the shoulder, alter everything else."
+reason = "A shoulder seam cannot be moved; a sleeve and a waist can, cheaply."
+group = "Silhouette"
+
+[[principles]]
+id = "build-every-outfit-from-two-base-col"
+text = "Build every outfit from two base colours and at most one accent."
+reason = "A tight palette means anything in the wardrobe combines without thinking."
+group = "Colour"
+
+[[principles]]
+id = "keep-black-away-from-your-face"
+text = "Keep black away from your face."
+reason = "Warm medium-brown skin with a golden undertone goes flat against it; cream and navy do the opposite."
+group = "Colour"
+
+[[principles]]
+id = "choose-cloth-with-visible-texture-ov"
+text = "Choose cloth with visible texture over cloth with a pattern."
+reason = "Texture reads as considered at three metres, pattern reads as effort."
+group = "Fabric"
+
+[[principles]]
+id = "let-the-trouser-touch-the-shoe-once-"
+text = "Let the trouser touch the shoe once and stop."
+reason = "A quarter break is the difference between tailored and borrowed."
+group = "Proportion"
+
+[[principles]]
+id = "one-thing-at-a-time-may-be-interesti"
+text = "One thing at a time may be interesting."
+reason = "If the overcoat is the event, the rest of the outfit is scenery."
+group = "Restraint"
+
+[[principles]]
+id = "dress-one-notch-above-the-room-never"
+text = "Dress one notch above the room, never two."
+reason = "One notch reads as self-respect, two reads as a costume."
+group = "Occasion"

@@ -28,8 +28,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .inventory import Inventory, Item
-from .outfits import Outfit, Outfits
+from .inventory import ASPIRATIONAL, Inventory, Item
+from .outfits import Outfit, Outfits, wearability
 
 
 @dataclass
@@ -83,6 +83,8 @@ class Plan:
     steps: list[Step] = field(default_factory=list)
     still_blocked: list[Outfit] = field(default_factory=list)
     leverage: list[Leverage] = field(default_factory=list)
+    # Outfits money cannot fix: a piece in them was deleted or retired.
+    broken: list[Outfit] = field(default_factory=list)
     budget: float | None = None
     skipped_for_budget: list[Outfit] = field(default_factory=list)
     # Set only when the budget could not reach a single bundle: the cheapest one
@@ -115,11 +117,23 @@ class Plan:
 
 
 def _missing_ids(outfit: Outfit, inventory: Inventory, acquired: set[str]) -> set[str]:
-    """Ids in this outfit that are neither owned nor already bought in the plan."""
+    """Ids in this outfit still to be bought.
+
+    Only wanted pieces count. A retired garment is also "not owned", but nobody
+    should be told to go and buy back something they got rid of, and a deleted
+    one cannot be bought at all.
+    """
     return {
         i.id for i in inventory.resolve(outfit.item_ids)
-        if not i.owned and i.id not in acquired
+        if i.status == ASPIRATIONAL and i.id not in acquired
     }
+
+
+def _usable(outfits_list: list[Outfit], inventory: Inventory) -> tuple[list[Outfit], list[Outfit]]:
+    """Split into outfits money can help with, and outfits it cannot."""
+    broken = [o for o in outfits_list if wearability(o, inventory).broken]
+    broken_ids = {o.id for o in broken}
+    return [o for o in outfits_list if o.id not in broken_ids], broken
 
 
 def item_leverage(
@@ -131,6 +145,7 @@ def item_leverage(
     opposed to the plan, which depends on what you buy first.
     """
     considered = outfits.loved() if loved_only else outfits.outfits
+    considered, _ = _usable(considered, inventory)
     blocked = [o for o in considered if _missing_ids(o, inventory, set())]
 
     rows: dict[str, Leverage] = {}
@@ -162,10 +177,12 @@ def purchase_plan(
 ) -> Plan:
     """Greedy weighted set cover, one blocked outfit's missing pieces per round."""
     considered = outfits.loved() if loved_only else outfits.outfits
+    considered, broken = _usable(considered, inventory)
     wearable_now = [o for o in considered if not _missing_ids(o, inventory, set())]
     blocked = [o for o in considered if _missing_ids(o, inventory, set())]
 
     plan = Plan(
+        broken=broken,
         wearable_now=wearable_now,
         blocked=blocked,
         leverage=item_leverage(outfits, inventory, loved_only=loved_only),

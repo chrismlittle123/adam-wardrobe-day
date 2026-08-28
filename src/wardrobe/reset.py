@@ -80,7 +80,14 @@ def snapshot(keys: list[str] | None = None) -> Snapshot | None:
     if not keys:
         return None
     when = dt.datetime.now()
-    destination = paths.backups() / when.strftime(STAMP)
+    # Two wipes inside the same second would otherwise land in one directory and
+    # the second would overwrite the first, silently losing a backup.
+    base = when.strftime(STAMP)
+    destination = paths.backups() / base
+    suffix = 2
+    while destination.exists():
+        destination = paths.backups() / f"{base}.{suffix}"
+        suffix += 1
     destination.mkdir(parents=True, exist_ok=True)
     for key in keys:
         source = paths.resolve(key)
@@ -119,13 +126,13 @@ def snapshots() -> list[Snapshot]:
         if not directory.is_dir():
             continue
         try:
-            when = dt.datetime.strptime(directory.name, STAMP)
+            when = dt.datetime.strptime(directory.name.split(".")[0], STAMP)
         except ValueError:
             continue
         keys_file = directory / "KEYS"
         keys = keys_file.read_text().split() if keys_file.is_file() else []
         out.append(Snapshot(directory, when, keys))
-    return sorted(out, key=lambda s: s.when, reverse=True)
+    return sorted(out, key=lambda s: (s.when, s.path.name), reverse=True)
 
 
 def restore(snap: Snapshot) -> list[str]:

@@ -1,0 +1,112 @@
+[[outfits]]
+id = "saturday-fulham-road"
+name = "Saturday, Fulham Road"
+item_ids = [
+    "white-cotton-tee",
+    "dark-indigo-jeans",
+    "white-leather-trainers",
+    "steel-dive-watch",
+]
+tags = [
+    "weekend",
+    "casual",
+]
+notes = ""
+images = []
+loved = true
+created = "2026-08-29T00:10:47"
+prompt = ""
+
+[[outfits]]
+id = "office-tuesday"
+name = "Office Tuesday"
+item_ids = [
+    "pale-blue-oxford",
+    "grey-flannel-trousers",
+    "brown-suede-loafers",
+    "brown-leather-belt",
+]
+tags = [
+    "work",
+    "smart",
+]
+notes = ""
+images = []
+loved = true
+created = "2026-08-29T00:10:47"
+prompt = ""
+
+[[outfits]]
+id = "dinner-at-da-mario"
+name = "Dinner at Da Mario"
+item_ids = [
+    "navy-merino-crewneck",
+    "grey-flannel-trousers",
+    "brown-suede-loafers",
+    "steel-dive-watch",
+]
+tags = [
+    "dinner",
+    "evening",
+]
+notes = ""
+images = []
+loved = true
+created = "2026-08-29T00:10:47"
+prompt = ""
+
+[[outfits]]
+id = "rain-on-the-king-s-road"
+name = "Rain on the King's Road"
+item_ids = [
+    "white-cotton-tee",
+    "dark-indigo-jeans",
+    "black-chelsea-boots",
+    "camel-wool-overcoat",
+]
+tags = [
+    "rain",
+    "winter",
+]
+notes = ""
+images = []
+loved = true
+created = "2026-08-29T00:10:47"
+prompt = ""
+
+[[outfits]]
+id = "summer-lunch"
+name = "Summer lunch"
+item_ids = [
+    "cream-camp-collar-shirt",
+    "grey-flannel-trousers",
+    "brown-suede-loafers",
+]
+tags = [
+    "summer",
+    "weekend",
+]
+notes = ""
+images = []
+loved = true
+created = "2026-08-29T00:10:47"
+prompt = ""
+
+[[outfits]]
+id = "blazer-no-tie"
+name = "Blazer, no tie"
+item_ids = [
+    "pale-blue-oxford",
+    "navy-hopsack-blazer",
+    "dark-indigo-jeans",
+    "black-chelsea-boots",
+]
+tags = [
+    "smart",
+    "evening",
+]
+notes = ""
+images = []
+loved = false
+created = "2026-08-29T00:10:47"
+prompt = ""

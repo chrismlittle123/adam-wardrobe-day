@@ -81,7 +81,7 @@ Who he is lives in `profile.toml` and feeds every prompt.
 ## Checking it works
 
 ```bash
-uv run wardrobe-check              # 29 checks, about a second
+uv run wardrobe-check              # 36 checks, a couple of seconds
 uv run wardrobe-check --live       # plus two real Vertex AI calls
 uv run pytest                      # the same checks, from CI
 uv run wardrobe-reset --yes        # clear the data, snapshot taken first

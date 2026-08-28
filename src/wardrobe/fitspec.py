@@ -41,12 +41,16 @@ HEIGHT_RATIOS: dict[str, float] = {
     "ankle": 0.128,
 }
 
-# Multipliers on the estimate for builds away from lean-athletic.
+# Multipliers on the estimate for builds away from athletic. "Lean athletic" is
+# its own row rather than a compromise between two others: a man who is both
+# carries an athletic chest on a lean waist, and averaging the two gets the
+# chest wrong in one direction and the waist wrong in the other.
 BUILD_FACTORS: dict[str, dict[str, float]] = {
-    "lean":     {"chest": 0.97, "waist": 0.94, "seat": 0.97, "bicep": 0.93, "thigh": 0.95},
-    "athletic": {"chest": 1.00, "waist": 1.00, "seat": 1.00, "bicep": 1.00, "thigh": 1.00},
-    "average":  {"chest": 1.02, "waist": 1.09, "seat": 1.03, "bicep": 1.04, "thigh": 1.04},
-    "solid":    {"chest": 1.06, "waist": 1.20, "seat": 1.07, "bicep": 1.10, "thigh": 1.09},
+    "lean":          {"chest": 0.97, "waist": 0.94, "seat": 0.97, "bicep": 0.93, "thigh": 0.95},
+    "lean athletic": {"chest": 1.00, "waist": 0.94, "seat": 0.99, "bicep": 0.99, "thigh": 0.98},
+    "athletic":      {"chest": 1.00, "waist": 1.00, "seat": 1.00, "bicep": 1.00, "thigh": 1.00},
+    "average":       {"chest": 1.02, "waist": 1.09, "seat": 1.03, "bicep": 1.04, "thigh": 1.04},
+    "solid":         {"chest": 1.06, "waist": 1.20, "seat": 1.07, "bicep": 1.10, "thigh": 1.09},
 }
 
 HOW_TO_MEASURE: dict[str, str] = {
@@ -124,10 +128,18 @@ def estimate(height_cm: float, build: str = "athletic") -> dict[str, float]:
 
 
 def _build_key(build: str) -> str:
+    """Which row of BUILD_FACTORS a free-text build description lands on.
+
+    Checked most specific first. "Very lean and athletic" contains both words and
+    must not resolve to plain "lean", which would shave three centimetres off the
+    chest estimate and quietly hand him a jacket a size too small.
+    """
     text = (build or "").lower()
-    for key in ("lean", "athletic", "solid", "average"):
+    if "lean" in text and "athletic" in text:
+        return "lean athletic"
+    for key in ("solid", "average", "athletic", "lean"):
         if key in text:
-            return "lean" if key == "lean" and "athletic" not in text else key
+            return key
     return "athletic"
 
 

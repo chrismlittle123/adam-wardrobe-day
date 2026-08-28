@@ -12,6 +12,7 @@ jacket" produces a different jacket every time; the photograph produces that one
 
 from __future__ import annotations
 
+import io
 import re
 import shutil
 import tomllib
@@ -19,6 +20,7 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import tomli_w
+from PIL import Image, UnidentifiedImageError
 
 from . import paths
 
@@ -173,6 +175,16 @@ class Item:
             if v and v != NONE and k in fields
         )
 
+    def prune_sizes(self) -> None:
+        """Drop size keys that do not belong to this garment.
+
+        Re-classify a shirt as a trouser and the collar measurement would
+        otherwise sit in the file forever, invisible but not gone.
+        """
+        allowed = {f.key for f in size_scheme(self.garment)}
+        self.sizes = {k: v for k, v in self.sizes.items()
+                      if k in allowed and v and v != NONE}
+
     def searchable(self) -> str:
         return " ".join(
             [self.name, self.colour, self.fabric, self.garment,
@@ -196,6 +208,8 @@ class Inventory:
         return cls(items=items, path=path)
 
     def save(self) -> Path:
+        for item in self.items:
+            item.prune_sizes()
         self.path.write_text(tomli_w.dumps({"items": [asdict(i) for i in self.items]}))
         return self.path
 
@@ -262,18 +276,42 @@ class Inventory:
         return f"{base}-{n}"
 
 
+# Guards on uploads. The first is a decompression-bomb stop before anything is
+# decoded; the second is what actually keeps the repository small, since a phone
+# photograph is fifteen times larger than anything this app needs.
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+MAX_EDGE_PX = 1600
+JPEG_QUALITY = 88
+
+
 def save_photo(item_id: str, uploaded, photo_dir: Path | None = None) -> str:
-    """Write an uploaded photo next to the inventory. Returns the stored path."""
+    """Store an uploaded photo, downscaled. Returns the stored path.
+
+    Everything is re-encoded to JPEG at a bounded size rather than written
+    through. A garment reference only needs to be recognisable, and writing a
+    12 MB original straight to disk puts it in the repository forever.
+    """
     photo_dir = Path(photo_dir) if photo_dir else paths.photos()
     photo_dir.mkdir(parents=True, exist_ok=True)
-    suffix = Path(getattr(uploaded, "name", "photo.png")).suffix.lower() or ".png"
-    if suffix not in (".png", ".jpg", ".jpeg", ".webp"):
-        raise ValueError(f"{suffix} is not an image this app will store.")
+
+    data = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
+    if len(data) > MAX_UPLOAD_BYTES:
+        raise ValueError(
+            f"That file is {len(data) / 1_048_576:.0f} MB. The limit is "
+            f"{MAX_UPLOAD_BYTES // 1_048_576} MB; take the photo again at a lower resolution."
+        )
+    try:
+        Image.open(io.BytesIO(data)).verify()      # verify() exhausts the reader,
+        image = Image.open(io.BytesIO(data))       # so open it again to use it
+        image = image.convert("RGB")
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise ValueError(f"That file is not a readable image ({exc}).") from exc
+
+    image.thumbnail((MAX_EDGE_PX, MAX_EDGE_PX), Image.LANCZOS)
     for stale in photo_dir.glob(f"{item_id}.*"):
         stale.unlink()
-    destination = photo_dir / f"{item_id}{suffix}"
-    data = uploaded.getvalue() if hasattr(uploaded, "getvalue") else uploaded.read()
-    destination.write_bytes(data)
+    destination = photo_dir / f"{item_id}.jpg"
+    image.save(destination, "JPEG", quality=JPEG_QUALITY, optimize=True)
     return str(destination)
 
 

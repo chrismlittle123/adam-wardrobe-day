@@ -17,7 +17,7 @@ import tomli_w
 
 from . import paths
 
-from .inventory import ASPIRATIONAL, Inventory, Item
+from .inventory import ASPIRATIONAL, RETIRED, Inventory, Item
 
 # Starting tags. Anything typed in the gallery joins the list for next time.
 SEED_TAGS: tuple[str, ...] = (
@@ -44,16 +44,40 @@ class Outfit:
 
 @dataclass
 class Wearability:
-    """What this outfit costs and what is stopping it."""
+    """What this outfit costs and what is stopping it.
+
+    Three different things can stop it, and collapsing them loses information.
+    `missing` is buyable. `retired` and `dangling` are not: they make the outfit
+    broken rather than expensive, and no amount of money fixes them.
+    """
 
     wearable: bool
-    missing: list[Item]
+    missing: list[Item]          # wanted, and buying it fixes this outfit
     owned_value: float
     to_buy: float
+    retired: list[Item] = field(default_factory=list)
+    dangling: list[str] = field(default_factory=list)   # ids of deleted garments
+    empty: bool = False          # no garments in it at all
 
     @property
     def total(self) -> float:
         return self.owned_value + self.to_buy
+
+    @property
+    def broken(self) -> bool:
+        """Money cannot fix this one. A piece was deleted, retired, or never added."""
+        return bool(self.retired or self.dangling or self.empty)
+
+    @property
+    def fault(self) -> str:
+        bits = []
+        if self.empty:
+            bits.append("no garments in it")
+        if self.dangling:
+            bits.append(f"{len(self.dangling)} deleted piece(s)")
+        if self.retired:
+            bits.append(", ".join(i.name or i.garment for i in self.retired) + " retired")
+        return "; ".join(bits)
 
 
 @dataclass
@@ -104,6 +128,20 @@ class Outfits:
             n += 1
         return f"{base}-{n}"
 
+    def forget_item(self, item_id: str) -> list[Outfit]:
+        """Drop a deleted garment from every outfit that used it.
+
+        Called when an item is deleted. Without it the id lingers and the outfit
+        quietly loses a piece instead of admitting it is broken.
+        """
+        touched = [o for o in self.outfits if item_id in o.item_ids]
+        for outfit in touched:
+            outfit.item_ids = [i for i in outfit.item_ids if i != item_id]
+        return touched
+
+    def using(self, item_id: str) -> list[Outfit]:
+        return [o for o in self.outfits if item_id in o.item_ids]
+
     def all_tags(self) -> list[str]:
         used = {t for o in self.outfits for t in o.tags}
         return sorted(used | set(SEED_TAGS))
@@ -129,12 +167,26 @@ class Outfits:
 
 
 def wearability(outfit: Outfit, inventory: Inventory) -> Wearability:
-    """Cost split and what is blocking it. Missing means not currently owned."""
+    """Cost split and what is blocking it.
+
+    Dangling ids are counted explicitly. Resolving them away silently would make
+    an outfit look wearable the moment one of its garments was deleted, which is
+    the opposite of true.
+    """
     items = inventory.resolve(outfit.item_ids)
-    missing = [i for i in items if not i.owned]
+    found = {i.id for i in items}
+    dangling = [i for i in outfit.item_ids if i not in found]
+    missing = [i for i in items if i.status == ASPIRATIONAL]
+    retired = [i for i in items if i.status == RETIRED]
     owned_value = sum(i.price for i in items if i.owned)
     to_buy = sum(i.price for i in missing)
-    return Wearability(not missing, missing, round(owned_value, 2), round(to_buy, 2))
+    return Wearability(
+        # An outfit with nothing in it is not something he can wear, and counting
+        # it as wearable quietly inflates the only number the plan reports.
+        wearable=bool(items) and not (missing or retired or dangling),
+        missing=missing, owned_value=round(owned_value, 2), to_buy=round(to_buy, 2),
+        retired=retired, dangling=dangling, empty=not outfit.item_ids,
+    )
 
 
 def describe_outfit(outfit: Outfit, inventory: Inventory) -> str:
