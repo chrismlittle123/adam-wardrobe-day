@@ -165,10 +165,10 @@ class Item:
 
     def size_line(self) -> str:
         """The sizes as one readable line, in this garment's own scheme."""
-        fields = {f.key: f.label for f in size_scheme(self.garment)}
+        labels = {f.key: f.label for f in size_scheme(self.garment)}
         return " · ".join(
-            f"{fields.get(k, k)} {v}" for k, v in self.sizes.items()
-            if v and v != NONE and k in fields
+            f"{labels.get(k, k)} {v}" for k, v in self.sizes.items()
+            if v and v != NONE and k in labels
         )
 
     def prune_sizes(self) -> None:

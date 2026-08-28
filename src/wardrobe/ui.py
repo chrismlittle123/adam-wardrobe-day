@@ -13,7 +13,7 @@ import io
 from pathlib import Path
 
 import streamlit as st
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 
 CSS = """
 <style>
@@ -234,7 +234,19 @@ def thumb_b64(path: str, mtime: float, width: int = 640) -> str:
 
 
 def plate(path: Path, label: str = "", right: str = "", width: int = 640) -> None:
-    b64 = thumb_b64(str(path), path.stat().st_mtime, width)
+    """Render an image in a frame, or a placeholder if it cannot be read.
+
+    A truncated or half-written file must not take the page down with it. One
+    corrupt look in the gallery used to raise straight out of the render and
+    kill every tab at once.
+    """
+    try:
+        b64 = thumb_b64(str(path), path.stat().st_mtime, width)
+    except (UnidentifiedImageError, OSError, ValueError):
+        st.markdown(
+            '<div class="plate"><div class="empty" style="padding:2rem 1rem">'
+            f'{path.name}<br>could not be read</div></div>', unsafe_allow_html=True)
+        return
     cap = (f'<div class="cap"><span>{label}</span><span>{right}</span></div>'
            if label or right else "")
     st.markdown(

@@ -640,7 +640,9 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         title = name.strip() or ", ".join(i.name or i.garment for i in items[:3])
         with st.spinner(f"Dressing {profile.subject.name}…"):
             try:
-                paths = generate_images(
+                # Not `paths`: that name is the module, and binding it here would
+                # make it local for the whole function and break paths.looks() above.
+                written = generate_images(
                     prompt,
                     out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
                     reference_images=[portrait, *photos[:4]],
@@ -652,7 +654,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                 return
         outfits.add(Outfit(
             name=title, item_ids=[i.id for i in items], tags=list(tag_choice),
-            images=[str(p) for p in paths], notes=extra, prompt=prompt,
+            images=[str(w) for w in written], notes=extra, prompt=prompt,
         ))
         outfits.save()
         st.success(f"Saved as “{title}”. It is in the Outfit Gallery.")

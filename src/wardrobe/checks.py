@@ -683,6 +683,118 @@ def check_snapshots_do_not_collide() -> str:
     return f"{first.path.name} and {second.path.name} kept apart"
 
 
+def check_no_module_shadowing() -> str:
+    """No function may bind a name it also imports at module level.
+
+    Python decides a name is local for the whole function body, so
+    `paths = generate_images(...)` at the bottom breaks `paths.looks()` at the
+    top with an UnboundLocalError. That killed the outfit generator outright and
+    nothing caught it, because rendering a page never runs the click handler.
+    """
+    import ast as _ast
+
+    offences: list[str] = []
+    for source in sorted(Path(__file__).parent.glob("*.py")):
+        tree = _ast.parse(source.read_text())
+        imported = {a.asname or a.name.split(".")[0] for n in _ast.walk(tree)
+                    if isinstance(n, (_ast.Import, _ast.ImportFrom)) for a in n.names}
+        for fn in [n for n in _ast.walk(tree)
+                   if isinstance(n, (_ast.FunctionDef, _ast.AsyncFunctionDef))]:
+            bound = {t.id for node in _ast.walk(fn) if isinstance(node, _ast.Assign)
+                     for t in node.targets if isinstance(t, _ast.Name)}
+            for name in sorted(bound & imported):
+                offences.append(f"{source.name}:{fn.lineno} {fn.name}() shadows {name!r}")
+    assert not offences, "; ".join(offences)
+    return "no function shadows an imported name"
+
+
+def check_generate_button_runs() -> str:
+    """Press the button, not just draw it.
+
+    Image generation is stubbed, so this costs nothing and still exercises the
+    whole handler: prompt assembly, path resolution, writing the file, and
+    saving the outfit.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    from . import gemini_image
+    from .inventory import Inventory
+    from .outfits import Outfits
+
+    inventory, _ = _seeded()
+    made: dict[str, object] = {}
+
+    def stub(prompt, *, out_prefix, reference_images=None, count=1, settings=None):
+        from PIL import Image as _Image
+        out_prefix.parent.mkdir(parents=True, exist_ok=True)
+        written = []
+        for n in range(count):
+            target = out_prefix.with_name(f"{out_prefix.name}{'' if count == 1 else f'-{n}'}.png")
+            _Image.new("RGB", (64, 96), (200, 150, 120)).save(target, "PNG")
+            written.append(target)
+        made.update(prompt=prompt, refs=list(reference_images or []))
+        return written
+
+    real = gemini_image.generate_images
+    gemini_image.generate_images = stub
+    try:
+        app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+        if app.exception:
+            raise AssertionError(f"render failed: {app.exception[0].value}")
+
+        def widget(collection, key):
+            return next((w for w in collection if getattr(w, "key", None) == key), None)
+
+        top = widget(app.selectbox, "pick-Top")
+        bottom = widget(app.selectbox, "pick-Bottom")
+        assert top and bottom, "the item pickers are missing"
+        tee = next(i for i in inventory.items if i.name == "White cotton tee")
+        jeans = next(i for i in inventory.items if i.name == "Dark indigo jeans")
+        app = top.set_value(tee.id).run()
+        app = widget(app.selectbox, "pick-Bottom").set_value(jeans.id).run()
+        if app.exception:
+            raise AssertionError(f"selecting items failed: {app.exception[0].value}")
+
+        button = next((b for b in app.button if b.label == "Generate look"), None)
+        assert button, "the Generate look button is missing once pieces are chosen"
+        app = button.click().run()
+        if app.exception:
+            raise AssertionError(f"clicking Generate raised: {app.exception[0].value}")
+    finally:
+        gemini_image.generate_images = real
+
+    assert made.get("prompt"), "the handler never reached image generation"
+    assert "white cotton t-shirt" in made["prompt"].lower() or "white" in made["prompt"].lower(), \
+        "the chosen garments never reached the prompt"
+    assert len(made["refs"]) >= 1, "the portrait was not passed as a reference"
+    saved = Outfits.load().outfits
+    assert saved, "the generated outfit was not saved"
+    latest = saved[-1]
+    assert latest.images and Path(latest.images[0]).is_file(), "no image recorded on the outfit"
+    assert {tee.id, jeans.id} <= set(latest.item_ids), "the outfit lost its pieces"
+    return f"clicked through, saved “{latest.name}” with {len(latest.images)} image(s)"
+
+
+def check_unreadable_image_does_not_crash() -> str:
+    """A corrupt look must degrade to a placeholder, not take the page down."""
+    from streamlit.testing.v1 import AppTest
+
+    from .outfits import Outfit, Outfits
+    inventory, outfits = _seeded()
+    broken = paths.looks() / "corrupt.png"
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_bytes(b"definitely not a png")
+    tee = next(i for i in inventory.items if i.name == "White cotton tee")
+    outfits.add(Outfit(name="Corrupt look", item_ids=[tee.id], images=[str(broken)]))
+    outfits.save()
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    assert not app.exception, f"one bad image killed the render: {app.exception[0].value}"
+    page = "\n".join(m.value for m in app.markdown)
+    assert "could not be read" in page, "no placeholder shown for the corrupt image"
+    return "corrupt image degraded to a placeholder, page still rendered"
+
+
 def check_reset_round_trip() -> str:
     from .inventory import Inventory
     from . import reset
@@ -765,6 +877,9 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
+    (APP, "No function shadows an imported module", check_no_module_shadowing),
+    (APP, "Generate look actually runs when clicked", check_generate_button_runs),
+    (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
     (APP, "Wipe and restore round trip", check_reset_round_trip),
     (APP, "Snapshots in the same second stay apart", check_snapshots_do_not_collide),
     (LIVE, "Gemini returns text", check_live_text),
