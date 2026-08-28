@@ -1,0 +1,159 @@
+"""Outfits: a name, a set of item ids, some tags, and whatever images we made.
+
+An outfit holds ids, never copies of the garments. So when a wanted item is
+bought and flips to owned, every outfit built on it becomes wearable at once,
+with nothing to migrate.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import re
+import tomllib
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+
+import tomli_w
+
+from .inventory import ASPIRATIONAL, Inventory, Item
+
+DEFAULT_PATH = Path("outfits.toml")
+
+# Starting tags. Anything typed in the gallery joins the list for next time.
+SEED_TAGS: tuple[str, ...] = (
+    "work", "weekend", "dinner", "date", "summer", "winter", "rain",
+    "travel", "smart", "casual", "evening", "wedding",
+)
+
+
+@dataclass
+class Outfit:
+    id: str = ""
+    name: str = ""
+    item_ids: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    notes: str = ""
+    images: list[str] = field(default_factory=list)
+    loved: bool = False
+    created: str = ""
+    prompt: str = ""
+
+    def cover(self) -> str | None:
+        return next((p for p in self.images if Path(p).is_file()), None)
+
+
+@dataclass
+class Wearability:
+    """What this outfit costs and what is stopping it."""
+
+    wearable: bool
+    missing: list[Item]
+    owned_value: float
+    to_buy: float
+
+    @property
+    def total(self) -> float:
+        return self.owned_value + self.to_buy
+
+
+@dataclass
+class Outfits:
+    outfits: list[Outfit] = field(default_factory=list)
+    path: Path = DEFAULT_PATH
+
+    @classmethod
+    def load(cls, path: Path | str = DEFAULT_PATH) -> "Outfits":
+        path = Path(path)
+        if not path.is_file():
+            return cls(path=path)
+        raw = tomllib.loads(path.read_text())
+        allowed = {f.name for f in fields(Outfit)}
+        rows = [Outfit(**{k: v for k, v in r.items() if k in allowed}) for r in raw.get("outfits", [])]
+        return cls(outfits=rows, path=path)
+
+    def save(self) -> Path:
+        self.path.write_text(tomli_w.dumps({"outfits": [asdict(o) for o in self.outfits]}))
+        return self.path
+
+    def by_id(self, outfit_id: str) -> Outfit | None:
+        return next((o for o in self.outfits if o.id == outfit_id), None)
+
+    def add(self, outfit: Outfit) -> Outfit:
+        outfit.id = outfit.id or self.unique_id(outfit.name)
+        outfit.created = outfit.created or dt.datetime.now().isoformat(timespec="seconds")
+        self.outfits.append(outfit)
+        return outfit
+
+    def update(self, outfit: Outfit) -> None:
+        for index, existing in enumerate(self.outfits):
+            if existing.id == outfit.id:
+                self.outfits[index] = outfit
+                return
+        self.outfits.append(outfit)
+
+    def remove(self, outfit_id: str) -> None:
+        self.outfits = [o for o in self.outfits if o.id != outfit_id]
+
+    def unique_id(self, name: str) -> str:
+        base = re.sub(r"[^a-z0-9]+", "-", (name or "outfit").lower()).strip("-")[:36] or "outfit"
+        taken = {o.id for o in self.outfits}
+        if base not in taken:
+            return base
+        n = 2
+        while f"{base}-{n}" in taken:
+            n += 1
+        return f"{base}-{n}"
+
+    def all_tags(self) -> list[str]:
+        used = {t for o in self.outfits for t in o.tags}
+        return sorted(used | set(SEED_TAGS))
+
+    def loved(self) -> list["Outfit"]:
+        return [o for o in self.outfits if o.loved]
+
+    def filter(self, *, tags: list[str] | None = None, loved_only: bool = False,
+               match_all: bool = False, query: str = "") -> list[Outfit]:
+        out = self.outfits
+        if loved_only:
+            out = [o for o in out if o.loved]
+        if tags:
+            wanted = set(tags)
+            out = [o for o in out if (
+                wanted <= set(o.tags) if match_all else bool(wanted & set(o.tags))
+            )]
+        if query.strip():
+            needle = query.strip().lower()
+            out = [o for o in out
+                   if needle in " ".join([o.name, o.notes, *o.tags]).lower()]
+        return out
+
+
+def wearability(outfit: Outfit, inventory: Inventory) -> Wearability:
+    """Cost split and what is blocking it. Missing means not currently owned."""
+    items = inventory.resolve(outfit.item_ids)
+    missing = [i for i in items if not i.owned]
+    owned_value = sum(i.price for i in items if i.owned)
+    to_buy = sum(i.price for i in missing)
+    return Wearability(not missing, missing, round(owned_value, 2), round(to_buy, 2))
+
+
+def describe_outfit(outfit: Outfit, inventory: Inventory) -> str:
+    """The garment list as a sentence, for the image prompt."""
+    items = inventory.resolve(outfit.item_ids)
+    return ". ".join(i.describe() for i in items) + ("." if items else "")
+
+
+def reference_photos(outfit: Outfit, inventory: Inventory, limit: int = 4) -> list[Path]:
+    """Item photos to pass alongside the subject portrait, most specific first.
+
+    The model takes only so many references before it starts blending them, so
+    the ones that carry the look (tops, outerwear, shoes) go in ahead of a belt.
+    """
+    order = {"Outerwear": 0, "Top": 1, "Bottom": 2, "Shoes": 3, "Accessory": 4}
+    items = [i for i in inventory.resolve(outfit.item_ids) if i.has_photo]
+    items.sort(key=lambda i: order.get(i.category, 9))
+    return [Path(i.photo) for i in items[:limit]]
+
+
+def aspirational_in(outfit: Outfit, inventory: Inventory) -> list[Item]:
+    return [i for i in inventory.resolve(outfit.item_ids) if i.status == ASPIRATIONAL]

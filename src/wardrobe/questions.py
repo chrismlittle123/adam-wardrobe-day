@@ -167,13 +167,6 @@ SECTIONS: tuple[Section, ...] = (
                 "The cream camp-collar shirt. A pair of mid-grey trousers that fit perfectly.",
                 core=True, lines=4,
             ),
-            Question(
-                "shoes_owned",
-                "Every pair of shoes you currently own.",
-                "Shoes decide the outfit and everyone forgets to list them.",
-                "White leather trainers, black Chelsea boots, running shoes, one dying pair of loafers.",
-                core=True, lines=4,
-            ),
         ),
     ),
     Section(
