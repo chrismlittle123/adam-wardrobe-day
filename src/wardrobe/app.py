@@ -1,264 +1,115 @@
-"""The wardrobe studio: see the man, brief the look, get the photograph back.
+"""Wardrobe Studio.
 
-Run it with `uv run wardrobe-app`, or directly:
-    uv run streamlit run src/wardrobe/app.py
+Six tabs, in the order the work actually happens: work out the style, record what
+is in the wardrobe, distil the principles, play with outfits, keep the good ones,
+then buy the pieces that unlock the most of them.
 
-Everything the model is told about the subject comes from profile.toml, which is
-rendered on the left as a tailor's docket and editable in place.
+Run it:
+    uv run wardrobe-app          # http://localhost:8501
 """
 
 from __future__ import annotations
 
-import base64
 import datetime as dt
-import io
 import re
 from pathlib import Path
 
 import streamlit as st
-from PIL import Image
 
+from wardrobe import fitspec, inventory as inv_mod, principles as prin_mod, shopping, ui
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
-from wardrobe.philosophy import (
-    DEFAULT_GUIDE_PATH,
-    Answers,
-    build_guide_prompt,
-    synthesise_guide,
+from wardrobe.inventory import (
+    ASPIRATIONAL, CATEGORIES, FIT_VERDICTS, GARMENTS, OWNED, RETIRED,
+    STATUSES, TRACKED_DIMENSIONS, Inventory, Item,
 )
+from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
+from wardrobe.philosophy import DEFAULT_GUIDE_PATH, Answers, build_guide_prompt, synthesise_guide
+from wardrobe.principles import GROUPS, Principle, Principles
 from wardrobe.profile import Profile
-from wardrobe.prompts import BACKGROUNDS, SHOTS, build_prompt
+from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
 from wardrobe.questions import SECTIONS
 
 LOOKS_DIR = Path("out/looks")
-
-# Pulled off the reference photo itself: walnut ground, the brass of the gold
-# chain-stitch on his collar, the cream of the shirt.
-CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=Karla:wght@300;400;500;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
-
-:root {
-  --ground: #17110E;
-  --panel:  #211915;
-  --raise:  #2C211B;
-  --brass:  #C9A227;
-  --cream:  #F0E6DB;
-  --muted:  #8A7767;
-  --line:   rgba(201,162,39,.22);
-}
-
-.stApp { background: var(--ground); }
-html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
-  font-family: 'Karla', system-ui, sans-serif;
-  color: var(--cream);
-}
-[data-testid="stAppViewContainer"] > .main { padding-top: 0; }
-[data-testid="stHeader"] { background: transparent; }
-#MainMenu, footer { visibility: hidden; }
-
-/* Masthead ---------------------------------------------------------------- */
-.masthead { padding: 2.2rem 0 1.1rem; border-bottom: 1px solid var(--line); margin-bottom: 2rem; }
-.masthead h1 {
-  font-family: 'Bodoni Moda', Georgia, serif;
-  font-weight: 400; font-size: clamp(2.4rem, 5vw, 3.6rem);
-  letter-spacing: .01em; line-height: 1; margin: 0; color: var(--cream);
-}
-.masthead h1 em { font-style: italic; color: var(--brass); }
-.masthead .sub {
-  font-family: 'IBM Plex Mono', monospace; font-size: .7rem; letter-spacing: .22em;
-  text-transform: uppercase; color: var(--muted); margin-top: .7rem;
-}
-
-/* Section eyebrows -------------------------------------------------------- */
-.eyebrow {
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; letter-spacing: .22em;
-  text-transform: uppercase; color: var(--brass); margin: 0 0 .9rem;
-  display: flex; align-items: center; gap: .8rem;
-}
-.eyebrow::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line); }
-
-/* The docket -------------------------------------------------------------- */
-.docket { background: var(--panel); border: 1px solid var(--line); padding: 1.4rem 1.5rem 1.1rem; }
-.docket .name {
-  font-family: 'Bodoni Moda', Georgia, serif; font-size: 1.9rem; font-weight: 400;
-  margin: 0 0 1.2rem; line-height: 1;
-}
-.docket dl { margin: 0; }
-.docket .row { display: flex; align-items: baseline; margin: 0 0 .62rem; }
-.docket dt {
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; letter-spacing: .13em;
-  text-transform: uppercase; color: var(--muted); white-space: nowrap;
-}
-.docket .leader {
-  flex: 1 1 auto; border-bottom: 1px dotted rgba(240,230,219,.22);
-  margin: 0 .6rem; transform: translateY(-.28rem); min-width: 1rem;
-}
-.docket dd {
-  margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: .82rem;
-  color: var(--cream); text-align: right;
-}
-.docket dd.prose {
-  font-family: 'Karla', sans-serif; font-size: .84rem; color: var(--cream);
-  text-align: right; max-width: 62%;
-}
-.chip {
-  display: inline-block; width: .78rem; height: .78rem; margin-right: .45rem;
-  border: 1px solid rgba(240,230,219,.35); vertical-align: -1px;
-}
-.docket .note {
-  margin: 1.1rem 0 0; padding-top: .9rem; border-top: 1px solid var(--line);
-  font-size: .8rem; color: var(--muted); line-height: 1.5;
-}
-
-/* Reference photo --------------------------------------------------------- */
-.plate { border: 1px solid var(--line); padding: .45rem; background: var(--panel); }
-.plate img { display: block; width: 100%; }
-.plate .cap {
-  font-family: 'IBM Plex Mono', monospace; font-size: .64rem; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--muted); padding: .6rem .2rem .15rem;
-  display: flex; justify-content: space-between;
-}
-
-/* Controls ---------------------------------------------------------------- */
-.stTextArea textarea, .stTextInput input {
-  background: var(--panel) !important; color: var(--cream) !important;
-  border: 1px solid var(--line) !important; border-radius: 0 !important;
-  font-family: 'Karla', sans-serif !important; font-size: .95rem !important;
-}
-.stTextArea textarea:focus, .stTextInput input:focus {
-  border-color: var(--brass) !important; box-shadow: none !important;
-}
-div[data-baseweb="select"] > div {
-  background: var(--panel) !important; border: 1px solid var(--line) !important;
-  border-radius: 0 !important;
-}
-.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
-  background: var(--brass); color: #17110E; border: none; border-radius: 0;
-  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; letter-spacing: .18em;
-  text-transform: uppercase; padding: .72rem 1.4rem; font-weight: 500;
-  transition: background .18s ease, transform .18s ease;
-}
-.stButton > button:hover, .stFormSubmitButton > button:hover, .stDownloadButton > button:hover {
-  background: var(--cream); color: #17110E; transform: translateY(-1px);
-}
-.stButton > button:focus-visible, .stFormSubmitButton > button:focus-visible {
-  outline: 2px solid var(--cream); outline-offset: 3px;
-}
-label, .stSlider label, .stSelectbox label {
-  font-family: 'IBM Plex Mono', monospace !important; font-size: .68rem !important;
-  letter-spacing: .16em !important; text-transform: uppercase !important;
-  color: var(--muted) !important;
-}
-.streamlit-expanderHeader, details summary {
-  font-family: 'IBM Plex Mono', monospace !important; font-size: .68rem !important;
-  letter-spacing: .16em !important; text-transform: uppercase !important;
-}
-.stCode, pre, code { font-family: 'IBM Plex Mono', monospace !important; font-size: .78rem !important; }
-
-/* Gallery ----------------------------------------------------------------- */
-.look-cap {
-  font-family: 'IBM Plex Mono', monospace; font-size: .66rem; letter-spacing: .1em;
-  color: var(--muted); padding-top: .5rem; line-height: 1.6;
-}
-.empty {
-  border: 1px dashed var(--line); padding: 3rem 2rem; text-align: center;
-  color: var(--muted); font-size: .9rem;
-}
+GEMINI_ERRORS = (GeminiImageError, GeminiTextError)
 
 
-/* Tabs -------------------------------------------------------------------- */
-.stTabs [data-baseweb="tab-list"] { gap: 2rem; border-bottom: 1px solid var(--line); }
-.stTabs [data-baseweb="tab"] {
-  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; letter-spacing: .2em;
-  text-transform: uppercase; color: var(--muted); background: transparent;
-  padding: .3rem 0 .8rem;
-}
-.stTabs [aria-selected="true"] { color: var(--brass) !important; }
-.stTabs [data-baseweb="tab-highlight"] { background: var(--brass); }
-
-/* Progress meter ---------------------------------------------------------- */
-.meter { margin: 0 0 1.8rem; }
-.meter .track { height: 2px; background: rgba(240,230,219,.12); position: relative; }
-.meter .fill { height: 2px; background: var(--brass); }
-.meter .read {
-  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--muted); display: flex;
-  justify-content: space-between; padding-bottom: .5rem;
-}
-.meter .read b { color: var(--cream); font-weight: 500; }
-
-/* Questionnaire ----------------------------------------------------------- */
-.sec-blurb { color: var(--muted); font-size: .86rem; line-height: 1.6; margin: 0 0 1.4rem; }
-.q-mark {
-  font-family: 'IBM Plex Mono', monospace; font-size: .6rem; letter-spacing: .18em;
-  text-transform: uppercase; color: var(--brass); border: 1px solid var(--line);
-  padding: .12rem .45rem; margin-left: .6rem; vertical-align: 2px;
-}
-.sec-count {
-  font-family: 'IBM Plex Mono', monospace; font-size: .66rem; color: var(--muted);
-  letter-spacing: .14em;
-}
-.guide-body { background: var(--panel); border: 1px solid var(--line); padding: 1.8rem 2rem; }
-.guide-body h1 {
-  font-family: 'Bodoni Moda', Georgia, serif; font-weight: 400; font-size: 2.1rem;
-  margin: 0 0 1.2rem;
-}
-.guide-body h2 {
-  font-family: 'IBM Plex Mono', monospace; font-size: .72rem; letter-spacing: .2em;
-  text-transform: uppercase; color: var(--brass); margin: 2rem 0 .8rem;
-}
-.guide-body table { border-collapse: collapse; width: 100%; font-size: .86rem; }
-.guide-body th, .guide-body td {
-  border-bottom: 1px solid var(--line); padding: .5rem .6rem; text-align: left;
-}
-
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-</style>
-"""
+def slug(text: str, limit: int = 34) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")[:limit].rstrip("-") or "look"
 
 
-# --- helpers -----------------------------------------------------------------
+# --- the shell ----------------------------------------------------------------
 
-@st.cache_data(show_spinner=False)
-def _thumb_b64(path: str, mtime: float, width: int = 640) -> str:
-    """Downscaled base64 PNG. `mtime` is in the signature so the cache busts
-    when the file on disk changes."""
-    img = Image.open(path).convert("RGB")
-    if img.width > width:
-        img = img.resize((width, round(img.height * width / img.width)), Image.LANCZOS)
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    return base64.b64encode(buf.getvalue()).decode()
+def render() -> None:
+    st.set_page_config(page_title="Wardrobe Studio", page_icon="👔", layout="wide")
+    st.markdown(ui.CSS, unsafe_allow_html=True)
 
+    try:
+        profile = Profile.load()
+    except FileNotFoundError as exc:
+        st.error(str(exc))
+        st.stop()
 
-def plate(path: Path, label: str) -> None:
-    b64 = _thumb_b64(str(path), path.stat().st_mtime)
-    img = Image.open(path)
+    answers = Answers.load()
+    inventory = Inventory.load()
+    outfits = Outfits.load()
+    principles = Principles.load()
+
+    sidebar(profile, inventory, outfits)
+
     st.markdown(
-        f'<div class="plate"><img src="data:image/png;base64,{b64}" alt="{label}">'
-        f'<div class="cap"><span>{label}</span><span>{img.width}&times;{img.height}</span></div></div>',
+        '<div class="masthead"><h1>Wardrobe <em>Studio</em></h1>'
+        '<div class="sub">Work out the style &middot; know the wardrobe &middot; '
+        'buy only what unlocks the most</div></div>',
         unsafe_allow_html=True,
     )
 
+    tabs = st.tabs([
+        "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles",
+        "4 · Outfit Generator", "5 · Outfit Gallery", "6 · Shopping Guide",
+    ])
+    with tabs[0]:
+        style_guide_tab(profile, answers)
+    with tabs[1]:
+        inventory_tab(profile, inventory)
+    with tabs[2]:
+        principles_tab(profile, answers, principles)
+    with tabs[3]:
+        generator_tab(profile, inventory, outfits, principles)
+    with tabs[4]:
+        gallery_tab(inventory, outfits)
+    with tabs[5]:
+        shopping_tab(profile, inventory, outfits)
 
-def row(label: str, value: str, prose: bool = False) -> str:
-    if not value:
-        return ""
-    cls = "prose" if prose else ""
-    return (
-        f'<div class="row"><dt>{label}</dt><span class="leader"></span>'
-        f'<dd class="{cls}">{value}</dd></div>'
-    )
+
+def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
+    with st.sidebar:
+        photo = profile.photo("neutral")
+        if photo:
+            ui.plate(photo, photo.name, width=380)
+        docket(profile)
+        counts = inventory.counts()
+        st.markdown(
+            f'<div class="look-cap">{counts[OWNED]} owned &middot; '
+            f'{counts[ASPIRATIONAL]} wanted &middot; {len(outfits.outfits)} outfits</div>',
+            unsafe_allow_html=True,
+        )
+        subject_editor(profile)
 
 
 def docket(profile: Profile) -> None:
     s = profile.subject
+
+    def row(label: str, value: str, prose: bool = False) -> str:
+        if not value:
+            return ""
+        return (f'<div class="row"><dt>{label}</dt><span class="leader"></span>'
+                f'<dd class="{"prose" if prose else ""}">{value}</dd></div>')
+
     height = f"{s.height_metric} &middot; {s.height_imperial}" if s.height_cm else ""
-    swatch = (
-        f'<span class="chip" style="background:{s.skin_tone_hex}"></span>{s.skin_tone_hex}'
-        if s.skin_tone_hex else ""
-    )
+    swatch = (f'<span class="chip" style="background:{s.skin_tone_hex}"></span>{s.skin_tone_hex}'
+              if s.skin_tone_hex else "")
+    measured = profile.measurements.measured()
     rows = [
         row("Height", height),
         row("Build", s.build, prose=True),
@@ -266,16 +117,9 @@ def docket(profile: Profile) -> None:
         row("Skin", swatch),
         row("Hair", s.hair, prose=True),
         row("Face", s.facial_hair, prose=True),
-        row("Eyes", s.eyes),
         row("Wears", s.details, prose=True),
+        row("Measured", f"{len(measured)} of 16" if measured else "none yet"),
     ]
-    labels = {
-        "chest_cm": "Chest", "waist_cm": "Waist", "inseam_cm": "Inseam",
-        "shoulder_cm": "Shoulder", "shoe_eu": "Shoe EU",
-    }
-    for key, value in profile.measurements.known().items():
-        rows.append(row(labels.get(key, key), f"{value} cm" if key != "shoe_eu" else str(value)))
-
     note = f'<p class="note">{s.skin_tone}</p>' if s.skin_tone else ""
     st.markdown(
         f'<div class="docket"><div class="name">{s.name}</div><dl>{"".join(rows)}</dl>{note}</div>',
@@ -283,97 +127,40 @@ def docket(profile: Profile) -> None:
     )
 
 
-def slug(text: str, limit: int = 34) -> str:
-    out = re.sub(r"[^a-z0-9]+", "-", text.lower()).strip("-")
-    return (out[:limit].rstrip("-") or "look")
+def subject_editor(profile: Profile) -> None:
+    s = profile.subject
+    with st.expander("Edit subject"):
+        with st.form("subject"):
+            s.name = st.text_input("Name", s.name)
+            s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 176)
+            s.body_fat_pct = st.number_input("Body fat (%)", 0, 50, s.body_fat_pct)
+            s.build = st.text_input("Build", s.build)
+            s.skin_tone_hex = st.color_picker("Skin", s.skin_tone_hex)
+            s.skin_tone = st.text_input("Skin, in words", s.skin_tone)
+            s.hair = st.text_input("Hair", s.hair)
+            s.facial_hair = st.text_input("Facial hair", s.facial_hair)
+            s.eyes = st.text_input("Eyes", s.eyes)
+            s.details = st.text_input("Always wears", s.details)
+            profile.style.direction = st.text_area("Style direction", profile.style.direction, height=68)
+            profile.style.avoid = st.text_area("Avoid", profile.style.avoid, height=68)
+            if st.form_submit_button("Save subject"):
+                profile.save()
+                st.rerun()
 
 
-def saved_looks() -> list[Path]:
-    if not LOOKS_DIR.is_dir():
-        return []
-    return sorted(LOOKS_DIR.glob("*.png"), key=lambda p: p.stat().st_mtime, reverse=True)
+# --- 1. style guide -----------------------------------------------------------
 
-
-# --- the page ----------------------------------------------------------------
-
-def meter(done: int, total: int, label: str) -> None:
-    pct = round(100 * done / total) if total else 0
-    st.markdown(
-        f'<div class="meter"><div class="read"><span>{label}</span>'
-        f'<span><b>{done}</b> of {total}</span></div>'
-        f'<div class="track"><div class="fill" style="width:{pct}%"></div></div></div>',
-        unsafe_allow_html=True,
+def style_guide_tab(profile: Profile, answers: Answers) -> None:
+    ui.eyebrow("The questions")
+    ui.blurb(
+        "Everything here feeds the guide. Nothing is compulsory; the guide names its "
+        "own gaps. Be specific: \"the three black going-out shirts\" is worth more than "
+        "\"some shirts\". Each section saves on its own."
     )
 
-
-def render() -> None:
-    st.set_page_config(page_title="Wardrobe Studio", page_icon="👔", layout="wide")
-    st.markdown(CSS, unsafe_allow_html=True)
-
-    try:
-        profile = Profile.load()
-    except FileNotFoundError as exc:
-        st.error(str(exc))
-        st.stop()
-    answers = Answers.load()
-
-    st.markdown(
-        '<div class="masthead"><h1>Wardrobe <em>Studio</em></h1>'
-        '<div class="sub">Answer the questions &middot; build the guide &middot; '
-        'see it on him</div></div>',
-        unsafe_allow_html=True,
-    )
-
-    studio, philosophy, guide = st.tabs(["Studio", "Philosophy", "Style guide"])
-    with studio:
-        studio_tab(profile)
-    with philosophy:
-        philosophy_tab(answers)
-    with guide:
-        guide_tab(profile, answers)
-
-
-def studio_tab(profile: Profile) -> None:
-    left, right = st.columns([5, 7], gap="large")
-
-    with left:
-        st.markdown('<div class="eyebrow">The subject</div>', unsafe_allow_html=True)
-        photo = profile.photo("neutral")
-        if photo:
-            plate(photo, photo.name)
-        else:
-            st.markdown(
-                '<div class="empty">No reference photo found. Check the [photos] '
-                'paths in profile.toml.</div>', unsafe_allow_html=True)
-        st.write("")
-        docket(profile)
-        edit_panel(profile)
-
-    with right:
-        st.markdown('<div class="eyebrow">The brief</div>', unsafe_allow_html=True)
-        brief_panel(profile, photo)
-
-    st.write("")
-    st.markdown('<div class="eyebrow">Looks</div>', unsafe_allow_html=True)
-    gallery()
-
-
-def philosophy_tab(answers: Answers) -> None:
-    st.markdown('<div class="eyebrow">Philosophy</div>', unsafe_allow_html=True)
-    st.markdown(
-        '<p class="sec-blurb">Everything here feeds the style guide. Nothing is '
-        'compulsory; the guide names its own gaps. Answer in full sentences, and be '
-        'specific: "the three black going-out shirts" is worth more than "some shirts". '
-        'Each section saves on its own.</p>',
-        unsafe_allow_html=True,
-    )
-
-    core_only = st.toggle(
-        "Core questions only", value=answers.is_empty(),
-        help="The shorter path: 28 questions instead of 40. The rest deepen the guide.",
-    )
+    core_only = st.toggle("Core questions only", value=answers.is_empty(), key="core-only")
     done, total = answers.progress(core_only=core_only)
-    meter(done, total, "Core answered" if core_only else "Answered")
+    ui.meter(done, total, "Core answered" if core_only else "Answered")
 
     for section in SECTIONS:
         questions = [q for q in section.questions if q.core or not core_only]
@@ -382,44 +169,31 @@ def philosophy_tab(answers: Answers) -> None:
         filled = sum(1 for q in questions if answers.get(q.id))
         mark = "✓" if filled == len(questions) else f"{filled}/{len(questions)}"
         with st.expander(f"{section.title}  ·  {mark}", expanded=filled == 0):
-            st.markdown(f'<p class="sec-blurb">{section.blurb}</p>', unsafe_allow_html=True)
+            ui.blurb(section.blurb)
             with st.form(f"sec-{section.id}"):
-                draft: dict[str, str] = {}
-                for q in questions:
-                    label = q.prompt + ("  ⟡ core five" if q.spine else "")
-                    draft[q.id] = st.text_area(
-                        label,
-                        value=answers.get(q.id),
-                        placeholder=q.placeholder,
-                        help=q.help or None,
-                        height=max(68, q.lines * 27),
-                        key=f"a-{q.id}",
+                draft = {
+                    q.id: st.text_area(
+                        q.prompt + ("  ⟡ core five" if q.spine else ""),
+                        value=answers.get(q.id), placeholder=q.placeholder,
+                        help=q.help or None, height=max(68, q.lines * 27), key=f"a-{q.id}",
                     )
+                    for q in questions
+                }
                 if st.form_submit_button(f"Save {section.title.lower()}"):
                     answers.values.update(draft)
                     answers.save()
-                    st.success(f"Saved to {answers.path}")
                     st.rerun()
 
-
-def guide_tab(profile: Profile, answers: Answers) -> None:
-    st.markdown('<div class="eyebrow">Style guide</div>', unsafe_allow_html=True)
-    done, total = answers.progress()
-    meter(done, total, "Built from")
-
+    ui.eyebrow("The guide")
+    total_done, total_all = answers.progress()
     left, right = st.columns([3, 1], gap="large")
     with left:
-        if done == 0:
-            st.markdown(
-                '<div class="empty">Nothing to build from yet. Answer a few questions '
-                'in Philosophy first.</div>', unsafe_allow_html=True)
-        elif done < 8:
-            st.warning(
-                f"Only {done} answers so far. The guide will be thin and will spend most "
-                "of its length listing what it still needs to know."
-            )
+        if total_done == 0:
+            ui.empty("Nothing to build from yet. Answer a few questions above.")
+        elif total_done < 8:
+            st.warning(f"Only {total_done} answers. The guide will be thin and mostly gaps.")
     with right:
-        build = st.button("Build style guide", type="primary", disabled=done == 0)
+        build = st.button("Build style guide", type="primary", disabled=total_done == 0)
 
     with st.expander("Prompt sent to Gemini"):
         st.code(build_guide_prompt(profile, answers), language=None)
@@ -427,120 +201,639 @@ def guide_tab(profile: Profile, answers: Answers) -> None:
     if build:
         with st.spinner("Writing the guide…"):
             try:
-                path, markdown = synthesise_guide(profile, answers)
-            except (GeminiTextError, GeminiImageError) as exc:
+                synthesise_guide(profile, answers)
+            except GEMINI_ERRORS as exc:
                 st.error(str(exc))
                 return
-        st.success(f"Written to {path}")
         st.rerun()
 
     if DEFAULT_GUIDE_PATH.is_file():
         markdown = DEFAULT_GUIDE_PATH.read_text()
         when = dt.datetime.fromtimestamp(DEFAULT_GUIDE_PATH.stat().st_mtime)
         st.markdown(
-            f'<div class="look-cap">{DEFAULT_GUIDE_PATH} &middot; '
-            f'{when:%d %b %H:%M} &middot; {len(markdown.split())} words</div>',
-            unsafe_allow_html=True,
-        )
+            f'<div class="look-cap">{DEFAULT_GUIDE_PATH} &middot; {when:%d %b %H:%M} '
+            f'&middot; {len(markdown.split())} words</div>', unsafe_allow_html=True)
         st.download_button("Download markdown", markdown, DEFAULT_GUIDE_PATH.name, "text/markdown")
         st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>', unsafe_allow_html=True)
 
 
-def edit_panel(profile: Profile) -> None:
-    s = profile.subject
-    with st.expander("Edit subject"):
-        with st.form("subject"):
-            s.name = st.text_input("Name", s.name)
+# --- 2. inventory -------------------------------------------------------------
+
+def item_fields(item: Item, key: str, inventory: Inventory) -> Item:
+    """The shared add/edit form body. Returns the item with form values applied."""
+    item.name = st.text_input("Name", item.name, key=f"{key}-name",
+                              placeholder="Cream camp-collar shirt")
+    c1, c2, c3 = st.columns(3)
+    item.garment = c1.selectbox("Garment", GARMENTS, index=GARMENTS.index(item.garment)
+                                if item.garment in GARMENTS else 0, key=f"{key}-garment")
+    item.category = inv_mod.category_for(item.garment)
+    item.status = c2.selectbox("Status", STATUSES, index=STATUSES.index(item.status),
+                               key=f"{key}-status")
+    item.price = c3.number_input("Price £", 0.0, 100000.0, float(item.price), step=5.0,
+                                 key=f"{key}-price",
+                                 help="What you paid, or what you expect it to cost.")
+    c4, c5, c6 = st.columns([2, 1, 2])
+    item.colour = c4.text_input("Colour", item.colour, key=f"{key}-colour",
+                                placeholder="chocolate brown")
+    item.colour_hex = c5.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
+    item.fabric = c6.text_input("Fabric", item.fabric, key=f"{key}-fabric",
+                                placeholder="brushed cotton twill")
+    c7, c8, c9 = st.columns(3)
+    item.pattern = c7.text_input("Pattern", item.pattern, key=f"{key}-pattern")
+    item.brand = c8.text_input("Brand", item.brand, key=f"{key}-brand")
+    item.size_label = c9.text_input("Size label", item.size_label, key=f"{key}-size",
+                                    help="What the tag says. Meaningless across brands, "
+                                         "which is why the measurements below matter.")
+    item.description = st.text_area(
+        "Description for the image model", item.description, key=f"{key}-desc", height=68,
+        help="Only what a photograph would not show. Drape, weight, how it sits.")
+    c10, c11 = st.columns([1, 2])
+    item.fit_verdict = c10.selectbox("Fit", FIT_VERDICTS, index=FIT_VERDICTS.index(item.fit_verdict)
+                                     if item.fit_verdict in FIT_VERDICTS else len(FIT_VERDICTS) - 1,
+                                     key=f"{key}-verdict")
+    item.fit_note = c11.text_input("Fit note", item.fit_note, key=f"{key}-fitnote",
+                                   placeholder="Shoulders right, sleeves 2 cm long")
+    tags = st.text_input("Tags, comma separated", ", ".join(item.tags), key=f"{key}-tags")
+    item.tags = [t.strip() for t in tags.split(",") if t.strip()]
+
+    dims = TRACKED_DIMENSIONS.get(item.garment, ())
+    if dims:
+        st.markdown('<div class="look-cap">Measured flat or round, in cm. '
+                    'Leave at 0 if not measured.</div>', unsafe_allow_html=True)
+        cols = st.columns(min(len(dims), 4))
+        for n, dim in enumerate(dims):
+            item.measurements[dim] = cols[n % len(cols)].number_input(
+                fitspec.LABELS.get(dim, dim.title()), 0.0, 300.0,
+                float(item.measurements.get(dim, 0)), step=0.5, key=f"{key}-m-{dim}")
+    return item
+
+
+def inventory_tab(profile: Profile, inventory: Inventory) -> None:
+    counts = inventory.counts()
+    value = shopping.wardrobe_value(inventory)
+    ui.stats([
+        ("Owned", str(counts[OWNED])),
+        ("Wanted", str(counts[ASPIRATIONAL])),
+        ("Retired", str(counts[RETIRED])),
+        ("Owned value", ui.money(value["owned_value"])),
+        ("Wanted value", ui.money(value["wanted_value"])),
+    ])
+    ui.blurb(
+        "Every piece, owned or merely wanted, lives here. Photograph anything words "
+        "cannot pin down: \"green jacket\" gives the model a different jacket every "
+        "time, the photograph gives it that one."
+    )
+
+    with st.expander("Add an item", expanded=not inventory.items):
+        with st.form("add-item", clear_on_submit=True):
+            draft = item_fields(Item(), "new", inventory)
+            photo = st.file_uploader("Photo", type=["png", "jpg", "jpeg", "webp"], key="new-photo")
+            if st.form_submit_button("Add to wardrobe"):
+                if not draft.name.strip():
+                    st.warning("Give it a name.")
+                else:
+                    added = inventory.add(draft)
+                    if photo:
+                        try:
+                            added.photo = inv_mod.save_photo(added.id, photo)
+                        except ValueError as exc:
+                            st.warning(str(exc))
+                    inventory.save()
+                    st.rerun()
+
+    if not inventory.items:
+        ui.empty("Nothing in the wardrobe yet. Add the first piece above.")
+        return
+
+    ui.eyebrow("The wardrobe")
+    f1, f2, f3 = st.columns([2, 1, 1])
+    query = f1.text_input("Search", "", key="inv-q", placeholder="brown, linen, Uniqlo…")
+    category = f2.selectbox("Category", ["All", *CATEGORIES], key="inv-cat")
+    status = f3.selectbox("Status", ["All", *STATUSES], key="inv-status")
+
+    found = inventory.filter(
+        query=query,
+        category=None if category == "All" else category,
+        status=None if status == "All" else status,
+    )
+    if not found:
+        ui.empty("Nothing matches that.")
+        return
+    st.markdown(f'<div class="look-cap">{len(found)} of {len(inventory.items)} pieces</div>',
+                unsafe_allow_html=True)
+
+    for chunk in (found[i:i + 3] for i in range(0, len(found), 3)):
+        for col, item in zip(st.columns(3, gap="medium"), chunk):
+            with col:
+                item_card(item, inventory)
+
+
+def item_card(item: Item, inventory: Inventory) -> None:
+    if item.has_photo:
+        ui.plate(Path(item.photo), width=420)
+    else:
+        st.markdown(f'<div class="swatch" style="background:{item.colour_hex}"></div>',
+                    unsafe_allow_html=True)
+
+    badge = {OWNED: "", ASPIRATIONAL: '<span class="badge want">wanted</span>',
+             RETIRED: '<span class="badge">retired</span>'}[item.status]
+    verdict = ""
+    if item.fit_verdict in ("Perfect", "Good"):
+        verdict = f'<span class="badge ok">{item.fit_verdict.lower()}</span>'
+    elif item.fit_verdict in ("Too big", "Too small", "Wrong shape"):
+        verdict = f'<span class="badge no">{item.fit_verdict.lower()}</span>'
+
+    meta = " · ".join(b for b in [item.brand, item.size_label, item.fabric] if b)
+    st.markdown(
+        f'<div class="item"><div class="top"><div class="nm">{item.name or item.garment}</div>'
+        f'{badge}{verdict}</div>'
+        f'<div class="meta">{item.garment}{" · " + meta if meta else ""}<br>'
+        f'<span class="price">{ui.money(item.price) if item.price else "no price"}</span>'
+        f'{" · " + item.fit_note if item.fit_note else ""}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Edit"):
+        with st.form(f"edit-{item.id}"):
+            edited = item_fields(item, f"e-{item.id}", inventory)
+            new_photo = st.file_uploader("Replace photo", type=["png", "jpg", "jpeg", "webp"],
+                                         key=f"ph-{item.id}")
             c1, c2 = st.columns(2)
-            s.height_cm = c1.number_input("Height (cm)", 120, 230, s.height_cm or 176)
-            s.body_fat_pct = c2.number_input("Body fat (%)", 0, 50, s.body_fat_pct)
-            s.build = st.text_input("Build", s.build)
-            c3, c4 = st.columns([1, 2])
-            s.skin_tone_hex = c3.color_picker("Skin", s.skin_tone_hex)
-            s.skin_tone = c4.text_input("Skin, in words", s.skin_tone)
-            s.hair = st.text_input("Hair", s.hair)
-            s.facial_hair = st.text_input("Facial hair", s.facial_hair)
-            c5, c6 = st.columns(2)
-            s.eyes = c5.text_input("Eyes", s.eyes)
-            s.details = c6.text_input("Always wears", s.details)
-
-            st.write("Measurements in cm. Leave at 0 until measured.")
-            m = profile.measurements
-            m1, m2, m3 = st.columns(3)
-            m.chest_cm = m1.number_input("Chest", 0, 200, m.chest_cm)
-            m.waist_cm = m2.number_input("Waist", 0, 200, m.waist_cm)
-            m.inseam_cm = m3.number_input("Inseam", 0, 150, m.inseam_cm)
-            m4, m5 = st.columns(2)
-            m.shoulder_cm = m4.number_input("Shoulder", 0, 100, m.shoulder_cm)
-            m.shoe_eu = m5.number_input("Shoe EU", 0, 60, m.shoe_eu)
-
-            profile.style.direction = st.text_area("Style direction", profile.style.direction, height=68)
-            profile.style.avoid = st.text_area("Avoid", profile.style.avoid, height=68)
-
-            if st.form_submit_button("Save subject"):
-                st.success(f"Saved to {profile.save()}")
+            save = c1.form_submit_button("Save")
+            delete = c2.form_submit_button("Delete")
+            if save:
+                if new_photo:
+                    try:
+                        edited.photo = inv_mod.save_photo(edited.id, new_photo)
+                    except ValueError as exc:
+                        st.warning(str(exc))
+                inventory.update(edited)
+                inventory.save()
+                st.rerun()
+            if delete:
+                inv_mod.drop_photo(item)
+                inventory.remove(item.id)
+                inventory.save()
                 st.rerun()
 
 
-def brief_panel(profile: Profile, photo: Path | None) -> None:
-    outfit = st.text_area(
-        "The outfit",
-        placeholder="Navy linen camp-collar shirt, cream wide-leg trousers, tan suede loafers.",
-        height=120,
-    )
-    c1, c2, c3 = st.columns([2, 2, 1])
-    shot = c1.selectbox("Framing", list(SHOTS))
-    background = c2.selectbox("Background", list(BACKGROUNDS))
-    count = c3.number_input("Variations", 1, 4, 1)
-    extra = st.text_input("Extra direction", placeholder="Sleeves rolled twice. Overcast daylight.")
+# --- 3. principles ------------------------------------------------------------
 
-    prompt = build_prompt(profile, outfit or "…", shot=shot, background=background, extra=extra)
+def principles_tab(profile: Profile, answers: Answers, principles: Principles) -> None:
+    ui.blurb(
+        "Not the style guide. The guide is a document you read once; these are the "
+        "dozen lines you hold in your head while putting an outfit together. Every "
+        "principle has to be checkable: you should be able to look at an outfit and "
+        "say whether it obeys or breaks it. They are fed into every generated look."
+    )
+
+    left, right = st.columns([3, 1], gap="large")
+    with right:
+        count = st.number_input("How many", 6, 20, 12, key="prin-count")
+        generate = st.button("Generate principles", type="primary")
+    with left:
+        if principles.principles:
+            st.markdown(f'<div class="look-cap">{len(principles.principles)} principles &middot; '
+                        f'{principles.path}</div>', unsafe_allow_html=True)
+        else:
+            ui.empty("No principles yet. Generate a set from the questionnaire, "
+                     "or write them by hand below.")
+
+    if generate:
+        guide = DEFAULT_GUIDE_PATH.read_text() if DEFAULT_GUIDE_PATH.is_file() else ""
+        with st.spinner("Thinking…"):
+            try:
+                fresh = prin_mod.generate(profile, answers, guide, int(count))
+            except (ValueError, *GEMINI_ERRORS) as exc:
+                st.error(str(exc))
+                return
+        principles.principles = []
+        for p in fresh:
+            principles.add(p)
+        principles.save()
+        st.rerun()
+
+    for group, group_principles in principles.by_group().items():
+        ui.eyebrow(group)
+        for p in group_principles:
+            c1, c2 = st.columns([9, 1])
+            c1.markdown(
+                f'<div class="step"><div class="pieces">{p.text}</div>'
+                f'<div class="why">{p.reason}</div></div>', unsafe_allow_html=True)
+            if c2.button("Drop", key=f"drop-{p.id}", type="secondary"):
+                principles.remove(p.id)
+                principles.save()
+                st.rerun()
+
+    with st.expander("Write one by hand"):
+        with st.form("add-principle", clear_on_submit=True):
+            text = st.text_input("Instruction", placeholder="Keep volume in one place only.")
+            reason = st.text_input("Reason", placeholder="Volume top and bottom reads as swamped.")
+            group = st.selectbox("Group", GROUPS)
+            if st.form_submit_button("Add principle") and text.strip():
+                principles.add(Principle(text=text.strip(), reason=reason.strip(), group=group))
+                principles.save()
+                st.rerun()
+
+
+# --- 4. outfit generator ------------------------------------------------------
+
+def item_picker(label: str, options: list[Item], key: str, multi: bool = False):
+    """A searchable box over inventory. Streamlit's select boxes filter as you type."""
+    ids = [i.id for i in options]
+    labels = {i.id: i.label for i in options}
+    if multi:
+        return st.multiselect(label, ids, default=[], format_func=lambda i: labels[i], key=key)
+    chosen = st.selectbox(label, [None, *ids], format_func=lambda i: labels.get(i, "—"), key=key)
+    return [chosen] if chosen else []
+
+
+def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
+                  principles: Principles) -> None:
+    ui.blurb(
+        "Assemble a look from the wardrobe, or invent a piece you do not own yet. "
+        "Wanted pieces behave exactly like owned ones here, which is the point: you "
+        "can try the coat before you buy it, and the Shopping Guide will later work "
+        "out whether it earns its place."
+    )
+
+    with st.expander("Invent a piece you do not own"):
+        with st.form("quick-aspirational", clear_on_submit=True):
+            c1, c2, c3 = st.columns([3, 2, 1])
+            name = c1.text_input("Name", placeholder="Camel wool overcoat")
+            garment = c2.selectbox("Garment", GARMENTS, key="asp-garment")
+            price = c3.number_input("Price £", 0.0, 100000.0, 0.0, step=10.0, key="asp-price")
+            c4, c5, c6 = st.columns([2, 1, 2])
+            colour = c4.text_input("Colour", placeholder="camel")
+            colour_hex = c5.color_picker("Swatch", "#C19A6B", key="asp-hex")
+            fabric = c6.text_input("Fabric", placeholder="wool melton")
+            if st.form_submit_button("Add as wanted") and name.strip():
+                inventory.add(Item(
+                    name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
+                    colour=colour, colour_hex=colour_hex, fabric=fabric,
+                    status=ASPIRATIONAL, price=price,
+                ))
+                inventory.save()
+                st.rerun()
+
+    wearable_items = [i for i in inventory.items if i.status != RETIRED]
+    if not wearable_items:
+        ui.empty("Nothing to dress him in. Add pieces in the Wardrobe Inventory tab first.")
+        return
+
+    ui.eyebrow("The pieces")
+    picked: list[str] = []
+    cols = st.columns(4, gap="medium")
+    for col, category in zip(cols, ("Outerwear", "Top", "Bottom", "Shoes")):
+        with col:
+            options = [i for i in wearable_items if i.category == category]
+            picked += item_picker(category, options, f"pick-{category}") if options else []
+    accessories = [i for i in wearable_items if i.category == "Accessory"]
+    if accessories:
+        picked += item_picker("Accessories", accessories, "pick-acc", multi=True)
+
+    items = inventory.resolve(picked)
+    if not items:
+        ui.empty("Pick at least one piece.")
+        return
+
+    photos = [Path(i.photo) for i in items if i.has_photo]
+    missing_now = [i for i in items if not i.owned]
+    cost_note = (f"{len(missing_now)} piece(s) not owned, "
+                 f"{ui.money(sum(i.price for i in missing_now))} to buy"
+                 if missing_now else "every piece already owned")
+    st.markdown(
+        f'<div class="look-cap">{len(items)} pieces &middot; {len(photos)} with photos '
+        f'&middot; {cost_note}</div>', unsafe_allow_html=True)
+
+    ui.eyebrow("The shot")
+    c1, c2, c3 = st.columns([2, 2, 1])
+    shot = c1.selectbox("Framing", list(SHOTS), key="gen-shot")
+    background = c2.selectbox("Background", list(BACKGROUNDS), key="gen-bg")
+    count = c3.number_input("Variations", 1, 4, 1, key="gen-count")
+    c4, c5 = st.columns([2, 2])
+    name = c4.text_input("Outfit name", placeholder="Saturday lunch, Fulham Road")
+    tag_choice = c5.multiselect("Tags", outfits.all_tags(), key="gen-tags")
+    extra = st.text_input("Extra direction", placeholder="Sleeves rolled twice. Overcast daylight.")
+    use_principles = st.toggle("Apply the principles", value=bool(principles.principles),
+                               key="gen-prin")
+
+    prompt = build_outfit_prompt(
+        profile, [i.describe() for i in items], shot=shot, background=background,
+        principles=principles.as_prompt_block() if use_principles else "",
+        photo_count=len(photos), extra=extra,
+    )
     with st.expander("Prompt sent to Gemini"):
         st.code(prompt, language=None)
 
-    if not photo:
-        st.warning("No reference photo, so nothing to generate from.")
+    portrait = profile.photo("neutral")
+    if not portrait:
+        st.warning("No reference portrait, so nothing to dress.")
         return
 
     if st.button("Generate look", type="primary"):
-        if not outfit.strip():
-            st.warning("Describe the outfit first.")
-            return
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-        prefix = LOOKS_DIR / f"{stamp}-{slug(outfit)}"
+        title = name.strip() or ", ".join(i.name or i.garment for i in items[:3])
         with st.spinner(f"Dressing {profile.subject.name}…"):
             try:
                 paths = generate_images(
                     prompt,
-                    out_prefix=prefix,
-                    reference_images=[photo],
+                    out_prefix=LOOKS_DIR / f"{stamp}-{slug(title)}",
+                    reference_images=[portrait, *photos[:4]],
                     count=int(count),
                     settings=Settings.from_env(),
                 )
-            except GeminiImageError as exc:
+            except GEMINI_ERRORS as exc:
                 st.error(str(exc))
                 return
-        st.success(f"{len(paths)} image{'s' if len(paths) != 1 else ''} saved to {LOOKS_DIR}/")
+        outfits.add(Outfit(
+            name=title, item_ids=[i.id for i in items], tags=list(tag_choice),
+            images=[str(p) for p in paths], notes=extra, prompt=prompt,
+        ))
+        outfits.save()
+        st.success(f"Saved as “{title}”. It is in the Outfit Gallery.")
+
+
+# --- 5. outfit gallery --------------------------------------------------------
+
+def gallery_tab(inventory: Inventory, outfits: Outfits) -> None:
+    if not outfits.outfits:
+        ui.empty("No outfits yet. Build one in the Outfit Generator.")
+        return
+
+    loved = outfits.loved()
+    all_costs = [wearability(o, inventory) for o in outfits.outfits]
+    ui.stats([
+        ("Outfits", str(len(outfits.outfits))),
+        ("Loved", str(len(loved))),
+        ("Wearable now", str(sum(1 for w in all_costs if w.wearable))),
+        ("To buy, all outfits", ui.money(sum(
+            i.price for i in {m.id: m for w in all_costs for m in w.missing}.values()))),
+    ])
+    ui.blurb(
+        "Tag them however you actually think about them. The Shopping Guide only "
+        "counts the ones you love, so starring is not decoration: it decides what "
+        "gets bought."
+    )
+
+    f1, f2, f3, f4 = st.columns([2, 2, 1, 1])
+    query = f1.text_input("Search", "", key="gal-q")
+    tags = f2.multiselect("Tags", outfits.all_tags(), key="gal-tags")
+    match_all = f3.toggle("Match all tags", key="gal-all")
+    loved_only = f4.toggle("Loved only", key="gal-loved")
+
+    found = outfits.filter(tags=tags, loved_only=loved_only, match_all=match_all, query=query)
+    if not found:
+        ui.empty("Nothing matches that.")
+        return
+    st.markdown(f'<div class="look-cap">{len(found)} of {len(outfits.outfits)} outfits</div>',
+                unsafe_allow_html=True)
+
+    for chunk in (found[i:i + 3] for i in range(0, len(found), 3)):
+        for col, outfit in zip(st.columns(3, gap="medium"), chunk):
+            with col:
+                outfit_card(outfit, inventory, outfits)
+
+
+def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
+    cover = outfit.cover()
+    if cover:
+        ui.plate(Path(cover), outfit.name[:22], width=420)
+    else:
+        ui.empty("No image")
+
+    w = wearability(outfit, inventory)
+    badge = ('<span class="badge ok">wearable now</span>' if w.wearable
+             else f'<span class="badge want">{len(w.missing)} to buy</span>')
+    pieces = ", ".join(i.name or i.garment for i in inventory.resolve(outfit.item_ids))
+    tag_line = " ".join(f'<span class="badge">{t}</span>' for t in outfit.tags)
+    st.markdown(
+        f'<div class="item"><div class="top"><div class="nm">{outfit.name}</div>{badge}</div>'
+        f'<div class="meta">{pieces}<br>'
+        f'<span class="price">{ui.money(w.total)}</span> total &middot; '
+        f'owned {ui.money(w.owned_value)} &middot; to buy {ui.money(w.to_buy)}</div>'
+        f'<div style="margin-top:.5rem">{tag_line}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    c1, c2 = st.columns([1, 1])
+    if c1.button("♥ Loved" if outfit.loved else "♡ Love", key=f"love-{outfit.id}",
+                 type="primary" if outfit.loved else "secondary"):
+        outfit.loved = not outfit.loved
+        outfits.update(outfit)
+        outfits.save()
         st.rerun()
 
+    with c2.expander("Edit"):
+        with st.form(f"of-{outfit.id}"):
+            outfit.name = st.text_input("Name", outfit.name, key=f"on-{outfit.id}")
+            outfit.tags = st.multiselect("Tags", outfits.all_tags(), default=outfit.tags,
+                                         key=f"ot-{outfit.id}")
+            new_tag = st.text_input("New tag", key=f"nt-{outfit.id}",
+                                    placeholder="rainy Tuesday")
+            outfit.notes = st.text_area("Notes", outfit.notes, height=68, key=f"onote-{outfit.id}")
+            s1, s2 = st.columns(2)
+            if s1.form_submit_button("Save"):
+                if new_tag.strip():
+                    outfit.tags = sorted(set(outfit.tags) | {new_tag.strip().lower()})
+                outfits.update(outfit)
+                outfits.save()
+                st.rerun()
+            if s2.form_submit_button("Delete"):
+                outfits.remove(outfit.id)
+                outfits.save()
+                st.rerun()
 
-def gallery() -> None:
-    looks = saved_looks()
-    if not looks:
+    if w.missing:
         st.markdown(
-            '<div class="empty">No looks yet. Describe an outfit above and generate one.</div>',
-            unsafe_allow_html=True,
+            '<div class="look-cap">Missing: ' +
+            ", ".join(f"{m.name} {ui.money(m.price)}" for m in w.missing) + "</div>",
+            unsafe_allow_html=True)
+
+
+# --- 6. shopping guide --------------------------------------------------------
+
+def shopping_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
+    ui.blurb(
+        "Two halves. First the sizes, because buying online without finished garment "
+        "measurements is a coin toss. Then the plan, worked out from the outfits you "
+        "loved rather than from taste."
+    )
+
+    measurements_panel(profile)
+    size_targets_panel(profile)
+    plan_panel(inventory, outfits)
+
+
+def measurements_panel(profile: Profile) -> None:
+    ui.eyebrow("Body measurements")
+    body = profile.measurements
+    missing = body.missing_critical()
+    if missing:
+        st.warning(
+            "Not measured yet: " + ", ".join(fitspec.LABELS.get(m, m) for m in missing) +
+            ". Until then every size target below is derived from height and build, "
+            "which is fine for a shortlist and useless for a blazer. Twenty minutes "
+            "with a tape measure fixes it permanently."
         )
+    ui.meter(len(body.measured()), 16, "Measured")
+
+    with st.expander("Take the measurements", expanded=bool(missing) and not body.measured()):
+        with st.form("measurements"):
+            names = [f for f in fitspec.HOW_TO_MEASURE]
+            cols = st.columns(3)
+            for n, dim in enumerate(names):
+                label = fitspec.LABELS.get(dim, dim.replace("_", " ").title())
+                setattr(body, dim, cols[n % 3].number_input(
+                    label + (" ★" if dim in fitspec.CRITICAL else ""),
+                    0.0, 300.0, float(getattr(body, dim, 0)), step=0.5,
+                    help=fitspec.HOW_TO_MEASURE[dim], key=f"bm-{dim}"))
+            body.shoe_eu = st.number_input("Shoe EU", 0.0, 60.0, float(body.shoe_eu), step=0.5,
+                                           key="bm-shoe")
+            if st.form_submit_button("Save measurements"):
+                profile.save()
+                st.rerun()
+
+    values, estimated = body.resolved(profile.subject.height_cm, profile.subject.build)
+    rows = [{
+        "Dimension": fitspec.LABELS.get(k, k.replace("_", " ").title()),
+        "Value": f'{v:g} cm' if k != "shoe_eu" else f"EU {v:g}",
+        "Source": '<span class="est">estimated</span>' if k in estimated else "measured",
+    } for k, v in values.items()]
+    ui.table(rows, numeric=("Value",))
+
+
+def size_targets_panel(profile: Profile) -> None:
+    ui.eyebrow("Size targets")
+    ui.blurb(
+        "What the finished garment should measure, not what the body measures. A size "
+        "label means nothing across two brands; these numbers mean the same thing "
+        "everywhere. Take them into a shop, or send them to an alterations tailor."
+    )
+
+    c1, c2, c3 = st.columns(3)
+    garment = c1.selectbox("Garment", list(fitspec.EASE), key="sz-garment")
+    fit = c2.selectbox("Fit", fitspec.FITS, index=1, key="sz-fit")
+    lengths = list(fitspec.LENGTH_RATIOS.get(garment, {}))
+    length_style = c3.selectbox("Length", lengths, key="sz-len") if lengths else None
+
+    rise, trouser_break = "Mid", "Quarter break"
+    if garment in ("Trousers", "Jeans"):
+        c4, c5 = st.columns(2)
+        rise = c4.selectbox("Rise", list(fitspec.RISES), index=1, key="sz-rise")
+        trouser_break = c5.selectbox("Break", list(fitspec.BREAKS), index=1, key="sz-break")
+
+    targets = fitspec.target_spec(
+        garment, profile.measurements, profile.subject.height_cm, fit=fit,
+        build=profile.subject.build, length_style=length_style,
+        rise=rise, trouser_break=trouser_break,
+    )
+    rows = [{
+        "Dimension": t.label,
+        "Garment, round": f'{t.value:g} cm' + (' <span class="est">*</span>' if t.estimated else ""),
+        "Measured flat": f"{t.flat:g} cm" if t.flat else "—",
+        "Derived from": t.note,
+    } for t in targets]
+    ui.table(rows, numeric=("Garment, round", "Measured flat"))
+    st.markdown(
+        '<div class="look-cap">Round is the full circumference. Flat is what a shop\'s '
+        'size chart usually quotes, laid flat and measured across, so it is half the '
+        'round figure. <span class="est">*</span> means the number rests on an '
+        'estimated body measurement.</div>', unsafe_allow_html=True)
+
+
+def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
+    ui.eyebrow("What to buy next")
+
+    loved = outfits.loved()
+    if not loved:
+        ui.empty("No loved outfits yet. Love a few in the gallery and the plan will "
+                 "build itself from them.")
+
+    c1, c2, c3 = st.columns([1, 1, 2])
+    loved_only = c1.toggle("Loved outfits only", value=True, key="sh-loved")
+    use_budget = c2.toggle("Cap the budget", key="sh-usebudget")
+    budget = c3.number_input("Budget £", 0.0, 100000.0, 1000.0, step=50.0,
+                             key="sh-budget") if use_budget else None
+
+    plan = shopping.purchase_plan(outfits, inventory, loved_only=loved_only, budget=budget)
+    if not plan.blocked:
+        ui.empty("Every outfit under consideration is already wearable. "
+                 "Nothing to buy, which is the best possible answer.")
         return
-    for chunk in (looks[i:i + 3] for i in range(0, len(looks), 3)):
-        for col, path in zip(st.columns(3, gap="medium"), chunk):
-            with col:
-                plate(path, path.stem[:16])
-                when = dt.datetime.fromtimestamp(path.stat().st_mtime).strftime("%d %b %H:%M")
-                title = path.stem.split("-", 2)[-1].replace("-", " ")
-                st.markdown(f'<div class="look-cap">{title}<br>{when}</div>', unsafe_allow_html=True)
-                st.download_button("Download", path.read_bytes(), path.name, "image/png",
-                                   key=f"dl-{path.name}")
+
+    ui.stats([
+        ("Wearable now", str(len(plan.wearable_now))),
+        ("Blocked", str(len(plan.blocked))),
+        ("Plan unlocks", str(plan.outfits_unlocked)),
+        ("Total", ui.money(plan.total_cost)),
+        ("Per outfit", ui.money(plan.total_cost / plan.outfits_unlocked)
+         if plan.outfits_unlocked else "—"),
+    ], brass_first=True)
+
+    for n, step in enumerate(plan.steps, 1):
+        pieces = ", ".join(i.name or i.garment for i in step.items)
+        unlocked = ", ".join(o.name for o in step.unlocked) or "nothing on its own"
+        st.markdown(
+            f'<div class="step"><div class="hd"><div><span class="n">{n}</span> '
+            f'<span class="pieces">{pieces}</span></div>'
+            f'<div class="cost">{ui.money(step.price)}</div></div>'
+            f'<div class="why">Unlocks: {unlocked}<br>'
+            f'Running total {ui.money(step.cumulative_cost)} for '
+            f'{step.cumulative_unlocked} outfit(s), {ui.money(step.cost_per_outfit or 0)} each'
+            f'</div></div>', unsafe_allow_html=True)
+
+    if plan.skipped_for_budget:
+        st.info(f"Out of budget: {', '.join(o.name for o in plan.skipped_for_budget)}.")
+    elif plan.still_blocked:
+        st.info(f"Still blocked: {', '.join(o.name for o in plan.still_blocked)}.")
+
+    with st.expander("How this is worked out"):
+        st.markdown(
+            "Each blocked outfit gives a *bundle*: the pieces still missing from it. "
+            "Each round takes the bundle with the best outfits-per-pound, and any other "
+            "outfit whose gap is a subset of that bundle unlocks for free. Repeat until "
+            "nothing is blocked.\n\n"
+            "Scoring one garment at a time looks reasonable and behaves badly: an outfit "
+            "missing two pieces is completed by neither alone, so both score zero and the "
+            "plan stalls. Bundles avoid that.\n\n"
+            "This is greedy weighted set cover, so it is an approximation, not the "
+            "provably cheapest plan. Every step shows its own arithmetic so you can "
+            "disagree with it."
+        )
+
+    ui.eyebrow("Every missing piece, ranked")
+    ui.blurb("Independent of purchase order: how many blocked outfits each piece appears "
+             "in, and how many it finishes single-handedly.")
+    rows = [{
+        "Piece": l.item.name or l.item.garment,
+        "Price": ui.money(l.price) if l.price else "—",
+        "In blocked outfits": str(l.appearances),
+        "Finishes alone": str(l.solo_unlocks),
+        "Outfits": ", ".join(l.outfit_names[:4]),
+    } for l in plan.leverage]
+    ui.table(rows, numeric=("Price", "In blocked outfits", "Finishes alone"))
+
+    ui.eyebrow("Star what you will actually buy")
+    starred_total = 0.0
+    for l in plan.leverage:
+        c1, c2 = st.columns([5, 1])
+        c1.markdown(
+            f'<div class="look-cap">{l.item.name or l.item.garment} &middot; '
+            f'{ui.money(l.price) if l.price else "no price"} &middot; '
+            f'in {l.appearances} blocked outfit(s)</div>', unsafe_allow_html=True)
+        label = "★ Starred" if l.item.starred else "☆ Star"
+        if c2.button(label, key=f"star-{l.item.id}",
+                     type="primary" if l.item.starred else "secondary"):
+            l.item.starred = not l.item.starred
+            inventory.update(l.item)
+            inventory.save()
+            st.rerun()
+        if l.item.starred:
+            starred_total += l.price
+    if starred_total:
+        st.markdown(f'<div class="look-cap">Starred total: '
+                    f'<b>{ui.money(starred_total)}</b></div>', unsafe_allow_html=True)
 
 
 def main() -> int:

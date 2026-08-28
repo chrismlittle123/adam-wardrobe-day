@@ -1,5 +1,8 @@
 """The subject: who we are dressing, loaded from profile.toml.
 
+Body measurements live here too, in the full tailoring set, because every
+garment target in fitspec is derived from them.
+
 One file describes the man, and everything else reads from it. The app renders
 it, the prompt builder folds it into every request, and the edit panel writes it
 back. Nothing about the subject is hard-coded anywhere else.
@@ -13,23 +16,11 @@ from pathlib import Path
 
 import tomli_w
 
+from .fitspec import Body
+
 DEFAULT_PROFILE_PATH = Path("profile.toml")
 
 CM_PER_INCH = 2.54
-
-
-@dataclass
-class Measurements:
-    """Centimetres. Zero means "not measured yet", never "zero centimetres"."""
-
-    chest_cm: int = 0
-    waist_cm: int = 0
-    inseam_cm: int = 0
-    shoulder_cm: int = 0
-    shoe_eu: int = 0
-
-    def known(self) -> dict[str, int]:
-        return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name)}
 
 
 @dataclass
@@ -68,7 +59,7 @@ class Subject:
 class Profile:
     subject: Subject = field(default_factory=Subject)
     photos: dict[str, str] = field(default_factory=dict)
-    measurements: Measurements = field(default_factory=Measurements)
+    measurements: Body = field(default_factory=Body)
     style: Style = field(default_factory=Style)
     path: Path = DEFAULT_PROFILE_PATH
 
@@ -84,7 +75,7 @@ class Profile:
         return cls(
             subject=_build(Subject, raw.get("subject", {})),
             photos=dict(raw.get("photos", {})),
-            measurements=_build(Measurements, raw.get("measurements", {})),
+            measurements=_build(Body, raw.get("measurements", {})),
             style=_build(Style, raw.get("style", {})),
             path=path,
         )

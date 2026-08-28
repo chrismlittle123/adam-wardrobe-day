@@ -9,6 +9,7 @@ not just as description.
 
 from __future__ import annotations
 
+from .fitspec import LABELS
 from .profile import Profile
 
 SHOTS: dict[str, str] = {
@@ -28,13 +29,7 @@ BACKGROUNDS: dict[str, str] = {
     "Interior": "Warm domestic interior behind him, softly out of focus",
 }
 
-MEASUREMENT_LABELS: dict[str, str] = {
-    "chest_cm": "chest",
-    "waist_cm": "waist",
-    "inseam_cm": "inseam",
-    "shoulder_cm": "shoulder width",
-    "shoe_eu": "shoe size EU",
-}
+CIRCUMFERENCE_FREE = {"shoe_eu"}
 
 
 def physique(profile: Profile) -> str:
@@ -43,9 +38,9 @@ def physique(profile: Profile) -> str:
     parts = [p for p in (s.height_metric and f"{s.height_metric} ({s.height_imperial})", s.build) if p]
     if s.body_fat_pct:
         parts.append(f"around {s.body_fat_pct}% body fat")
-    for key, value in profile.measurements.known().items():
-        label = MEASUREMENT_LABELS.get(key, key)
-        parts.append(f"{label} {value}" + ("" if key == "shoe_eu" else " cm"))
+    for key, value in profile.measurements.measured().items():
+        label = LABELS.get(key, key.replace("_", " "))
+        parts.append(f"{label.lower()} {value:g}" + ("" if key in CIRCUMFERENCE_FREE else " cm"))
     return ", ".join(parts)
 
 
@@ -105,3 +100,43 @@ def build_prompt(
         "No text, no watermark, no logos, no collage, no extra people, no mirror.",
     ]
     return "\n".join(lines)
+
+
+def build_outfit_prompt(
+    profile: Profile,
+    garments: list[str],
+    *,
+    shot: str = "Full length",
+    background: str = "White studio",
+    principles: str = "",
+    photo_count: int = 0,
+    extra: str = "",
+) -> str:
+    """Prompt for a specific outfit assembled from inventory items.
+
+    When garment photographs are supplied they lead, because "green jacket"
+    produces a different jacket every time and the photograph produces that one.
+    The model is told explicitly which reference is the man and which are cloth,
+    otherwise it happily puts the jacket's photographer in the picture.
+    """
+    outfit = "\n".join(f"- {g}" for g in garments) if garments else "…"
+    notes: list[str] = []
+    if photo_count:
+        notes.append(
+            f"Reference image 1 is the man. The next {photo_count} reference image(s) are "
+            "the actual garments. Reproduce those garments faithfully: their exact colour, "
+            "cloth, pattern and cut. Take only the clothing from them, never the background, "
+            "the lighting or any person in them."
+        )
+    if principles.strip():
+        notes.append("Follow these wardrobe principles:\n" + principles.strip())
+    if extra.strip():
+        notes.append(extra.strip())
+
+    return build_prompt(
+        profile,
+        f"He is wearing exactly these pieces and nothing else:\n{outfit}",
+        shot=shot,
+        background=background,
+        extra="\n\n".join(notes),
+    )
