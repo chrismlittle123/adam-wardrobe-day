@@ -35,7 +35,9 @@ Two hard rules:
 2. Where an answer is missing and it matters, say so plainly in the Open
    questions section rather than filling the gap with a guess.
 
-Write British English. Use markdown. No preamble, no sign-off, no emoji."""
+Write British English. Use markdown. No preamble, no sign-off, no emoji.
+
+If he has allocated points across practicality, comfort, aesthetics and cost, that allocation is the tie-breaker. Whenever two recommendations conflict, side with whichever he scored higher, and say so in the clause. A man who put 8 on aesthetics and 2 on cost is told to buy the better coat; one who scored it the other way is not."""
 
 GUIDE_SHAPE = """Write the guide with exactly these top-level sections:
 

@@ -1,18 +1,22 @@
 """The style-guide questionnaire.
 
-Five of these are the spine of the whole thing: what the wardrobe should say,
-what is currently saying the wrong thing, what is missing, what looks amazing,
-and who he is looking at. Those are marked `spine`.
+Intent alone does not dress anybody. A man will tell you his philosophy is
+Milanese tailoring and then wear the same grey hoodie for four years, so the
+audit section asks what actually happens on a Tuesday rather than what he
+believes on a Sunday. Questions marked `core` are the shorter path; the rest
+deepen the guide.
 
-The rest exist because intent alone does not dress anybody. A man will tell you
-his philosophy is Milanese tailoring and then wear the same grey hoodie for four
-years, so the audit and life sections ask what actually happens on a Tuesday.
-Questions marked `core` are the shorter path; the rest deepen the guide.
+Most questions take prose. One takes a budget of points, because asking someone
+to rank practicality against beauty in a sentence gets you "both, really", and
+making him spend a fixed twenty forces the trade-off into the open.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, field
+
+TEXT, POINTS = "text", "points"
 
 
 @dataclass(frozen=True)
@@ -22,8 +26,10 @@ class Question:
     help: str = ""
     placeholder: str = ""
     core: bool = False
-    spine: bool = False
     lines: int = 3
+    kind: str = TEXT
+    buckets: tuple[str, ...] = ()
+    points_total: int = 20
 
 
 @dataclass(frozen=True)
@@ -45,7 +51,7 @@ SECTIONS: tuple[Section, ...] = (
                 "What do you want your wardrobe to say about you, and in which contexts?",
                 "Split it by context if it changes: work, dinner, a date, a Sunday.",
                 "At work: competent and unbothered. On a Saturday: like I have a life.",
-                core=True, spine=True, lines=5,
+                core=True, lines=5,
             ),
             Question(
                 "never_look_like",
@@ -80,14 +86,14 @@ SECTIONS: tuple[Section, ...] = (
                 "What styles or vibes do you personally think look amazing?",
                 "On anyone. Doesn't have to be realistic for you.",
                 "Late-90s Milanese, soft-shouldered, unstructured. Also 70s tennis club.",
-                core=True, spine=True, lines=5,
+                core=True, lines=5,
             ),
             Question(
                 "icons",
                 "Any style icons who fit the vibe you're going for?",
                 "People, characters, a specific photograph. Say what it is about them.",
                 "Marcello Mastroianni. Not the suits, the ease. Also Paul Mescal's tailoring.",
-                core=True, spine=True, lines=4,
+                core=True, lines=4,
             ),
             Question(
                 "stolen_outfit",
@@ -123,14 +129,14 @@ SECTIONS: tuple[Section, ...] = (
                 "What's in your wardrobe that isn't saying what you want it to say?",
                 "Name specific garments, not categories.",
                 "The three black going-out shirts. A puffer that makes me look square.",
-                core=True, spine=True, lines=5,
+                core=True, lines=5,
             ),
             Question(
                 "missing",
                 "What's missing that could say it?",
                 "Guesses are fine. This is the shopping list before it is a shopping list.",
                 "A proper overcoat. Trousers that aren't jeans. One good brown shoe.",
-                core=True, spine=True, lines=5,
+                core=True, lines=5,
             ),
             Question(
                 "actually_wear",
@@ -181,40 +187,12 @@ SECTIONS: tuple[Section, ...] = (
                 "Three days in the office, two at home, gym four times, dinner out twice a week.",
                 core=True, lines=5,
             ),
-            Question(
-                "work_code",
-                "What is the dress code where you work, written and unwritten?",
-                "The unwritten one is the real one.",
-                "",
-                core=True, lines=3,
-            ),
-            Question(
-                "climate",
-                "Which city, and what is the weather really like?",
-                "Layering, rain, and how much of the year is grey.",
-                "London. Grey and damp nine months of the year. Two good weeks in June.",
-                core=True, lines=3,
-            ),
-            Question(
-                "dreaded",
-                "Which recurring occasions do you dread dressing for?",
-                "Weddings, work drinks, meeting a partner's family, a nice restaurant.",
-                "",
-                core=True, lines=3,
-            ),
-            Question(
-                "travel",
-                "How much do you travel, and what do you pack?",
-                "",
-                "",
-                lines=3,
-            ),
         ),
     ),
     Section(
         "fit",
         "Body and fit",
-        "The measurements are on the subject card. This is about how he likes cloth to sit.",
+        "The measurements live in the Shopping Guide. This is about how he likes cloth to sit.",
         (
             Question(
                 "fit_preference",
@@ -237,35 +215,14 @@ SECTIONS: tuple[Section, ...] = (
                 "Trousers fit the waist and swim on the thigh. Shirt sleeves always too long.",
                 core=True, lines=4,
             ),
-            Question(
-                "details_fit",
-                "Preferences on trouser break, rise, sleeve length, collar?",
-                "Skip if you have no idea. The guide will make a recommendation instead.",
-                "",
-                lines=3,
-            ),
         ),
     ),
     Section(
         "colour",
         "Colour and cloth",
         "Warm medium-brown skin with a golden undertone carries warm colour easily and "
-        "gets flattened by cold grey. Worth knowing what he already believes.",
+        "gets flattened by cold grey.",
         (
-            Question(
-                "colours_good",
-                "Which colours do you feel good in?",
-                "",
-                "Cream, olive, rust, navy. Anything warm.",
-                core=True, lines=3,
-            ),
-            Question(
-                "colours_never",
-                "Which colours do you never wear, and why?",
-                "",
-                "Black near my face. Pastel anything. Cold light grey.",
-                core=True, lines=3,
-            ),
             Question(
                 "palette_width",
                 "Tight repeatable palette, or do you want range?",
@@ -280,88 +237,29 @@ SECTIONS: tuple[Section, ...] = (
                 "",
                 lines=3,
             ),
-            Question(
-                "pattern",
-                "How much pattern can you actually live with?",
-                "Solid only, subtle texture, stripe, or genuinely loud.",
-                "",
-                lines=2,
-            ),
-        ),
-    ),
-    Section(
-        "picture",
-        "The rest of the picture",
-        "Style is not only cloth. Hair and hardware do half the work.",
-        (
-            Question(
-                "grooming",
-                "Hair, beard, glasses: current state and anything you're considering?",
-                "",
-                "",
-                lines=3,
-            ),
-            Question(
-                "jewellery",
-                "Jewellery, watch, fragrance, tattoos. What do you wear every day?",
-                "The things that never come off should be designed around, not ignored.",
-                "Small gold stud, thin gold chain, both always on.",
-                core=True, lines=3,
-            ),
-            Question(
-                "outerwear_bags",
-                "Coats and bags you own or want.",
-                "In London the coat is what people actually see.",
-                "",
-                lines=3,
-            ),
         ),
     ),
     Section(
         "practical",
         "Money and reality",
-        "The constraint that decides whether any of this happens.",
+        "The constraints that decide whether any of this happens.",
         (
             Question(
-                "budget",
-                "Budget: roughly per piece, and overall for this project?",
-                "A number changes the entire recommendation. Ranges are fine.",
-                "Up to £200 a piece, more for a coat or shoes. Maybe £2,000 total over six months.",
-                core=True, lines=3,
-            ),
-            Question(
-                "buying_philosophy",
-                "Few and expensive, or more and cheaper?",
-                "",
-                "",
-                core=True, lines=2,
-            ),
-            Question(
-                "secondhand",
-                "Secondhand and vintage: yes, no, or depends?",
-                "",
-                "",
-                lines=2,
+                "priorities",
+                "You have 20 points. Spend them across practicality, comfort, aesthetics "
+                "and cost, by how much each one matters to you.",
+                "They must add up to 20, so something has to lose. That is the point: it "
+                "settles every later argument between the beautiful thing and the sensible one.",
+                core=True,
+                kind=POINTS,
+                buckets=("Practicality", "Comfort", "Aesthetics", "Cost"),
+                points_total=20,
             ),
             Question(
                 "upkeep",
                 "How much ironing, hand-washing and dry-cleaning will you genuinely do?",
                 "Answer with what you actually do, not what you intend to do.",
                 "None. If it needs ironing it will not be worn.",
-                core=True, lines=3,
-            ),
-            Question(
-                "brands",
-                "Brands you already trust, and brands you would rather avoid?",
-                "",
-                "",
-                lines=3,
-            ),
-            Question(
-                "deadline",
-                "Anything coming up you need to be dressed for?",
-                "A wedding, a holiday, a new job. Deadlines set the order of the shopping list.",
-                "",
                 core=True, lines=3,
             ),
         ),
@@ -374,3 +272,18 @@ BY_ID: dict[str, Question] = {q.id: q for q in ALL_QUESTIONS}
 
 def section_of(question_id: str) -> Section | None:
     return next((s for s in SECTIONS if any(q.id == question_id for q in s.questions)), None)
+
+
+# --- point questions ----------------------------------------------------------
+
+def format_points(scores: dict[str, int]) -> str:
+    """Store as readable prose so the file stays legible and the guide prompt
+    can read it without a special case."""
+    return ", ".join(f"{bucket} {value}" for bucket, value in scores.items())
+
+
+def parse_points(answer: str, buckets: tuple[str, ...]) -> dict[str, int]:
+    """Read the stored line back into the widget. Missing buckets come back zero."""
+    found = {m.group(1).lower(): int(m.group(2))
+             for m in re.finditer(r"([A-Za-z]+)\s*[:=]?\s*(\d+)", answer or "")}
+    return {bucket: found.get(bucket.lower(), 0) for bucket in buckets}

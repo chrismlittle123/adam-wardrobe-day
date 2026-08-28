@@ -35,7 +35,9 @@ Bad: "Embrace timeless elegance." That cannot be checked against an outfit.
 
 Each principle: one imperative sentence, then one sentence of reason. Ground
 every one in something he actually said or in his physical proportions. Do not
-invent facts about his life."""
+invent facts about his life.
+
+If he has allocated points across practicality, comfort, aesthetics and cost, that allocation is the tie-breaker. Whenever two recommendations conflict, side with whichever he scored higher, and say so in the clause. A man who put 8 on aesthetics and 2 on cost is told to buy the better coat; one who scored it the other way is not."""
 
 
 @dataclass

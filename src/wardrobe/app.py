@@ -28,7 +28,7 @@ from wardrobe.philosophy import DEFAULT_GUIDE_PATH, Answers, build_guide_prompt,
 from wardrobe.principles import GROUPS, Principle, Principles
 from wardrobe.profile import Profile
 from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
-from wardrobe.questions import SECTIONS
+from wardrobe.questions import POINTS, SECTIONS, Question, format_points, parse_points
 
 LOOKS_DIR = Path("out/looks")
 GEMINI_ERRORS = (GeminiImageError, GeminiTextError)
@@ -171,18 +171,25 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
         with st.expander(f"{section.title}  ·  {mark}", expanded=filled == 0):
             ui.blurb(section.blurb)
             with st.form(f"sec-{section.id}"):
-                draft = {
-                    q.id: st.text_area(
-                        q.prompt + ("  ⟡ core five" if q.spine else ""),
-                        value=answers.get(q.id), placeholder=q.placeholder,
-                        help=q.help or None, height=max(68, q.lines * 27), key=f"a-{q.id}",
-                    )
-                    for q in questions
-                }
+                draft: dict[str, str] = {}
+                for q in questions:
+                    if q.kind == POINTS:
+                        draft[q.id] = points_input(q, answers.get(q.id))
+                    else:
+                        draft[q.id] = st.text_area(
+                            q.prompt, value=answers.get(q.id), placeholder=q.placeholder,
+                            help=q.help or None, height=max(68, q.lines * 27), key=f"a-{q.id}",
+                        )
                 if st.form_submit_button(f"Save {section.title.lower()}"):
                     answers.values.update(draft)
                     answers.save()
-                    st.rerun()
+                    # Saved either way; a wrong total is still a real signal, so it
+                    # is flagged rather than refused. No rerun, or the note vanishes.
+                    off = [n for n in (points_warning(q, draft.get(q.id, "")) for q in questions) if n]
+                    for note in off:
+                        st.warning(note)
+                    if not off:
+                        st.rerun()
 
     ui.eyebrow("The guide")
     total_done, total_all = answers.progress()
@@ -215,6 +222,52 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
             f'&middot; {len(markdown.split())} words</div>', unsafe_allow_html=True)
         st.download_button("Download markdown", markdown, DEFAULT_GUIDE_PATH.name, "text/markdown")
         st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>', unsafe_allow_html=True)
+
+
+def points_input(question: Question, stored: str) -> str:
+    """A fixed budget spent across named buckets. Forcing a total makes the
+    trade-off explicit; asking in prose gets you "both, really"."""
+    st.markdown(f'<div class="qlabel">{question.prompt}</div>', unsafe_allow_html=True)
+    if question.help:
+        st.caption(question.help)
+
+    current = parse_points(stored, question.buckets)
+    cols = st.columns(len(question.buckets))
+    scores = {
+        bucket: int(col.number_input(
+            bucket, 0, question.points_total, int(current[bucket]), step=1,
+            key=f"a-{question.id}-{bucket}"))
+        for col, bucket in zip(cols, question.buckets)
+    }
+
+    spent = sum(scores.values())
+    total = question.points_total
+    width = max(spent, total)
+    bars = "".join(
+        f'<span class="s{n}" style="width:{100 * v / width:.1f}%"></span>'
+        for n, v in enumerate(scores.values()) if v
+    )
+    left = total - spent
+    state = "" if spent == total else " off"
+    tail = ("balanced" if left == 0 else
+            f"{left} left" if left > 0 else f"{-left} over")
+    st.markdown(
+        f'<div class="alloc">{bars}</div>'
+        f'<div class="alloc-read{state}"><span>{" · ".join(f"{k} {v}" for k, v in scores.items())}</span>'
+        f'<span><b>{spent}</b> of {total} · {tail}</span></div>',
+        unsafe_allow_html=True,
+    )
+    return format_points(scores)
+
+
+def points_warning(question: Question, answer: str) -> str:
+    if question.kind != POINTS:
+        return ""
+    spent = sum(parse_points(answer, question.buckets).values())
+    if spent == question.points_total:
+        return ""
+    return (f"That is {spent} points, not {question.points_total}. Saved anyway, but the "
+            "weighting only means something if the total is fixed.")
 
 
 # --- 2. inventory -------------------------------------------------------------

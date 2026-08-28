@@ -202,6 +202,21 @@ details summary { font-family: 'IBM Plex Mono', monospace !important; font-size:
 .look-cap { font-family: 'IBM Plex Mono', monospace; font-size: .64rem; letter-spacing: .1em;
             color: var(--muted); padding-top: .45rem; line-height: 1.6; }
 
+/* Point allocation -------------------------------------------------------- */
+.qlabel { font-size: .95rem; color: var(--cream); margin: .5rem 0 .1rem; line-height: 1.5; }
+.alloc { display: flex; height: 6px; margin: .7rem 0 .4rem; background: rgba(240,230,219,.10); }
+.alloc span { display: block; height: 6px; }
+.alloc .s0 { background: var(--brass); }
+.alloc .s1 { background: #A8862B; }
+.alloc .s2 { background: #7E6626; }
+.alloc .s3 { background: #584820; }
+.alloc-read {
+  font-family: 'IBM Plex Mono', monospace; font-size: .64rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between;
+}
+.alloc-read b { color: var(--cream); font-weight: 500; }
+.alloc-read.off b { color: var(--bad); }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 """

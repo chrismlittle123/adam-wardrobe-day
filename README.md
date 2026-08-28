@@ -33,9 +33,12 @@ uv run wardrobe-app          # http://localhost:8501
 
 Six tabs, in the order the work happens.
 
-1. **Style Guide** — 39 questions across 8 sections: intent, taste, an honest
-   audit of what actually gets worn, life, fit, colour, grooming, budget.
-   Answers land in `style-answers.toml` and synthesise into `STYLE-GUIDE.md`.
+1. **Style Guide** — 24 questions across 7 sections: intent, taste, an honest
+   audit of what actually gets worn, life, fit, colour, and one question that
+   makes him spend 20 points across practicality, comfort, aesthetics and cost.
+   That allocation becomes the tie-breaker whenever two recommendations
+   conflict. Answers land in `style-answers.toml` and synthesise into
+   `STYLE-GUIDE.md`.
 2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos,
    size labels and finished garment measurements. Photograph anything words
    cannot pin down: "green jacket" gives a different jacket every time.
