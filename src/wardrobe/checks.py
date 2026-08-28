@@ -22,11 +22,11 @@ from . import paths
 
 APP_FILE = Path(__file__).with_name("app.py")
 
-DATA, FIT, INVENTORY, QUESTIONS, MATHS, PROMPTS, APP, LIVE = (
-    "Data", "Fit engine", "Inventory", "Questionnaire",
+DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, PROMPTS, APP, LIVE = (
+    "Data", "Fit engine", "Inventory", "Questionnaire", "Colour",
     "Shopping maths", "Prompts", "App", "Live Gemini",
 )
-GROUPS: tuple[str, ...] = (DATA, FIT, INVENTORY, QUESTIONS, MATHS, PROMPTS, APP, LIVE)
+GROUPS: tuple[str, ...] = (DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, PROMPTS, APP, LIVE)
 
 
 @dataclass
@@ -265,6 +265,21 @@ def check_pattern_removed() -> str:
     return f"no pattern field; describe() gives {described!r}"
 
 
+def check_fabric_list() -> str:
+    """Fabric is a fixed list, and the sample data uses names from it."""
+    from .inventory import FABRICS, FABRIC_OPTIONS, NONE, fabric_family
+    from .seed import ITEMS
+    flat = [f for group in FABRICS.values() for f in group]
+    assert len(flat) == len(set(flat)), "a fabric appears in two families"
+    assert FABRIC_OPTIONS[0] == NONE, "no blank option"
+    assert list(FABRIC_OPTIONS[1:]) == sorted(FABRIC_OPTIONS[1:]), "fabrics not alphabetical"
+    assert len(FABRIC_OPTIONS) > 30, "the list is too thin to cover a wardrobe"
+    assert fabric_family("Wool flannel") == "Wool", "family lookup broken"
+    unknown = [row[4] for row in ITEMS if row[4] and row[4] not in FABRIC_OPTIONS]
+    assert not unknown, f"sample data uses fabrics not on the list: {unknown}"
+    return f"{len(flat)} fabrics across {len(FABRICS)} families, sample data conforms"
+
+
 def check_alphabetical() -> str:
     from .inventory import CATEGORIES, GARMENTS
     assert list(GARMENTS) == sorted(GARMENTS), "garments not alphabetical"
@@ -411,6 +426,136 @@ def check_points_round_trip() -> str:
     assert sum(parse_points("", question.buckets).values()) == 0, "empty should parse to zeros"
     assert parse_points("Aesthetics 9", question.buckets)["Comfort"] == 0, "missing bucket not zero"
     return f"{line} -> parsed back exactly"
+
+
+# --- Colour -------------------------------------------------------------------
+
+def _palette():
+    from .palette import ACCENT, Colour, FIELD, GROUND, LEATHER, Palette
+    palette = Palette()
+    for name, hex_code, role in (
+        ("Cream", "#F2E9D8", FIELD), ("Ecru", "#E8DFC8", FIELD), ("Pale blue", "#BFD3E6", FIELD),
+        ("Navy", "#26303F", GROUND), ("Mid grey", "#7A7A78", GROUND),
+        ("Olive", "#6B6B47", GROUND), ("Camel", "#C19A6B", GROUND),
+        ("Chocolate", "#6B4426", LEATHER), ("Chestnut", "#8B5A2B", LEATHER),
+        ("Rust", "#8E3B2E", ACCENT),
+    ):
+        palette.add(Colour(name=name, hex=hex_code, role=role))
+    return palette
+
+
+def check_colour_arithmetic() -> str:
+    """Hue, lightness and the round trip through hex."""
+    from .palette import contrast, from_hsl, hsl, hue_distance, hue_name, lightness, to_hex, to_rgb
+    assert to_hex(to_rgb("#C58466")).upper() == "#C58466", "hex round trip lost precision"
+    assert hsl("#FFFFFF")[2] == 1.0 and hsl("#000000")[2] == 0.0, "lightness poles wrong"
+    assert lightness("#F2E9D8") > lightness("#26303F"), "cream is not lighter than navy"
+    assert _near(contrast("#FFFFFF", "#000000"), 1.0), "maximum contrast is not 1"
+    assert _near(contrast("#26303F", "#26303F"), 0.0), "a colour contrasts with itself"
+    assert hue_distance("#FF0000", "#00FF00") == 120, "hue distance wrong"
+    assert hue_distance("#FF0000", "#FF0000") == 0, "a hue differs from itself"
+    assert hue_name("#7A7A78") == "grey", "flat grey not named grey"
+    assert hue_name("#6B4426") == "brown", "chocolate should be brown, not a wheel sector"
+    assert hue_name("#C19A6B") != "brown", "camel is too light to be brown"
+    assert hue_name("#26303F") == "blue", "navy must read as blue, not a colour-wheel sector"
+    assert hue_name("#6B6B47") == "olive", "olive must read as olive"
+    assert hue_name("#8E3B2E") == "red" and hue_name("#8B5A2B") == "brown", \
+        "rust and chestnut are not being told apart"
+    assert from_hsl(0, 1, 0.5).upper() == "#FF0000", "hsl to hex wrong"
+    return "hex round trips, contrast poles at 0 and 1, grey and brown named"
+
+
+def check_warmth_against_skin() -> str:
+    """The verdicts have to match what is actually true of warm skin."""
+    from .palette import warmth
+    skin = "#C58466"
+    assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should sit in his family"
+    assert warmth("#6B4426", skin)[0] == "harmonious", "chocolate should sit in his family"
+    assert warmth("#26303F", skin)[0] == "flattering", "navy should flatter by contrast"
+    # A warm off-white is harmonious rather than flattering; only a truly neutral
+    # one goes through the desaturated branch.
+    assert warmth("#F8F4EC", skin)[0] == "harmonious", "warm off-white should sit in his family"
+    assert warmth("#FAFAFA", skin)[0] == "flattering", "neutral off-white should lift warm skin"
+    assert warmth("#7A7A78", skin)[0] == "careful", "flat grey should be flagged"
+    assert all(warmth(h, skin)[1] for h in ("#C19A6B", "#26303F", "#7A7A78")), \
+        "a verdict came back with no reason"
+    return "camel harmonious, navy flattering, flat grey flagged"
+
+
+def check_harmonies_are_wearable() -> str:
+    """Neighbours off the wheel, pulled back into clothes."""
+    from .palette import chroma, harmonies, hue_distance
+    base = "#C19A6B"
+    schemes = harmonies(base)
+    for wanted in ("Analogous", "Complementary", "Triadic", "Shades"):
+        assert wanted in schemes, f"{wanted} missing"
+    complement = schemes["Complementary"][0]
+    assert 150 <= hue_distance(base, complement) <= 210, "complement is not opposite"
+    for name, swatches in schemes.items():
+        for swatch in swatches:
+            assert chroma(swatch) <= 0.60, f"{name} returned a traffic cone: {swatch}"
+    assert len(schemes["Analogous"]) == 2, "analogous should give both sides"
+    return f"{len(schemes)} schemes, all under 0.60 chroma"
+
+
+def check_combination_scoring() -> str:
+    """The scorer must prefer real outfits and reject muddy ones."""
+    from .palette import combinations, coverage, score_combination
+    palette = _palette()
+    counts = coverage(palette)
+    assert counts["Top"] and counts["Bottom"] and counts["Shoes"], "roles gave no coverage"
+
+    best = combinations(palette, limit=5)
+    assert best, "nothing scored at all"
+    top = best[0]
+    assert top.score >= 90, f"the best recipe only scored {top.score}"
+    assert {"Top", "Bottom", "Shoes"} == set(top.pieces), "a slot is missing"
+    assert top.reasons, "a perfect score with nothing to say for itself"
+
+    def by_name(name):
+        return next(c for c in palette.colours if c.name == name)
+
+    muddy = score_combination({"Top": by_name("Rust"), "Bottom": by_name("Olive"),
+                               "Shoes": by_name("Chocolate")})
+    assert muddy.score < 55, f"rust on olive scored {muddy.score}, it should not"
+    assert any("one garment" in f for f in muddy.faults), "the muddy fault was not named"
+
+    classic = score_combination({"Top": by_name("Cream"), "Bottom": by_name("Navy"),
+                                 "Shoes": by_name("Chocolate")})
+    assert classic.score > muddy.score + 30, "cream/navy/brown is not beating rust on olive"
+    assert classic.verdict == "wear it", f"the safest outfit in menswear got {classic.verdict}"
+    return f"best {top.score} ({top.name}); rust on olive {muddy.score}"
+
+
+def check_colour_rules_are_obeyed() -> str:
+    """A colour not ticked for a category must never appear in that slot."""
+    from .palette import combinations, score_combination
+    palette = _palette()
+    navy = next(c for c in palette.colours if c.name == "Navy")
+    navy.categories = ["Bottom"]
+    cream = next(c for c in palette.colours if c.name == "Cream")
+    cream.categories = ["Top"]
+
+    for combination in combinations(palette, limit=40, minimum=0):
+        assert combination.pieces["Top"].id != navy.id, "navy appeared as a top"
+        assert combination.pieces["Bottom"].id != cream.id, "cream appeared as a bottom"
+    assert palette.for_category("Bottom"), "the grid removed every trouser colour"
+    assert navy not in palette.for_category("Top"), "for_category ignores the grid"
+    return "the grid is obeyed; navy never a top, cream never a bottom"
+
+
+def check_palette_round_trip() -> str:
+    from .palette import Colour, GROUND, Palette
+    palette = Palette()
+    palette.add(Colour(name="Navy", hex="#26303F", role=GROUND, note="flannel only"))
+    palette.patterns = ["Herringbone", "Gingham"]
+    palette.save()
+    again = Palette.load()
+    assert len(again.colours) == 1 and again.colours[0].note == "flannel only", "colour lost"
+    assert again.patterns == ["Herringbone", "Gingham"], "patterns lost"
+    assert again.colours[0].allowed, "a colour with no categories got no role defaults"
+    assert again.has("#26303f"), "hex matching is case sensitive"
+    return f"{again.path.name} round trips with notes and patterns"
 
 
 # --- Shopping maths -----------------------------------------------------------
@@ -633,8 +778,9 @@ def check_app_renders_empty() -> str:
     app = _render()
     labels = [t.label for t in app.tabs]
     numbered = [l for l in labels if l[0].isdigit()]
-    assert len(numbered) == 6, f"expected 6 numbered tabs, got {numbered}"
-    assert [l[0] for l in numbered] == list("123456"), f"tabs out of order: {numbered}"
+    assert len(numbered) == 7, f"expected 7 numbered tabs, got {numbered}"
+    assert [l[0] for l in numbered] == list("1234567"), f"tabs out of order: {numbered}"
+    assert "Colour" in numbered[3], f"Colour is not the fourth tab: {numbered[3]}"
     assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
     return f"{len(labels)} tabs: " + " · ".join(labels)
 
@@ -795,6 +941,35 @@ def check_unreadable_image_does_not_crash() -> str:
     return "corrupt image degraded to a placeholder, page still rendered"
 
 
+def check_answer_view_opens() -> str:
+    """A saved answer must render as its own page, reached by ?answer=<id>."""
+    from streamlit.testing.v1 import AppTest
+
+    from .seed import seed_answers
+    seed_answers()
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["answer"] = "says_what"
+    app = app.run()
+    assert not app.exception, f"the answer view raised: {app.exception[0].value}"
+    page = "\n".join(m.value for m in app.markdown)
+    assert "competent and senior" in page, "the answer itself is missing"
+    assert "answer-q" in page, "the question was not rendered as the heading"
+    assert not app.tabs, "the standalone view drew the whole app instead"
+    assert "?answer=all" in page, "no link back to the full list"
+
+    every = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    every.query_params["answer"] = "all"
+    every = every.run()
+    assert not every.exception, f"the index raised: {every.exception[0].value}"
+    index = "\n".join(m.value for m in every.markdown)
+    assert index.count("?answer=") >= 20, "the index is not linking every answer"
+
+    normal = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    assert normal.tabs, "the app stopped drawing tabs without a query param"
+    return "single answer, index, and the app itself all render"
+
+
 def check_reset_round_trip() -> str:
     from .inventory import Inventory
     from . import reset
@@ -854,6 +1029,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (FIT, "Estimated and measured told apart", check_estimated_flag),
     (FIT, "Lean and athletic is not read as lean", check_build_matching),
     (INVENTORY, "Pattern is gone from items", check_pattern_removed),
+    (INVENTORY, "Fabric comes from a fixed list", check_fabric_list),
     (INVENTORY, "Garments and categories alphabetical", check_alphabetical),
     (INVENTORY, "Each garment has its own size scheme", check_size_schemes),
     (INVENTORY, "Size line hides blanks and junk", check_size_line_and_category),
@@ -862,6 +1038,12 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (QUESTIONS, "Principles come in batches of five", check_principles_batching),
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
+    (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
+    (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
+    (COLOUR, "Harmonies come back wearable", check_harmonies_are_wearable),
+    (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
+    (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
+    (COLOUR, "Palette round trips with patterns", check_palette_round_trip),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),
     (MATHS, "Plan never buys what he owns", check_plan_never_buys_owned),
@@ -880,6 +1062,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "No function shadows an imported module", check_no_module_shadowing),
     (APP, "Generate look actually runs when clicked", check_generate_button_runs),
     (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
+    (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),
     (APP, "Snapshots in the same second stay apart", check_snapshots_do_not_collide),
     (LIVE, "Gemini returns text", check_live_text),

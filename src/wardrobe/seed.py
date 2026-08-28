@@ -16,34 +16,34 @@ from .principles import Principle, Principles
 
 # name, garment, colour, hex, fabric, sizes, price (0 = owned)
 ITEMS: tuple[tuple, ...] = (
-    ("White cotton tee", "T-shirt", "white", "#F4F2ED", "heavy jersey",
+    ("White cotton tee", "T-shirt", "white", "#F4F2ED", "Cotton jersey",
      {"alpha": "M", "cut": "Regular"}, 0),
-    ("Cream camp-collar shirt", "Shirt", "cream", "#F2E9D8", "cotton",
+    ("Cream camp-collar shirt", "Shirt", "cream", "#F2E9D8", "Cotton poplin",
      {"collar": '15.5"', "alpha": "M", "cut": "Regular"}, 0),
-    ("Pale blue oxford", "Shirt", "pale blue", "#BFD3E6", "oxford cotton",
+    ("Pale blue oxford", "Shirt", "pale blue", "#BFD3E6", "Oxford cotton",
      {"collar": '15.5"', "alpha": "M", "cut": "Regular"}, 0),
-    ("Dark indigo jeans", "Jeans", "indigo", "#2B3A4F", "13oz denim",
+    ("Dark indigo jeans", "Jeans", "indigo", "#2B3A4F", "Selvedge denim",
      {"waist": '31"', "leg": '32"', "cut": "Slim"}, 0),
-    ("Navy merino crewneck", "Knitwear", "navy", "#26303F", "merino wool",
+    ("Navy merino crewneck", "Knitwear", "navy", "#26303F", "Merino wool",
      {"alpha": "M", "cut": "Regular"}, 0),
-    ("White leather trainers", "Trainers", "white", "#EDEAE3", "leather",
+    ("White leather trainers", "Trainers", "white", "#EDEAE3", "Calf leather",
      {"uk": "9", "eu": "43", "width": "Standard"}, 0),
-    ("Black Chelsea boots", "Boots", "black", "#1B1918", "calf leather",
+    ("Black Chelsea boots", "Boots", "black", "#1B1918", "Calf leather",
      {"uk": "9", "eu": "43", "width": "Standard"}, 0),
-    ("Navy hopsack blazer", "Blazer", "navy", "#232C3B", "wool hopsack",
+    ("Navy hopsack blazer", "Blazer", "navy", "#232C3B", "Wool hopsack",
      {"chest": '38"', "length": "Regular", "eu": "48", "cut": "Slim"}, 0),
-    ("Steel dive watch", "Watch", "steel", "#9AA0A6", "steel", {"case": "40mm"}, 0),
-    ("Brown leather belt", "Belt", "chocolate", "#5A3A22", "leather",
+    ("Steel dive watch", "Watch", "steel", "#9AA0A6", "", {"case": "40mm"}, 0),
+    ("Brown leather belt", "Belt", "chocolate", "#5A3A22", "Calf leather",
      {"waist": '32"', "alpha": "M"}, 0),
-    ("Grey flannel trousers", "Trousers", "mid grey", "#7A7A78", "wool flannel",
+    ("Grey flannel trousers", "Trousers", "mid grey", "#7A7A78", "Wool flannel",
      {"waist": '31"', "leg": '32"', "cut": "Regular"}, 150),
-    ("Brown suede loafers", "Loafers", "chocolate", "#6B4426", "suede",
+    ("Brown suede loafers", "Loafers", "chocolate", "#6B4426", "Suede",
      {"uk": "9", "eu": "43", "width": "Standard"}, 220),
-    ("Camel wool overcoat", "Overcoat", "camel", "#C19A6B", "wool melton",
+    ("Camel wool overcoat", "Overcoat", "camel", "#C19A6B", "Wool melton",
      {"chest": '38"', "length": "Regular", "eu": "48", "cut": "Regular"}, 420),
-    ("Olive linen overshirt", "Overshirt", "olive", "#6B6B47", "linen",
+    ("Olive linen overshirt", "Overshirt", "olive", "#6B6B47", "Linen",
      {"alpha": "M", "cut": "Relaxed"}, 110),
-    ("Ecru knit polo", "Polo", "ecru", "#E8DFC8", "cotton knit",
+    ("Ecru knit polo", "Polo", "ecru", "#E8DFC8", "Cotton piqué",
      {"alpha": "M", "cut": "Regular"}, 95),
 )
 
@@ -126,6 +126,41 @@ PRINCIPLES: tuple[tuple[str, str, str], ...] = (
 )
 
 
+# A starting palette, arranged by role rather than by preference, so the colour
+# page has something with real structure in it. Two leathers and no more: any
+# wardrobe that needs three has a problem somewhere else.
+COLOURS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("Cream", "#F2E9D8", "Field", ("Top", "Outerwear")),
+    ("Ecru", "#E8DFC8", "Field", ("Top",)),
+    ("Pale blue", "#BFD3E6", "Field", ("Top",)),
+    ("White", "#F6F4EF", "Field", ("Top",)),
+    ("Navy", "#26303F", "Ground", ("Bottom", "Outerwear", "Top")),
+    ("Charcoal", "#3A3A3C", "Ground", ("Bottom", "Outerwear")),
+    ("Mid grey", "#7A7A78", "Ground", ("Bottom",)),
+    ("Olive", "#5F6146", "Ground", ("Bottom", "Outerwear")),
+    ("Camel", "#C19A6B", "Ground", ("Outerwear", "Top")),
+    ("Stone", "#C9BCA4", "Ground", ("Bottom",)),
+    ("Chocolate", "#6B4426", "Leather", ("Shoes", "Accessory")),
+    ("Chestnut", "#8B5A2B", "Leather", ("Shoes", "Accessory")),
+    ("Rust", "#8E3B2E", "Accent", ("Accessory", "Top")),
+    ("Burgundy", "#6E2C33", "Accent", ("Accessory",)),
+)
+
+SEED_PATTERNS: tuple[str, ...] = (
+    "Solid", "Marl", "Herringbone", "Birdseye", "Windowpane", "Bengal stripe", "Cable",
+)
+
+
+def seed_palette(palette=None):
+    from .palette import Colour, Palette
+    palette = palette if palette is not None else Palette.load()
+    for name, hex_code, role, categories in COLOURS:
+        palette.add(Colour(name=name, hex=hex_code, role=role, categories=list(categories)))
+    palette.patterns = list(SEED_PATTERNS)
+    palette.save()
+    return palette
+
+
 def seed_inventory(inventory: Inventory | None = None) -> Inventory:
     inventory = inventory if inventory is not None else Inventory.load()
     for name, garment, colour, hex_code, fabric, sizes, price in ITEMS:
@@ -170,9 +205,11 @@ def seed_all() -> dict[str, int]:
     outfits = seed_outfits(inventory)
     answers = seed_answers()
     principles = seed_principles()
+    palette = seed_palette()
     return {
         "items": len(inventory.items),
         "outfits": len(outfits.outfits),
         "answers": len(answers.values),
         "principles": len(principles.principles),
+        "colours": len(palette.colours),
     }

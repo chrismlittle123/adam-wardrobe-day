@@ -62,6 +62,8 @@ def describe(key: str) -> str:
         return f"{_count(target, 'items')} item(s)"
     if key == "outfits":
         return f"{_count(target, 'outfits')} outfit(s)"
+    if key == "palette":
+        return f"{_count(target, 'colours')} colour(s)"
     if key == "principles":
         return f"{_count(target, 'principles')} principle(s)"
     if key == "guide":

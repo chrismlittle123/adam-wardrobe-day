@@ -49,14 +49,33 @@ Six tabs, in the order the work happens.
    five suggestions at a time and you keep the ones that ring true; each round
    is told what you already kept so it goes somewhere new. Hand-written ones
    sit alongside. All of them are fed into every generated look.
-4. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
+4. **Colour** — the palette as a set of roles rather than a list. Ground, Field,
+   Accent, Leather, each with the garments it is allowed on. A hue wheel plots
+   the palette against his actual skin tone, harmonies are stolen off the wheel
+   with one click, patterns are picked from a list, and a grid says which colour
+   goes on which garment. Then every recipe the grid permits is enumerated and
+   scored, best first, with its reasoning printed next to it.
+5. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
    you do not own yet. Item photos ride along as references so the generated
    image shows *that* jacket.
-5. **Outfit Gallery** — tag, search, love. Each outfit shows its cost split
+6. **Outfit Gallery** — tag, search, love. Each outfit shows its cost split
    between what is already owned and what is still to buy.
-6. **Shopping Guide** — ten body measurements, all takeable on yourself with a
+7. **Shopping Guide** — ten body measurements, all takeable on yourself with a
    tape and a mirror, then the finished garment dimensions derived from them,
    then a purchase plan.
+
+### The colour maths
+
+Coordination is two measurable things. **Value contrast**: a top and a bottom
+within 0.10 of each other in lightness read as one garment whatever their hues.
+**Temperature**: where a hue sits relative to his skin at `#C58466`. Near it is
+harmonious, the far side flatters by contrast (which is why navy suits everyone),
+and the near-miss between them is where sallow greens live.
+
+Colours are named the way cloth is described, not the way a colour wheel divides.
+Equal 30° sectors put navy in "cyan" and olive in "amber"; brown and olive and
+cream never fall out of a wheel at all, because they are dark or pale warm tints
+rather than hues.
 
 ### The shopping maths
 
@@ -84,7 +103,7 @@ Who he is lives in `profile.toml` and feeds every prompt.
 ## Checking it works
 
 ```bash
-uv run wardrobe-check              # 40 checks, a couple of seconds
+uv run wardrobe-check              # 51 checks, a couple of seconds
 uv run wardrobe-check --live       # plus two real Vertex AI calls
 uv run pytest                      # the same checks, from CI
 uv run wardrobe-reset --yes        # clear the data, snapshot taken first

@@ -17,21 +17,28 @@ from pathlib import Path
 import streamlit as st
 
 from wardrobe import (
+    palette as pal_mod,
     checks as check_mod, fitspec, inventory as inv_mod, paths,
     principles as prin_mod, reset as reset_mod, seed as seed_mod, shopping, ui,
 )
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
-    ASPIRATIONAL, CATEGORIES, GARMENTS, NONE, OWNED, RETIRED, STATUSES,
-    Inventory, Item, size_scheme,
+    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, GARMENTS, NONE, OWNED, RETIRED,
+    STATUSES, Inventory, Item, size_scheme,
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
+from wardrobe.palette import (
+    ACCENT, CATEGORIES as COLOUR_CATEGORIES, FIELD, GROUND, LEATHER, PATTERNS,
+    ROLES, Colour, Palette,
+)
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
 from wardrobe.profile import Profile
 from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
-from wardrobe.questions import POINTS, SECTIONS, Question, format_points, parse_points
+from wardrobe.questions import (
+    BY_ID, POINTS, SECTIONS, Question, format_points, parse_points,
+)
 
 GEMINI_ERRORS = (GeminiImageError, GeminiTextError)
 
@@ -53,6 +60,15 @@ def render() -> None:
         st.stop()
 
     answers = Answers.load()
+
+    # A standalone read-only page, reached by a target="_blank" link from the
+    # questionnaire. Rendered instead of the app, not inside it, so the browser
+    # tab holds one answer and nothing else.
+    focus = st.query_params.get("answer")
+    if focus is not None:
+        answer_view(profile, answers, focus)
+        return
+
     inventory = Inventory.load()
     outfits = Outfits.load()
     principles = Principles.load()
@@ -67,8 +83,8 @@ def render() -> None:
     )
 
     tabs = st.tabs([
-        "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles",
-        "4 · Outfit Generator", "5 · Outfit Gallery", "6 · Shopping Guide",
+        "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles", "4 · Colour",
+        "5 · Outfit Generator", "6 · Outfit Gallery", "7 · Shopping Guide",
         "⚙ Diagnostics",
     ])
     with tabs[0]:
@@ -78,12 +94,14 @@ def render() -> None:
     with tabs[2]:
         principles_tab(profile, answers, principles)
     with tabs[3]:
-        generator_tab(profile, inventory, outfits, principles)
+        colour_tab(profile, Palette.load())
     with tabs[4]:
-        gallery_tab(inventory, outfits)
+        generator_tab(profile, inventory, outfits, principles)
     with tabs[5]:
-        shopping_tab(profile, inventory, outfits)
+        gallery_tab(inventory, outfits)
     with tabs[6]:
+        shopping_tab(profile, inventory, outfits)
+    with tabs[7]:
         diagnostics_tab()
 
 
@@ -154,6 +172,58 @@ def subject_editor(profile: Profile) -> None:
                 st.rerun()
 
 
+def answer_view(profile: Profile, answers: Answers, focus: str) -> None:
+    """One saved answer, on its own, in its own browser tab."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    answered = [q for q in BY_ID.values() if answers.get(q.id)]
+
+    if focus == "all" or focus not in BY_ID:
+        st.markdown(
+            '<div class="masthead"><h1>Saved <em>answers</em></h1>'
+            f'<div class="sub">{profile.subject.name} &middot; {len(answered)} of '
+            f'{len(BY_ID)} answered</div></div>', unsafe_allow_html=True)
+        if not answered:
+            ui.empty("Nothing answered yet.")
+            return
+        for section in SECTIONS:
+            rows = [q for q in section.questions if answers.get(q.id)]
+            if not rows:
+                continue
+            ui.eyebrow(section.title)
+            for q in rows:
+                st.markdown(
+                    f'<div class="answer-index"><a href="?answer={q.id}" target="_self">'
+                    f'{q.prompt}</a></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="look-cap">{answers.get(q.id)}</div>',
+                            unsafe_allow_html=True)
+        return
+
+    question = BY_ID[focus]
+    section = next((s for s in SECTIONS if question in s.questions), None)
+    order = [q.id for q in answered]
+    here = order.index(focus) if focus in order else -1
+
+    st.markdown(
+        f'<div class="masthead"><h1>{profile.subject.name}</h1>'
+        f'<div class="sub">{section.title if section else "Answer"}'
+        f'{f" &middot; {here + 1} of {len(order)}" if here >= 0 else ""}</div></div>',
+        unsafe_allow_html=True)
+    st.markdown(f'<div class="answer-q">{question.prompt}</div>', unsafe_allow_html=True)
+    body = answers.get(focus)
+    st.markdown(f'<div class="answer-a">{body or "Not answered yet."}</div>',
+                unsafe_allow_html=True)
+    if question.help:
+        st.markdown(f'<div class="look-cap">{question.help}</div>', unsafe_allow_html=True)
+
+    links = ['<a href="?answer=all" target="_self">All answers</a>']
+    if here > 0:
+        links.append(f'<a href="?answer={order[here - 1]}" target="_self">&larr; Previous</a>')
+    if 0 <= here < len(order) - 1:
+        links.append(f'<a href="?answer={order[here + 1]}" target="_self">Next &rarr;</a>')
+    links.append('<a href="./" target="_self">Back to the app</a>')
+    st.markdown(f'<div class="answer-nav">{"".join(links)}</div>', unsafe_allow_html=True)
+
+
 # --- 1. style guide -----------------------------------------------------------
 
 def style_guide_tab(profile: Profile, answers: Answers) -> None:
@@ -166,6 +236,10 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
 
     done, total = answers.progress()
     ui.meter(done, total, "Answered")
+    if done:
+        st.markdown('<div class="look-cap"><a href="?answer=all" target="_blank">'
+                    'Open every saved answer in a new tab &#8599;</a></div>',
+                    unsafe_allow_html=True)
 
     for section in SECTIONS:
         questions = list(section.questions)
@@ -183,6 +257,11 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
                             q.prompt, value=answers.get(q.id), placeholder=q.placeholder,
                             help=q.help or None, height=max(68, q.lines * 27), key=f"a-{q.id}",
                         )
+                    if answers.get(q.id):
+                        st.markdown(
+                            f'<div class="look-cap"><a href="?answer={q.id}" '
+                            f'target="_blank">Open this answer in a new tab &#8599;</a></div>',
+                            unsafe_allow_html=True)
                 if st.form_submit_button(f"Save {section.title.lower()}"):
                     answers.values.update(draft)
                     answers.save()
@@ -306,8 +385,14 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     item.colour = c1.text_input("Colour", item.colour, key=f"{key}-colour",
                                 placeholder="chocolate brown")
     item.colour_hex = c2.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
-    item.fabric = c3.text_input("Fabric", item.fabric, key=f"{key}-fabric",
-                                placeholder="brushed cotton twill")
+    item.fabric = c3.selectbox(
+        "Fabric", FABRIC_OPTIONS,
+        index=FABRIC_OPTIONS.index(item.fabric) if item.fabric in FABRIC_OPTIONS else 0,
+        key=f"{key}-fabric",
+        help="Fixed list on purpose: free text gave three spellings of cotton and "
+             "the image model three different shirts.")
+    if item.fabric == NONE:
+        item.fabric = ""
     if status == ASPIRATIONAL:
         item.price = st.number_input(
             "Estimated price £", 0.0, 100000.0, float(item.price), step=10.0,
@@ -539,7 +624,227 @@ def handwrite_panel(principles: Principles) -> None:
                 st.rerun()
 
 
-# --- 4. outfit generator ------------------------------------------------------
+# --- 4. colour ----------------------------------------------------------------
+
+VERDICT_BADGE = {"harmonious": "ok", "flattering": "ok", "careful": "no"}
+
+
+def colour_tab(profile: Profile, palette: Palette) -> None:
+    skin = profile.subject.skin_tone_hex
+    ui.blurb(
+        "A palette is not a list of colours, it is a set of roles. Navy is a "
+        "different garment as the ground under everything than as the field next to "
+        "the face, so every colour carries a role and the garments it is allowed on. "
+        "Coordination then stops being taste and becomes two things that can be "
+        "measured: how far apart two colours sit in lightness, and where a hue sits "
+        f"relative to his skin at {skin}."
+    )
+    palette_panel(palette, skin)
+    harmony_panel(palette, skin)
+    pattern_panel(palette)
+    rules_panel(palette)
+    combination_panel(palette, skin)
+
+
+def palette_panel(palette: Palette, skin: str) -> None:
+    ui.eyebrow("The palette")
+    wheel, controls = st.columns([2, 3], gap="large")
+
+    with wheel:
+        st.markdown(ui.wheel_svg(palette.colours, skin), unsafe_allow_html=True)
+        st.markdown(
+            '<div class="look-cap">Angle is hue, distance from the centre is '
+            'saturation. The hollow ring is his skin. A tight cluster is a '
+            'disciplined palette; a scatter is not.</div>', unsafe_allow_html=True)
+
+    with controls:
+        with st.form("add-colour", clear_on_submit=True):
+            c1, c2 = st.columns([1, 3])
+            hex_code = c1.color_picker("Colour", "#26303F", key="pal-hex")
+            name = c2.text_input("Name", placeholder="Navy", key="pal-name")
+            c3, c4 = st.columns([1, 2])
+            role = c3.selectbox("Role", list(ROLES), key="pal-role",
+                                help=" · ".join(f"{k}: {v}" for k, v in ROLES.items()))
+            categories = c4.multiselect("Allowed on", COLOUR_CATEGORIES, key="pal-cats",
+                                        help="Leave empty to use the role's defaults.")
+            note = st.text_input("Note", placeholder="Only in flannel, never in cotton",
+                                 key="pal-note")
+            verdict, why = pal_mod.warmth(hex_code, skin)
+            st.markdown(
+                f'<div class="look-cap"><span class="badge {VERDICT_BADGE[verdict]}">'
+                f'{verdict}</span> {why} &middot; reads as '
+                f'{pal_mod.hue_name(hex_code)}, lightness '
+                f'{pal_mod.lightness(hex_code):.2f}</div>', unsafe_allow_html=True)
+            if st.form_submit_button("Add to palette"):
+                palette.add(Colour(name=name.strip() or pal_mod.hue_name(hex_code).title(),
+                                   hex=hex_code, role=role,
+                                   categories=list(categories), note=note.strip()))
+                palette.save()
+                st.rerun()
+
+    if not palette.colours:
+        ui.empty("No colours yet. Pick one above, or steal a harmony below.")
+        return
+
+    for role, colours in palette.by_role().items():
+        st.markdown(f'<div class="look-cap">{role} &middot; {ROLES[role]}</div>',
+                    unsafe_allow_html=True)
+        st.markdown(ui.swatch_strip(colours), unsafe_allow_html=True)
+        for colour in colours:
+            c1, c2 = st.columns([9, 1])
+            verdict, why = colour.verdict(skin)
+            note_line = f"<br>{colour.note}" if colour.note else ""
+            c1.markdown(
+                f'<div class="step" style="border-left-color:{colour.hex}">'
+                f'<div class="hd"><div class="pieces">'
+                f'<span class="chip" style="background:{colour.hex}"></span>'
+                f'{colour.name}</div><div class="cost">{colour.hex}</div></div>'
+                f'<div class="why"><span class="badge {VERDICT_BADGE[verdict]}">{verdict}</span> '
+                f'{why}<br>{colour.family}, lightness {colour.light:.2f} &middot; '
+                f'{", ".join(colour.allowed)}{note_line}</div></div>',
+                unsafe_allow_html=True)
+            if c2.button("Drop", key=f"pdrop-{colour.id}", type="secondary"):
+                palette.remove(colour.id)
+                palette.save()
+                st.rerun()
+
+
+def harmony_panel(palette: Palette, skin: str) -> None:
+    ui.eyebrow("Steal a harmony")
+    ui.blurb(
+        "The wheel put to work. Pick a colour and take its neighbours: analogous "
+        "sits either side, complementary is opposite. Chroma and lightness are "
+        "pulled back into wearable range on the way out, because a mathematically "
+        "perfect complement at full saturation is a traffic cone."
+    )
+    c1, c2 = st.columns([1, 3])
+    base = c1.color_picker("Base", palette.colours[0].hex if palette.colours else "#C19A6B",
+                           key="harm-base")
+    c2.markdown(f'<div class="look-cap">Neighbours of {base}, reads as '
+                f'{pal_mod.hue_name(base)}</div>', unsafe_allow_html=True)
+
+    for scheme, swatches in pal_mod.harmonies(base).items():
+        columns = st.columns([2] + [1] * len(swatches) * 2)
+        columns[0].markdown(f'<div class="look-cap">{scheme}</div>', unsafe_allow_html=True)
+        for n, swatch in enumerate(swatches):
+            verdict, _ = pal_mod.warmth(swatch, skin)
+            columns[1 + n * 2].markdown(
+                f'<div style="background:{swatch};height:2rem;border:1px solid var(--line)" '
+                f'title="{swatch} · {verdict}"></div>', unsafe_allow_html=True)
+            taken = palette.has(swatch)
+            if columns[2 + n * 2].button("In" if taken else "Add",
+                                         key=f"harm-{scheme}-{n}", disabled=taken,
+                                         type="secondary"):
+                palette.add(Colour(name=pal_mod.hue_name(swatch).title(), hex=swatch,
+                                   role=ACCENT if pal_mod.chroma(swatch) > 0.4 else GROUND))
+                palette.save()
+                st.rerun()
+
+
+def pattern_panel(palette: Palette) -> None:
+    ui.eyebrow("Patterns")
+    ui.blurb("Tick what you would actually wear. These go into the style guide and "
+             "into every generated look, so an unticked pattern is one the model "
+             "will not put you in.")
+    with st.form("patterns"):
+        chosen: list[str] = []
+        columns = st.columns(len(PATTERNS))
+        for column, (family, options) in zip(columns, PATTERNS.items()):
+            with column:
+                st.markdown(f'<div class="look-cap">{family}</div>', unsafe_allow_html=True)
+                for option in options:
+                    if st.checkbox(option, value=option in palette.patterns,
+                                   key=f"pat-{option}"):
+                        chosen.append(option)
+        if st.form_submit_button("Save patterns"):
+            palette.patterns = chosen
+            palette.save()
+            st.rerun()
+
+
+def rules_panel(palette: Palette) -> None:
+    ui.eyebrow("Which colour goes on which garment")
+    if not palette.colours:
+        ui.empty("Add some colours first.")
+        return
+    ui.blurb(
+        "The grid is the rule. A colour ticked for Bottom is a trouser colour and "
+        "will never be offered as a shirt. This is what stops the combinations "
+        "below from proposing cream trousers under a chocolate shirt."
+    )
+    with st.form("colour-rules"):
+        header = st.columns([3] + [1] * len(COLOUR_CATEGORIES))
+        header[0].markdown('<div class="look-cap">Colour</div>', unsafe_allow_html=True)
+        for column, category in zip(header[1:], COLOUR_CATEGORIES):
+            column.markdown(f'<div class="look-cap">{category}</div>', unsafe_allow_html=True)
+
+        draft: dict[str, list[str]] = {}
+        for colour in palette.colours:
+            row = st.columns([3] + [1] * len(COLOUR_CATEGORIES))
+            row[0].markdown(
+                f'<div class="look-cap"><span class="chip" style="background:{colour.hex}">'
+                f'</span>{colour.name}</div>', unsafe_allow_html=True)
+            picked = []
+            for column, category in zip(row[1:], COLOUR_CATEGORIES):
+                if column.checkbox(category, value=colour.allows(category),
+                                   key=f"rule-{colour.id}-{category}",
+                                   label_visibility="collapsed"):
+                    picked.append(category)
+            draft[colour.id] = picked
+        if st.form_submit_button("Save the grid"):
+            for colour in palette.colours:
+                colour.categories = draft.get(colour.id, [])
+            palette.save()
+            st.rerun()
+
+    gaps = [c for c, n in pal_mod.coverage(palette).items() if not n]
+    if gaps:
+        st.info(f"Nothing is allowed on: {', '.join(gaps)}. "
+                "Combinations need a colour for Top, Bottom and Shoes at minimum.")
+
+
+def combination_panel(palette: Palette, skin: str) -> None:
+    ui.eyebrow("What actually goes together")
+    counts = pal_mod.coverage(palette)
+    if not all(counts[c] for c in ("Top", "Bottom", "Shoes")):
+        ui.empty("Needs at least one colour allowed on Top, Bottom and Shoes.")
+        return
+
+    c1, c2, c3 = st.columns([1, 1, 2])
+    with_coat = c1.toggle("Include a coat", key="comb-coat")
+    minimum = c2.slider("Minimum score", 0, 100, 55, step=5, key="comb-min")
+    total = (counts["Top"] * counts["Bottom"] * counts["Shoes"]
+             * (counts["Outerwear"] if with_coat else 1))
+    c3.markdown(f'<div class="look-cap">{total:,} recipes scored, best first. Every one '
+                f'is enumerated, so nothing plausible is missed and nothing implausible '
+                f'gets a free pass.</div>', unsafe_allow_html=True)
+
+    found = pal_mod.combinations(palette, with_outerwear=with_coat, skin_hex=skin,
+                                 limit=15, minimum=minimum)
+    if not found:
+        ui.empty("Nothing clears that score. Lower it, or widen the grid above.")
+        return
+
+    for combination in found:
+        badge = ("ok" if combination.score >= 80 else
+                 "want" if combination.score >= 65 else "no")
+        pieces = "".join(
+            f'<div style="flex:1"><div style="background:{c.hex};height:3.2rem;'
+            f'border:1px solid var(--line)"></div>'
+            f'<div class="look-cap">{slot}<br>{c.name}</div></div>'
+            for slot, c in combination.pieces.items())
+        good = "".join(f"<br>+ {r}" for r in combination.reasons)
+        bad = "".join(f"<br>&minus; {f}" for f in combination.faults)
+        st.markdown(
+            f'<div class="step"><div class="hd"><div class="pieces">'
+            f'<span class="badge {badge}">{combination.verdict}</span> '
+            f'{combination.name}</div><div class="cost">{combination.score}</div></div>'
+            f'<div style="display:flex;gap:.5rem;margin:.7rem 0 .2rem">{pieces}</div>'
+            f'<div class="why">{(good + bad).lstrip("<br>")}</div></div>',
+            unsafe_allow_html=True)
+
+
+# --- 5. outfit generator ------------------------------------------------------
 
 def item_picker(label: str, options: list[Item], key: str, multi: bool = False):
     """A searchable box over inventory. Streamlit's select boxes filter as you type."""
@@ -570,11 +875,12 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             c4, c5, c6 = st.columns([2, 1, 2])
             colour = c4.text_input("Colour", placeholder="camel")
             colour_hex = c5.color_picker("Swatch", "#C19A6B", key="asp-hex")
-            fabric = c6.text_input("Fabric", placeholder="wool melton")
+            fabric = c6.selectbox("Fabric", FABRIC_OPTIONS, key="asp-fabric")
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
-                    colour=colour, colour_hex=colour_hex, fabric=fabric,
+                    colour=colour, colour_hex=colour_hex,
+                    fabric="" if fabric == NONE else fabric,
                     status=ASPIRATIONAL, price=price,
                 ))
                 inventory.save()
@@ -660,7 +966,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         st.success(f"Saved as “{title}”. It is in the Outfit Gallery.")
 
 
-# --- 5. outfit gallery --------------------------------------------------------
+# --- 6. outfit gallery --------------------------------------------------------
 
 def gallery_tab(inventory: Inventory, outfits: Outfits) -> None:
     if not outfits.outfits:
@@ -764,7 +1070,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
             unsafe_allow_html=True)
 
 
-# --- 6. shopping guide --------------------------------------------------------
+# --- 7. shopping guide --------------------------------------------------------
 
 def shopping_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
     ui.blurb(

@@ -112,6 +112,36 @@ SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
 }
 
 
+# Cloth, by family. Typing it free-hand produced "cotton", "Cotton" and "100%
+# cotton" as three different fabrics, which made the inventory unsearchable and
+# gave the image model three different answers for the same shirt.
+FABRICS: dict[str, tuple[str, ...]] = {
+    "Cotton": (
+        "Chambray", "Corduroy", "Cotton canvas", "Cotton jersey", "Cotton piqué",
+        "Cotton poplin", "Cotton twill", "Moleskin", "Oxford cotton", "Seersucker",
+        "Terry towelling",
+    ),
+    "Wool": (
+        "Boiled wool", "Cashmere", "Donegal tweed", "Fresco", "Harris tweed",
+        "Lambswool", "Merino wool", "Mohair", "Wool flannel", "Wool hopsack",
+        "Wool melton", "Worsted wool",
+    ),
+    "Linen and hemp": ("Hemp", "Irish linen", "Linen", "Linen-cotton", "Linen-wool"),
+    "Denim": ("Raw denim", "Selvedge denim", "Washed denim"),
+    "Leather": ("Calf leather", "Cordovan", "Nubuck", "Shearling", "Suede"),
+    "Silk and fine": ("Cotton-silk", "Silk", "Wool-silk-linen"),
+    "Technical": ("Fleece", "Nylon", "Polyester", "Ripstop", "Technical shell", "Waxed cotton"),
+}
+
+# Flat, alphabetical, with the placeholder first. The grouping above is for
+# reading; the dropdown is for finding.
+FABRIC_OPTIONS: tuple[str, ...] = (NONE, *sorted({f for g in FABRICS.values() for f in g}))
+
+
+def fabric_family(fabric: str) -> str:
+    return next((name for name, group in FABRICS.items() if fabric in group), "")
+
+
 def size_scheme(garment: str) -> tuple[SizeField, ...]:
     return SIZE_SCHEMES.get(garment, DEFAULT_SCHEME)
 
