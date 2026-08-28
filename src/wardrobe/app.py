@@ -158,14 +158,11 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
         "\"some shirts\". Each section saves on its own."
     )
 
-    core_only = st.toggle("Core questions only", value=answers.is_empty(), key="core-only")
-    done, total = answers.progress(core_only=core_only)
-    ui.meter(done, total, "Core answered" if core_only else "Answered")
+    done, total = answers.progress()
+    ui.meter(done, total, "Answered")
 
     for section in SECTIONS:
-        questions = [q for q in section.questions if q.core or not core_only]
-        if not questions:
-            continue
+        questions = list(section.questions)
         filled = sum(1 for q in questions if answers.get(q.id))
         mark = "✓" if filled == len(questions) else f"{filled}/{len(questions)}"
         with st.expander(f"{section.title}  ·  {mark}", expanded=filled == 0):

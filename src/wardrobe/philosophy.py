@@ -119,9 +119,8 @@ class Answers:
     def answered(self, questions=ALL_QUESTIONS) -> list[Question]:
         return [q for q in questions if self.get(q.id)]
 
-    def progress(self, core_only: bool = False) -> tuple[int, int]:
-        pool = [q for q in ALL_QUESTIONS if q.core] if core_only else list(ALL_QUESTIONS)
-        return len(self.answered(pool)), len(pool)
+    def progress(self) -> tuple[int, int]:
+        return len(self.answered()), len(ALL_QUESTIONS)
 
     def is_empty(self) -> bool:
         return not any(v.strip() for v in self.values.values())
