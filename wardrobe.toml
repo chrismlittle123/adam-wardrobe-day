@@ -292,3 +292,20 @@ price = 95.0
 [items.sizes]
 alpha = "M"
 cut = "Regular"
+
+[[items]]
+id = "camel-wool-overcoat-2"
+name = "camel wool overcoat"
+category = "Outerwear"
+garment = "Overcoat"
+colour = ""
+colour_hex = "#C19A6B"
+fabric = "wool"
+pattern = "Solid"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+price = 40.0
+
+[items.sizes]

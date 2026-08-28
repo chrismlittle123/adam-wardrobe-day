@@ -163,6 +163,25 @@ def check_principles_round_trip() -> str:
 
 # --- Fit engine ---------------------------------------------------------------
 
+def check_body_measurement_set() -> str:
+    """Exactly the ten a man can take on himself, plus the three derived for him."""
+    from .fitspec import CRITICAL, HOW_TO_MEASURE, Body, LABELS
+    wanted = {"chest", "waist", "shoulder", "bicep", "wrist", "sleeve",
+              "inseam", "outseam", "hip", "neck"}
+    fields = set(Body().__dataclass_fields__)
+    assert fields == wanted, f"body fields drifted: {fields ^ wanted}"
+    assert set(HOW_TO_MEASURE) == wanted, "the form asks for a different set"
+    assert set(CRITICAL) == wanted, "critical set drifted"
+    assert "seat" not in fields and LABELS["hip"] == "Hip", "seat was not renamed to hip"
+    assert all(HOW_TO_MEASURE[k].strip() for k in wanted), "a measurement has no instructions"
+
+    values, estimated = Body(chest=96.8).resolved(176, "lean athletic")
+    for derived in ("thigh", "knee", "ankle"):
+        assert derived in values and derived in estimated, f"{derived} not derived"
+    assert "chest" not in estimated, "a measured value was marked estimated"
+    return f"{len(wanted)} measured, {len(values) - len(wanted)} derived, hip not seat"
+
+
 def check_body_estimate() -> str:
     from .fitspec import estimate
     body = estimate(176, "very lean and athletic")
@@ -171,12 +190,13 @@ def check_body_estimate() -> str:
     assert body["waist"] < body["chest"], "waist not smaller than chest"
     assert 42 <= body["shoulder"] <= 48, f"shoulder off: {body['shoulder']}"
     assert 75 <= body["inseam"] <= 85, f"inseam off: {body['inseam']}"
-    return f"chest {body['chest']}, waist {body['waist']}, inseam {body['inseam']}"
+    assert 88 <= body["hip"] <= 100, f"hip off: {body['hip']}"
+    return f"chest {body['chest']}, waist {body['waist']}, hip {body['hip']}, inseam {body['inseam']}"
 
 
 def check_ease_applied() -> str:
     from .fitspec import Body, EASE, target_spec
-    body = Body(chest=96, waist=78, shoulder=45, sleeve=61, inseam=80, seat=94, neck=38)
+    body = Body(chest=96, waist=78, shoulder=45, sleeve=61, inseam=80, hip=94, neck=38)
     targets = {t.key: t for t in target_spec("Shirt", body, 176, fit="Regular")}
     expected = 96 + EASE["Shirt"]["Regular"]["chest"]
     assert _near(targets["chest"].value, expected), \
@@ -187,7 +207,7 @@ def check_ease_applied() -> str:
 
 def check_cuff_allowance() -> str:
     from .fitspec import Body, target_spec
-    body = Body(chest=96, waist=78, shoulder=45, sleeve=61, seat=94)
+    body = Body(chest=96, waist=78, shoulder=45, sleeve=61, hip=94)
     blazer = {t.key: t.value for t in target_spec("Blazer", body, 176)}
     shirt = {t.key: t.value for t in target_spec("Shirt", body, 176)}
     assert blazer["sleeve"] < shirt["sleeve"], "blazer sleeve not shortened for cuff"
@@ -197,7 +217,7 @@ def check_cuff_allowance() -> str:
 
 def check_break_and_flat() -> str:
     from .fitspec import Body, target_spec
-    body = Body(inseam=80, waist=78, seat=94, thigh=52, knee=38, ankle=22)
+    body = Body(inseam=80, waist=78, hip=94)
     no_break = {t.key: t.value for t in target_spec("Trousers", body, 176, trouser_break="No break")}
     full = {t.key: t.value for t in target_spec("Trousers", body, 176, trouser_break="Full break")}
     assert full["inseam"] > no_break["inseam"], "break does not lengthen the inseam"
@@ -237,6 +257,14 @@ def check_estimated_flag() -> str:
 
 # --- Inventory ----------------------------------------------------------------
 
+def check_pattern_removed() -> str:
+    from .inventory import Item
+    assert "pattern" not in Item().__dataclass_fields__, "the pattern field is back"
+    described = Item(name="X", colour="olive", fabric="linen", garment="Overshirt").describe()
+    assert described == "olive linen overshirt", f"describe() changed shape: {described!r}"
+    return f"no pattern field; describe() gives {described!r}"
+
+
 def check_alphabetical() -> str:
     from .inventory import CATEGORIES, GARMENTS
     assert list(GARMENTS) == sorted(GARMENTS), "garments not alphabetical"
@@ -260,6 +288,18 @@ def check_size_schemes() -> str:
     assert {"uk", "eu", "us"} <= set(keyed["Loafers"]), "shoes need all three systems"
     assert keyed["Bag"] == [], "a bag has no size"
     return "shirt/blazer/trouser/shoe schemes all distinct"
+
+
+def check_trouser_spec_survives_derived() -> str:
+    """Not asking for thigh, knee and ankle must not cost the trouser its leg opening."""
+    from .fitspec import Body, target_spec
+    targets = {t.key: t for t in target_spec("Trousers", Body(waist=78, hip=94, inseam=80), 176)}
+    for key in ("waist", "hip", "thigh", "knee", "ankle", "rise", "inseam", "outseam"):
+        assert key in targets, f"trouser spec lost {key}"
+    assert not targets["waist"].estimated and targets["ankle"].estimated, \
+        "measured and derived not distinguished"
+    assert targets["ankle"].value > 0, "leg opening came out empty"
+    return f"leg opening {targets['ankle'].value} cm, derived, spec complete"
 
 
 def check_size_pruning() -> str:
@@ -333,6 +373,24 @@ def check_size_line_and_category() -> str:
 
 
 # --- Questionnaire ------------------------------------------------------------
+
+def check_principles_batching() -> str:
+    """Suggestions come five at a time and are told what is already kept."""
+    from .philosophy import Answers
+    from .principles import BATCH, TARGET, Principle, build_prompt
+    from .profile import Profile
+    from .seed import seed_answers
+    assert BATCH == 5 and TARGET == 10, f"batch/target drifted: {BATCH}/{TARGET}"
+    kept = [Principle(text="Keep the volume in one place.", reason="Because.", group="Silhouette")]
+    prompt = build_prompt(Profile.load(), seed_answers(), "", BATCH, kept)
+    assert "exactly 5" in prompt, "the batch size never reaches the model"
+    assert "Keep the volume in one place." in prompt, "kept principles not sent"
+    assert "Do not repeat any of these" in prompt, "no instruction to avoid repeats"
+    assert "suggestions, not a finished set" in prompt, "framed as a finished set"
+    fresh = build_prompt(Profile.load(), seed_answers(), "", BATCH, [])
+    assert "already kept" not in fresh, "empty kept list still sends a block"
+    return f"{BATCH} at a time towards {TARGET}, previous keeps excluded"
+
 
 def check_question_bank() -> str:
     from .questions import ALL_QUESTIONS, SECTIONS
@@ -675,17 +733,21 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (DATA, "Item sizes survive a save", check_inventory_round_trip),
     (DATA, "Outfits keep tags and love", check_outfits_round_trip),
     (DATA, "Principles store and parse", check_principles_round_trip),
+    (FIT, "Body is the ten takeable measurements", check_body_measurement_set),
     (FIT, "Body estimate is anatomically sane", check_body_estimate),
+    (FIT, "Trouser spec keeps its leg opening", check_trouser_spec_survives_derived),
     (FIT, "Ease is added to the body measurement", check_ease_applied),
     (FIT, "Blazer sleeve leaves cuff showing", check_cuff_allowance),
     (FIT, "Trouser break and flat measurements", check_break_and_flat),
     (FIT, "Estimated and measured told apart", check_estimated_flag),
     (FIT, "Lean and athletic is not read as lean", check_build_matching),
+    (INVENTORY, "Pattern is gone from items", check_pattern_removed),
     (INVENTORY, "Garments and categories alphabetical", check_alphabetical),
     (INVENTORY, "Each garment has its own size scheme", check_size_schemes),
     (INVENTORY, "Size line hides blanks and junk", check_size_line_and_category),
     (INVENTORY, "Stale sizes pruned on re-classification", check_size_pruning),
     (INVENTORY, "Photo uploads are bounded and downscaled", check_photo_limits),
+    (QUESTIONS, "Principles come in batches of five", check_principles_batching),
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),

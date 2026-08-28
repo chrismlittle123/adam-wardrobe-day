@@ -26,25 +26,19 @@ original = "reference/adam.png"
 
 [measurements]
 # Centimetres, straight off a tape measure. Zero means "not measured yet", and
-# the app estimates from height and build until a real number lands here.
-# Everything in the Shopping Guide's size targets is derived from these, so the
-# seven marked critical in fitspec.py are worth an evening with a tape.
+# the app estimates from height and build until a real number lands here. Ten
+# is the whole set: only what a man can take on himself with a tape and a
+# mirror. Thigh, knee and ankle are derived from height instead.
 neck = 0
+shoulder = 0
 chest = 0
 waist = 0
-seat = 0
-shoulder = 0
-sleeve = 0
-back_length = 0
+hip = 0
 bicep = 0
 wrist = 0
+sleeve = 0
 inseam = 0
 outseam = 0
-thigh = 0
-knee = 0
-ankle = 0
-foot_length = 0
-shoe_eu = 0
 
 [style]
 # Free text, folded into the prompt as standing direction for every look.

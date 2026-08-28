@@ -28,7 +28,7 @@ from wardrobe.inventory import (
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
-from wardrobe.principles import GROUPS, Principle, Principles
+from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
 from wardrobe.profile import Profile
 from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
 from wardrobe.questions import POINTS, SECTIONS, Question, format_points, parse_points
@@ -123,7 +123,8 @@ def docket(profile: Profile) -> None:
         row("Hair", s.hair, prose=True),
         row("Face", s.facial_hair, prose=True),
         row("Wears", s.details, prose=True),
-        row("Measured", f"{len(measured)} of 16" if measured else "none yet"),
+        row("Measured", f"{len(measured)} of {len(fitspec.HOW_TO_MEASURE)}"
+            if measured else "none yet"),
     ]
     note = f'<p class="note">{s.skin_tone}</p>' if s.skin_tone else ""
     st.markdown(
@@ -307,10 +308,8 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     item.colour_hex = c2.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
     item.fabric = c3.text_input("Fabric", item.fabric, key=f"{key}-fabric",
                                 placeholder="brushed cotton twill")
-    c4, c5 = st.columns([1, 1])
-    item.pattern = c4.text_input("Pattern", item.pattern, key=f"{key}-pattern")
     if status == ASPIRATIONAL:
-        item.price = c5.number_input(
+        item.price = st.number_input(
             "Estimated price £", 0.0, 100000.0, float(item.price), step=10.0,
             key=f"{key}-price",
             help="What you expect to pay. The shopping plan spends this number.")
@@ -342,13 +341,10 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
 
 def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
     counts = inventory.counts()
-    value = shopping.wardrobe_value(inventory)
     ui.stats([
         ("Owned", str(counts[OWNED])),
         ("Wanted", str(counts[ASPIRATIONAL])),
         ("Retired", str(counts[RETIRED])),
-        ("Owned value", ui.money(value["owned_value"])),
-        ("Wanted value", ui.money(value["wanted_value"])),
     ])
     ui.blurb(
         "Every piece, owned or merely wanted, lives here. Photograph anything words "
@@ -460,39 +456,66 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
 def principles_tab(profile: Profile, answers: Answers, principles: Principles) -> None:
     ui.blurb(
         "Not the style guide. The guide is a document you read once; these are the "
-        "dozen lines you hold in your head while putting an outfit together. Every "
-        "principle has to be checkable: you should be able to look at an outfit and "
+        f"lines you hold in your head while getting dressed. Aim for about {TARGET}. "
+        "Every one has to be checkable: you should be able to look at an outfit and "
         "say whether it obeys or breaks it. They are fed into every generated look."
     )
+    ui.meter(len(principles.principles), TARGET, "Kept")
 
-    left, right = st.columns([3, 1], gap="large")
-    with right:
-        count = st.number_input("How many", 6, 20, 12, key="prin-count")
-        generate = st.button("Generate principles", type="primary")
-    with left:
-        if principles.principles:
-            st.markdown(f'<div class="look-cap">{len(principles.principles)} principles &middot; '
-                        f'{principles.path}</div>', unsafe_allow_html=True)
-        else:
-            ui.empty("No principles yet. Generate a set from the questionnaire, "
-                     "or write them by hand below.")
+    ideas_panel(profile, answers, principles)
+    kept_panel(principles)
+    handwrite_panel(principles)
 
-    if generate:
+
+def ideas_panel(profile: Profile, answers: Answers, principles: Principles) -> None:
+    ui.eyebrow("Inspiration")
+    ui.blurb(
+        f"{BATCH} suggestions at a time. Keep the ones that ring true, bin the rest. "
+        "Asking for ten in one go gets you four that are true and six that are "
+        "padding, and padding in a list this short is worse than a gap. Each round "
+        "is told what you have already kept, so it goes somewhere new."
+    )
+    if st.button(f"Suggest {BATCH} more", type="primary"):
         guide = paths.guide().read_text() if paths.guide().is_file() else ""
         with st.spinner("Thinking…"):
             try:
-                fresh = prin_mod.generate(profile, answers, guide, int(count))
+                st.session_state["principle_ideas"] = prin_mod.generate(
+                    profile, answers, guide, BATCH, principles.principles)
             except (ValueError, *GEMINI_ERRORS) as exc:
                 st.error(str(exc))
                 return
-        principles.principles = []
-        for p in fresh:
-            principles.add(p)
-        principles.save()
         st.rerun()
 
+    ideas: list[Principle] = st.session_state.get("principle_ideas", [])
+    if not ideas:
+        st.markdown('<div class="look-cap">No suggestions on the table. '
+                    'Generating again replaces whatever is here.</div>',
+                    unsafe_allow_html=True)
+        return
+
+    for n, idea in enumerate(ideas):
+        c1, c2, c3 = st.columns([8, 1, 1])
+        c1.markdown(
+            f'<div class="step"><div class="pieces">{idea.text}</div>'
+            f'<div class="why">{idea.group} &middot; {idea.reason}</div></div>',
+            unsafe_allow_html=True)
+        if c2.button("Keep", key=f"keep-{n}"):
+            principles.add(Principle(text=idea.text, reason=idea.reason, group=idea.group))
+            principles.save()
+            st.session_state["principle_ideas"] = [i for i in ideas if i is not idea]
+            st.rerun()
+        if c3.button("Bin", key=f"bin-{n}", type="secondary"):
+            st.session_state["principle_ideas"] = [i for i in ideas if i is not idea]
+            st.rerun()
+
+
+def kept_panel(principles: Principles) -> None:
+    ui.eyebrow("Kept")
+    if not principles.principles:
+        ui.empty("Nothing kept yet. Take a suggestion above, or write your own below.")
+        return
     for group, group_principles in principles.by_group().items():
-        ui.eyebrow(group)
+        st.markdown(f'<div class="look-cap">{group}</div>', unsafe_allow_html=True)
         for p in group_principles:
             c1, c2 = st.columns([9, 1])
             c1.markdown(
@@ -503,10 +526,12 @@ def principles_tab(profile: Profile, answers: Answers, principles: Principles) -
                 principles.save()
                 st.rerun()
 
+
+def handwrite_panel(principles: Principles) -> None:
     with st.expander("Write one by hand"):
         with st.form("add-principle", clear_on_submit=True):
-            text = st.text_input("Instruction", placeholder="Keep volume in one place only.")
-            reason = st.text_input("Reason", placeholder="Volume top and bottom reads as swamped.")
+            text = st.text_input("Instruction", placeholder="Keep the volume in one place only.")
+            reason = st.text_input("Reason", placeholder="Loose on top and below reads as swamped.")
             group = st.selectbox("Group", GROUPS)
             if st.form_submit_button("Add principle") and text.strip():
                 principles.add(Principle(text=text.strip(), reason=reason.strip(), group=group))
@@ -762,20 +787,21 @@ def measurements_panel(profile: Profile) -> None:
             "which is fine for a shortlist and useless for a blazer. Twenty minutes "
             "with a tape measure fixes it permanently."
         )
-    ui.meter(len(body.measured()), 16, "Measured")
+    ui.blurb(
+        "Ten measurements, all of them takeable on yourself with a tape and a mirror. "
+        "Thigh, knee and ankle are not asked for; they are derived from your height so "
+        "the trouser targets keep their leg opening."
+    )
+    ui.meter(len(body.measured()), len(fitspec.HOW_TO_MEASURE), "Measured")
 
     with st.expander("Take the measurements", expanded=bool(missing) and not body.measured()):
         with st.form("measurements"):
-            names = [f for f in fitspec.HOW_TO_MEASURE]
             cols = st.columns(3)
-            for n, dim in enumerate(names):
+            for n, dim in enumerate(fitspec.HOW_TO_MEASURE):
                 label = fitspec.LABELS.get(dim, dim.replace("_", " ").title())
                 setattr(body, dim, cols[n % 3].number_input(
-                    label + (" ★" if dim in fitspec.CRITICAL else ""),
-                    0.0, 300.0, float(getattr(body, dim, 0)), step=0.5,
+                    label, 0.0, 300.0, float(getattr(body, dim, 0)), step=0.5,
                     help=fitspec.HOW_TO_MEASURE[dim], key=f"bm-{dim}"))
-            body.shoe_eu = st.number_input("Shoe EU", 0.0, 60.0, float(body.shoe_eu), step=0.5,
-                                           key="bm-shoe")
             if st.form_submit_button("Save measurements"):
                 profile.save()
                 st.rerun()
@@ -783,8 +809,9 @@ def measurements_panel(profile: Profile) -> None:
     values, estimated = body.resolved(profile.subject.height_cm, profile.subject.build)
     rows = [{
         "Dimension": fitspec.LABELS.get(k, k.replace("_", " ").title()),
-        "Value": f'{v:g} cm' if k != "shoe_eu" else f"EU {v:g}",
-        "Source": '<span class="est">estimated</span>' if k in estimated else "measured",
+        "Value": f"{v:g} cm",
+        "Source": ('<span class="est">estimated</span>' if k in estimated else "measured")
+                  + ("" if k in fitspec.HOW_TO_MEASURE else " · derived only"),
     } for k, v in values.items()]
     ui.table(rows, numeric=("Value",))
 

@@ -125,7 +125,6 @@ class Item:
     colour: str = ""
     colour_hex: str = "#CCCCCC"
     fabric: str = ""
-    pattern: str = "Solid"
     status: str = OWNED
     photo: str = ""
     description: str = ""
@@ -158,10 +157,7 @@ class Item:
     def describe(self) -> str:
         """One line for the image prompt. Photographs beat adjectives, but when
         there is no photograph the adjectives have to carry it."""
-        bits = [b for b in (
-            self.pattern if self.pattern and self.pattern != "Solid" else "",
-            self.colour, self.fabric, self.garment.lower(),
-        ) if b]
+        bits = [b for b in (self.colour, self.fabric, self.garment.lower()) if b]
         line = " ".join(bits) or self.name
         if self.description:
             line = f"{line} ({self.description})"
@@ -188,7 +184,7 @@ class Item:
     def searchable(self) -> str:
         return " ".join(
             [self.name, self.colour, self.fabric, self.garment,
-             self.category, self.pattern, self.description, *self.sizes.values()]
+             self.category, self.description, *self.sizes.values()]
         ).lower()
 
 

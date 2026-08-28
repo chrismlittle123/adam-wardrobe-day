@@ -25,17 +25,18 @@ from dataclasses import asdict, dataclass, fields
 # Anthropometric ratios against height, tuned for a lean athletic build. Rough
 # by nature: they get a shopping list started, they do not fit a jacket.
 HEIGHT_RATIOS: dict[str, float] = {
-    "neck": 0.215,
     "chest": 0.550,
     "waist": 0.442,
-    "seat": 0.540,
+    "hip": 0.540,
     "shoulder": 0.255,
-    "sleeve": 0.345,
-    "back_length": 0.245,
     "bicep": 0.175,
     "wrist": 0.095,
+    "sleeve": 0.345,
+    "neck": 0.215,
     "inseam": 0.455,
     "outseam": 0.605,
+    # Not asked for, only derived: awkward to take on yourself, but the trouser
+    # spec needs them for the thigh and the leg opening.
     "thigh": 0.310,
     "knee": 0.215,
     "ankle": 0.128,
@@ -46,55 +47,50 @@ HEIGHT_RATIOS: dict[str, float] = {
 # carries an athletic chest on a lean waist, and averaging the two gets the
 # chest wrong in one direction and the waist wrong in the other.
 BUILD_FACTORS: dict[str, dict[str, float]] = {
-    "lean":          {"chest": 0.97, "waist": 0.94, "seat": 0.97, "bicep": 0.93, "thigh": 0.95},
-    "lean athletic": {"chest": 1.00, "waist": 0.94, "seat": 0.99, "bicep": 0.99, "thigh": 0.98},
-    "athletic":      {"chest": 1.00, "waist": 1.00, "seat": 1.00, "bicep": 1.00, "thigh": 1.00},
-    "average":       {"chest": 1.02, "waist": 1.09, "seat": 1.03, "bicep": 1.04, "thigh": 1.04},
-    "solid":         {"chest": 1.06, "waist": 1.20, "seat": 1.07, "bicep": 1.10, "thigh": 1.09},
+    "lean":          {"chest": 0.97, "waist": 0.94, "hip": 0.97, "bicep": 0.93, "thigh": 0.95},
+    "lean athletic": {"chest": 1.00, "waist": 0.94, "hip": 0.99, "bicep": 0.99, "thigh": 0.98},
+    "athletic":      {"chest": 1.00, "waist": 1.00, "hip": 1.00, "bicep": 1.00, "thigh": 1.00},
+    "average":       {"chest": 1.02, "waist": 1.09, "hip": 1.03, "bicep": 1.04, "thigh": 1.04},
+    "solid":         {"chest": 1.06, "waist": 1.20, "hip": 1.07, "bicep": 1.10, "thigh": 1.09},
 }
 
+# The ten the form asks for, in the order you would take them: top down, then legs.
 HOW_TO_MEASURE: dict[str, str] = {
-    "neck": "Round the base of the neck where a collar sits. One finger of slack.",
+    "neck": "Round the base of the neck where a collar sits. Leave one finger of slack.",
+    "shoulder": "Across the back, from the bony point of one shoulder to the other.",
     "chest": "Round the fullest part, under the arms, tape level, arms down, breathe out.",
     "waist": "Round the natural waist, the narrowest point, roughly at the navel.",
-    "seat": "Round the fullest part of the seat, feet together.",
-    "shoulder": "Across the back, from the bony point of one shoulder to the other.",
-    "sleeve": "From the shoulder point, over a slightly bent elbow, to the wrist bone.",
-    "back_length": "From the bone at the base of the neck down to the natural waist.",
+    "hip": "Round the fullest part of the hips and seat, feet together.",
     "bicep": "Round the fullest part of the upper arm, arm relaxed at the side.",
     "wrist": "Round the wrist bone, where a cuff closes.",
+    "sleeve": "From the shoulder point, over a slightly bent elbow, to the wrist bone.",
     "inseam": "From the crotch seam down the inside of the leg to the ankle bone.",
     "outseam": "From the waistband down the outside of the leg to the ankle bone.",
-    "thigh": "Round the fullest part of the thigh, standing.",
-    "knee": "Round the knee, standing straight.",
-    "ankle": "Round the ankle bone.",
-    "foot_length": "Heel to longest toe, standing, on paper against a wall.",
 }
 
-# Measurements you cannot fit a blazer without. Flagged hard in the UI.
-CRITICAL: tuple[str, ...] = ("chest", "waist", "shoulder", "sleeve", "inseam", "seat", "neck")
+# All ten matter; none is optional. Kept as a name because the UI flags them.
+CRITICAL: tuple[str, ...] = tuple(HOW_TO_MEASURE)
 
 
 @dataclass
 class Body:
-    """Centimetres off a tape measure. Zero means not measured."""
+    """The ten measurements worth taking, in centimetres. Zero means not measured.
 
-    neck: float = 0
+    Deliberately only what a man can get on himself with a tape and a mirror.
+    Thigh, knee and ankle are not asked for; they are derived from height so the
+    trouser spec keeps its leg opening without demanding a second pair of hands.
+    """
+
     chest: float = 0
     waist: float = 0
-    seat: float = 0
+    hip: float = 0
     shoulder: float = 0
-    sleeve: float = 0
-    back_length: float = 0
     bicep: float = 0
     wrist: float = 0
+    sleeve: float = 0
+    neck: float = 0
     inseam: float = 0
     outseam: float = 0
-    thigh: float = 0
-    knee: float = 0
-    ankle: float = 0
-    foot_length: float = 0
-    shoe_eu: float = 0
 
     def measured(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name)}
@@ -103,28 +99,25 @@ class Body:
         return [f.name for f in fields(self) if not getattr(self, f.name)]
 
     def missing_critical(self) -> list[str]:
-        return [k for k in CRITICAL if not getattr(self, k, 0)]
+        return self.missing()
 
     def resolved(self, height_cm: float, build: str = "athletic") -> tuple[dict[str, float], set[str]]:
-        """Every dimension filled in. Returns (values, names that were estimated)."""
-        estimated: set[str] = set()
-        out: dict[str, float] = {}
-        guess = estimate(height_cm, build)
-        for f in fields(self):
-            value = getattr(self, f.name)
-            if not value and f.name in guess:
-                value, _ = guess[f.name], estimated.add(f.name)
-            out[f.name] = round(float(value), 1)
-        return out, estimated
+        """Every dimension a garment target needs. Returns (values, estimated names).
+
+        Starts from the estimate and lets real measurements overwrite it, so the
+        derived-only dimensions are present without being asked for.
+        """
+        values = estimate(height_cm, build)
+        taken = self.measured()
+        values.update(taken)
+        estimated = {k for k in values if k not in taken}
+        return {k: round(float(v), 1) for k, v in values.items()}, estimated
 
 
 def estimate(height_cm: float, build: str = "athletic") -> dict[str, float]:
     """Starting-point body measurements from height and build. Rough on purpose."""
     factors = BUILD_FACTORS.get(_build_key(build), BUILD_FACTORS["athletic"])
-    out = {k: round(height_cm * r * factors.get(k, 1.0), 1) for k, r in HEIGHT_RATIOS.items()}
-    out["foot_length"] = round(height_cm * 0.152, 1)
-    out["shoe_eu"] = round(out["foot_length"] * 1.5 + 2)
-    return out
+    return {k: round(height_cm * r * factors.get(k, 1.0), 1) for k, r in HEIGHT_RATIOS.items()}
 
 
 def _build_key(build: str) -> str:
@@ -151,9 +144,9 @@ FITS: tuple[str, ...] = ("Slim", "Regular", "Relaxed")
 # values are the full round measure, not the flat half.
 EASE: dict[str, dict[str, dict[str, float]]] = {
     "Shirt": {
-        "Slim":    {"chest": 14, "waist": 12, "seat": 12, "shoulder": 0.5, "bicep": 8, "neck": 2},
-        "Regular": {"chest": 18, "waist": 18, "seat": 16, "shoulder": 1.5, "bicep": 11, "neck": 2},
-        "Relaxed": {"chest": 24, "waist": 26, "seat": 22, "shoulder": 3.0, "bicep": 15, "neck": 2.5},
+        "Slim":    {"chest": 14, "waist": 12, "hip": 12, "shoulder": 0.5, "bicep": 8, "neck": 2},
+        "Regular": {"chest": 18, "waist": 18, "hip": 16, "shoulder": 1.5, "bicep": 11, "neck": 2},
+        "Relaxed": {"chest": 24, "waist": 26, "hip": 22, "shoulder": 3.0, "bicep": 15, "neck": 2.5},
     },
     "T-shirt": {
         "Slim":    {"chest": 10, "waist": 12, "shoulder": 0, "bicep": 7},
@@ -171,24 +164,24 @@ EASE: dict[str, dict[str, dict[str, float]]] = {
         "Relaxed": {"chest": 22, "waist": 22, "shoulder": 3.0, "bicep": 15},
     },
     "Blazer": {
-        "Slim":    {"chest": 10, "waist": 8,  "seat": 10, "shoulder": 0.5, "bicep": 10},
-        "Regular": {"chest": 14, "waist": 14, "seat": 14, "shoulder": 1.5, "bicep": 13},
-        "Relaxed": {"chest": 18, "waist": 20, "seat": 18, "shoulder": 3.0, "bicep": 16},
+        "Slim":    {"chest": 10, "waist": 8,  "hip": 10, "shoulder": 0.5, "bicep": 10},
+        "Regular": {"chest": 14, "waist": 14, "hip": 14, "shoulder": 1.5, "bicep": 13},
+        "Relaxed": {"chest": 18, "waist": 20, "hip": 18, "shoulder": 3.0, "bicep": 16},
     },
     "Overcoat": {
-        "Slim":    {"chest": 20, "waist": 20, "seat": 18, "shoulder": 2.5, "bicep": 16},
-        "Regular": {"chest": 25, "waist": 26, "seat": 24, "shoulder": 3.5, "bicep": 19},
-        "Relaxed": {"chest": 30, "waist": 32, "seat": 30, "shoulder": 5.0, "bicep": 23},
+        "Slim":    {"chest": 20, "waist": 20, "hip": 18, "shoulder": 2.5, "bicep": 16},
+        "Regular": {"chest": 25, "waist": 26, "hip": 24, "shoulder": 3.5, "bicep": 19},
+        "Relaxed": {"chest": 30, "waist": 32, "hip": 30, "shoulder": 5.0, "bicep": 23},
     },
     "Trousers": {
-        "Slim":    {"waist": 2, "seat": 6,  "thigh": 6,  "knee": 6,  "ankle": 12},
-        "Regular": {"waist": 3, "seat": 10, "thigh": 9,  "knee": 9,  "ankle": 16},
-        "Relaxed": {"waist": 4, "seat": 14, "thigh": 13, "knee": 13, "ankle": 21},
+        "Slim":    {"waist": 2, "hip": 6,  "thigh": 6,  "knee": 6,  "ankle": 12},
+        "Regular": {"waist": 3, "hip": 10, "thigh": 9,  "knee": 9,  "ankle": 16},
+        "Relaxed": {"waist": 4, "hip": 14, "thigh": 13, "knee": 13, "ankle": 21},
     },
     "Jeans": {
-        "Slim":    {"waist": 1, "seat": 5,  "thigh": 5,  "knee": 5,  "ankle": 11},
-        "Regular": {"waist": 2, "seat": 9,  "thigh": 8,  "knee": 8,  "ankle": 15},
-        "Relaxed": {"waist": 3, "seat": 13, "thigh": 12, "knee": 12, "ankle": 20},
+        "Slim":    {"waist": 1, "hip": 5,  "thigh": 5,  "knee": 5,  "ankle": 11},
+        "Regular": {"waist": 2, "hip": 9,  "thigh": 8,  "knee": 8,  "ankle": 15},
+        "Relaxed": {"waist": 3, "hip": 13, "thigh": 12, "knee": 12, "ankle": 20},
     },
 }
 
@@ -208,11 +201,11 @@ BREAKS: dict[str, float] = {"No break": -2.0, "Quarter break": 0.0, "Half break"
 
 # Dimensions that read as a circumference, so a shop's flat measurement is half.
 CIRCUMFERENCE: frozenset[str] = frozenset(
-    {"chest", "waist", "seat", "neck", "bicep", "thigh", "knee", "ankle", "wrist"}
+    {"chest", "waist", "hip", "neck", "bicep", "thigh", "knee", "ankle", "wrist"}
 )
 
 LABELS: dict[str, str] = {
-    "chest": "Chest", "waist": "Waist", "seat": "Seat", "neck": "Neck",
+    "chest": "Chest", "waist": "Waist", "hip": "Hip", "neck": "Neck",
     "shoulder": "Shoulder", "sleeve": "Sleeve", "bicep": "Bicep", "thigh": "Thigh",
     "knee": "Knee", "ankle": "Leg opening", "length": "Length", "inseam": "Inseam",
     "rise": "Rise", "outseam": "Outseam",

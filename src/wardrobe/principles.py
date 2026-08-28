@@ -1,8 +1,12 @@
 """Guiding principles: the short rules used to invent outfits.
 
 Deliberately not the style guide. The guide is a document you read once; these
-are the eight or twelve lines you hold in your head while putting an outfit
-together, so they are short, testable, and phrased as instructions.
+are the ten or so lines you hold in your head while putting an outfit together,
+so they are short, testable, and phrased as instructions.
+
+The model does not write the set, it offers five at a time as inspiration and
+the good ones get kept. Generating ten in one go produces four that are true and
+six that are padding, and padding in a list this short is worse than a gap.
 """
 
 from __future__ import annotations
@@ -22,6 +26,10 @@ from .profile import Profile
 from .prompts import appearance, physique
 
 GROUPS: tuple[str, ...] = ("Silhouette", "Colour", "Fabric", "Proportion", "Restraint", "Occasion")
+
+# Five suggestions a round; about ten kept is a set you can actually hold in mind.
+BATCH = 5
+TARGET = 10
 
 SYSTEM = """You write guiding principles for one man's wardrobe.
 
@@ -101,8 +109,18 @@ class Principles:
         return "\n".join(f"- {p.line()}" for p in self.principles[:limit])
 
 
-def build_prompt(profile: Profile, answers: Answers, guide: str = "", count: int = 12) -> str:
+def build_prompt(profile: Profile, answers: Answers, guide: str = "",
+                 count: int = BATCH, existing: list[Principle] | None = None) -> str:
     guide_block = f"\n# The style guide already written\n\n{guide[:6000]}\n" if guide.strip() else ""
+    kept = existing or []
+    kept_block = ""
+    if kept:
+        lines = "\n".join(f"- [{p.group}] {p.text}" for p in kept)
+        kept_block = (
+            f"\n# Principles he has already kept\n\n{lines}\n\n"
+            "Do not repeat any of these, and do not restate one in different words. "
+            "Cover ground they do not.\n"
+        )
     return f"""# The man
 
 {physique(profile)}.
@@ -111,11 +129,15 @@ def build_prompt(profile: Profile, answers: Answers, guide: str = "", count: int
 # What he said
 
 {transcript(answers)}
-{guide_block}
+{guide_block}{kept_block}
 # Your task
 
-Write exactly {count} guiding principles, spread across these groups:
+Suggest exactly {count} guiding principles, drawn from these groups:
 {", ".join(GROUPS)}.
+
+These are suggestions, not a finished set. He will keep the ones that ring true
+and discard the rest, so make each one earn its place on its own rather than
+padding towards a number.
 
 Return them as a markdown list, one per line, in this exact format and nothing else:
 
@@ -139,8 +161,11 @@ def parse(raw: str) -> list[Principle]:
     return out
 
 
-def generate(profile: Profile, answers: Answers, guide: str = "", count: int = 12) -> list[Principle]:
-    raw = generate_text(build_prompt(profile, answers, guide, count), system=SYSTEM, temperature=0.7)
+def generate(profile: Profile, answers: Answers, guide: str = "", count: int = BATCH,
+             existing: list[Principle] | None = None) -> list[Principle]:
+    """A batch of suggestions. Nothing is saved; the caller keeps what it likes."""
+    raw = generate_text(build_prompt(profile, answers, guide, count, existing),
+                        system=SYSTEM, temperature=0.85)
     parsed = parse(raw)
     if not parsed:
         raise ValueError(f"Could not read any principles out of the reply:\n\n{raw[:500]}")

@@ -45,15 +45,18 @@ Six tabs, in the order the work happens.
    three disagreeing national systems for a shoe. Only wanted pieces carry a
    price, since what an owned garment cost is sunk. Photograph anything words
    cannot pin down: "green jacket" gives a different jacket every time.
-3. **Principles** — a dozen short checkable rules, generated from the answers
-   and hand-editable. Fed into every generated look.
+3. **Principles** — short checkable rules, about ten of them. The model offers
+   five suggestions at a time and you keep the ones that ring true; each round
+   is told what you already kept so it goes somewhere new. Hand-written ones
+   sit alongside. All of them are fed into every generated look.
 4. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
    you do not own yet. Item photos ride along as references so the generated
    image shows *that* jacket.
 5. **Outfit Gallery** — tag, search, love. Each outfit shows its cost split
    between what is already owned and what is still to buy.
-6. **Shopping Guide** — body measurements and the finished garment dimensions
-   derived from them, then a purchase plan.
+6. **Shopping Guide** — ten body measurements, all takeable on yourself with a
+   tape and a mirror, then the finished garment dimensions derived from them,
+   then a purchase plan.
 
 ### The shopping maths
 
@@ -81,7 +84,7 @@ Who he is lives in `profile.toml` and feeds every prompt.
 ## Checking it works
 
 ```bash
-uv run wardrobe-check              # 36 checks, a couple of seconds
+uv run wardrobe-check              # 40 checks, a couple of seconds
 uv run wardrobe-check --live       # plus two real Vertex AI calls
 uv run pytest                      # the same checks, from CI
 uv run wardrobe-reset --yes        # clear the data, snapshot taken first
