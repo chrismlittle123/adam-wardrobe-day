@@ -1,0 +1,39 @@
+# The subject of every generated look. This file is the single source of truth
+# for who the model is; the app reads it, shows it, and folds it into every
+# prompt sent to Gemini. Editable from the app's "Edit subject" panel.
+
+[subject]
+name = "Adam"
+height_cm = 176
+build = "very lean and athletic, narrow waist, defined shoulders"
+body_fat_pct = 10
+
+# Sampled from reference/adam-neutral.png: mean of forehead, both cheeks and
+# nose bridge, excluding the stubble shadow along the jaw.
+skin_tone_hex = "#C58466"
+skin_tone = "warm medium brown with a golden undertone"
+
+hair = "short dark natural curls, cropped close at the sides"
+facial_hair = "light moustache and short stubble along the jaw"
+eyes = "dark brown"
+details = "small gold stud earring, thin gold chain necklace"
+
+[photos]
+# The head-on white-background portrait is the better generation base: plain
+# background and square shoulders give the model far less to fight with.
+neutral = "reference/adam-neutral.png"
+original = "reference/adam.png"
+
+[measurements]
+# Centimetres. Leave at 0 until actually measured; the app hides zeroes and the
+# prompt never invents a number it was not given.
+chest_cm = 0
+waist_cm = 0
+inseam_cm = 0
+shoulder_cm = 0
+shoe_eu = 0
+
+[style]
+# Free text, folded into the prompt as standing direction for every look.
+direction = "Relaxed European tailoring. Natural shoulder, nothing boxy, nothing skinny."
+avoid = "Baggy fits, loud logos, novelty prints, black-on-black."

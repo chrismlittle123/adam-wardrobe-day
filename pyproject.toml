@@ -7,10 +7,14 @@ dependencies = [
     "google-genai>=1.0.0",
     "google-auth>=2.30.0",
     "python-dotenv>=1.0.0",
+    "streamlit>=1.62.0",
+    "pillow>=12.3.0",
+    "tomli-w>=1.2.0",
 ]
 
 [project.scripts]
 gemini-image = "wardrobe.gemini_image:main"
+wardrobe-app = "wardrobe.app:main"
 
 [build-system]
 requires = ["hatchling"]
