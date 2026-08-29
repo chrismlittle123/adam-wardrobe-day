@@ -259,6 +259,38 @@ def check_estimated_flag() -> str:
 
 # --- Inventory ----------------------------------------------------------------
 
+def check_garment_colour_comes_from_the_catalogue() -> str:
+    """A garment's colour is picked from the catalogue, never typed or mixed.
+
+    Free text had already produced chocolate, Chocolate and dark brown, which is
+    one colour wearing three names. A free hex picker would do the same thing
+    again with numbers instead of words.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    from .palette import COLOUR_NAMES, hex_for
+    from .inventory import Item
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    assert not app.exception, f"the app raised: {app.exception[0].value}"
+
+    boxes = [w for w in app.selectbox if w.label == "Colour"]
+    assert boxes, "no colour picker on the inventory form"
+    for box in boxes:
+        assert list(box.options) == ["", *COLOUR_NAMES], \
+            f"the colour list is not the catalogue: {list(box.options)[:4]}"
+
+    page = "\n".join(m.value for m in app.markdown)
+    assert "#CCCCCC" not in page, "the placeholder swatch is still on the page"
+    assert "Swatch" not in page, "the swatch preview is back"
+
+    # The hex still follows from the name, since the cards and the prompts use it.
+    item = Item(name="x", colour="Navy")
+    item.colour_hex = hex_for(item.colour)
+    assert item.colour_hex == "#26303F", "the hex no longer follows the name"
+    return f"colour picked from {len(COLOUR_NAMES)} catalogue names, no hex on the form"
+
+
 def check_pattern_removed() -> str:
     from .inventory import Item
     assert "pattern" not in Item().__dataclass_fields__, "the pattern field is back"
@@ -2109,6 +2141,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (FIT, "Trouser break and flat measurements", check_break_and_flat),
     (FIT, "Estimated and measured told apart", check_estimated_flag),
     (FIT, "Lean and athletic is not read as lean", check_build_matching),
+    (INVENTORY, "Garment colour comes from the catalogue",
+     check_garment_colour_comes_from_the_catalogue),
     (INVENTORY, "Pattern is gone from items", check_pattern_removed),
     (INVENTORY, "Fabric comes from a fixed list", check_fabric_list),
     (INVENTORY, "UK sizes on labels, centimetres for measurements", check_uk_sizing),

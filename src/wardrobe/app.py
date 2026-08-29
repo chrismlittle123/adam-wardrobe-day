@@ -487,21 +487,16 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
 
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
                               )
-    c1, c2, c3 = st.columns([2, 1, 2])
+    c1, c3 = st.columns(2)
     options = ["", *COLOUR_NAMES]
     item.colour = c1.selectbox(
         "Colour", options,
         index=options.index(item.colour) if item.colour in options else 0,
         key=f"{key}-colour",
-        help="Thirty colours a wardrobe is actually built from. Typed free-hand "
-             "this became chocolate, Chocolate and dark brown, which is one colour "
-             "wearing three names.")
+        help="From the colour catalogue only. Typed free-hand this became "
+             "chocolate, Chocolate and dark brown, which is one colour wearing "
+             "three names.")
     item.colour_hex = hex_for(item.colour) if item.colour else item.colour_hex
-    c2.markdown(
-        f'<div class="look-cap">Swatch</div>'
-        f'<div style="height:2.1rem;background:{item.colour_hex};'
-        f'border:1px solid var(--line)"></div>'
-        f'<div class="look-cap">{item.colour_hex}</div>', unsafe_allow_html=True)
     item.fabric = c3.selectbox(
         "Fabric", fabric_options(),
         index=fabric_options().index(item.fabric) if item.fabric in fabric_options() else 0,
@@ -1787,12 +1782,9 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             name = c1.text_input("Name")
             garment = c2.selectbox("Garment", garments(), key="asp-garment")
             grade = c3.selectbox("Grade", grades(), key="asp-grade")
-            c4, c5, c6 = st.columns([2, 1, 2])
+            c4, c6 = st.columns(2)
             colour = c4.selectbox("Colour", ["", *COLOUR_NAMES], key="asp-colour")
             colour_hex = hex_for(colour) if colour else "#CCCCCC"
-            c5.markdown(f'<div class="look-cap">Swatch</div><div style="height:2.1rem;'
-                        f'background:{colour_hex};border:1px solid var(--line)"></div>',
-                        unsafe_allow_html=True)
             fabric = c6.selectbox("Fabric", fabric_options(), key="asp-fabric")
             fit = st.selectbox("Fit", fits(), key="asp-fit")
             if st.form_submit_button("Add as wanted") and name.strip():
