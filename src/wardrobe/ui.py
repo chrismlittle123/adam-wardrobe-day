@@ -2,8 +2,13 @@
 
 The palette is taken off the reference photograph rather than chosen: walnut
 ground, the brass of the gold chain-stitch on his collar, the cream of the
-shirt. Georgia sets everything that is read as prose, Bodoni Moda appears in the
-masthead and item names, and IBM Plex Mono carries every number and label.
+shirt. Three faces, and they are one family plus a masthead rather than a
+collection: IBM Plex Sans sets everything read as prose, IBM Plex Mono carries
+every number and label, and Bodoni Moda appears only in the masthead and item
+names. Sans and mono are siblings on the same skeleton, so a label and the
+sentence beside it sit together instead of merely coexisting. Plex is humanist
+rather than geometric, which is what keeps it open at small sizes in light text
+on a dark ground.
 """
 
 from __future__ import annotations
@@ -17,7 +22,7 @@ from PIL import Image, UnidentifiedImageError
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
 
 :root {
   --ground: #17110E; --panel: #211915; --raise: #2C211B;
@@ -27,7 +32,7 @@ CSS = """
 
 .stApp { background: var(--ground); }
 html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
-  font-family: Georgia, 'Times New Roman', serif; color: var(--cream);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif; color: var(--cream);
 }
 [data-testid="stHeader"] { background: transparent; }
 #MainMenu, footer { visibility: hidden; }
@@ -68,7 +73,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 .docket dd {
   margin: 0; font-family: 'IBM Plex Mono', monospace; font-size: .78rem; text-align: right;
 }
-.docket dd.prose { font-family: Georgia, serif; font-size: .8rem; max-width: 64%; }
+.docket dd.prose { font-family: 'IBM Plex Sans', sans-serif; font-size: .8rem; max-width: 64%; }
 .docket .note {
   margin: .9rem 0 0; padding-top: .8rem; border-top: 1px solid var(--line);
   font-size: .76rem; color: var(--muted); line-height: 1.5;
@@ -91,7 +96,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 .stTextArea textarea, .stTextInput input, .stNumberInput input {
   background: var(--panel) !important; color: var(--cream) !important;
   border: 1px solid var(--line) !important; border-radius: 0 !important;
-  font-family: Georgia, 'Times New Roman', serif !important;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif !important;
 }
 .stTextArea textarea:focus, .stTextInput input:focus { border-color: var(--brass) !important; box-shadow: none !important; }
 div[data-baseweb="select"] > div, div[data-baseweb="input"] {
@@ -385,7 +390,7 @@ SHOP_CSS = """
   text-transform: uppercase; color: var(--muted);
 }
 .buy .why {
-  font-family: Georgia, serif; font-size: .82rem; color: var(--muted);
+  font-family: 'IBM Plex Sans', sans-serif; font-size: .82rem; color: var(--muted);
   margin-top: .35rem; line-height: 1.6;
 }
 .buy a {

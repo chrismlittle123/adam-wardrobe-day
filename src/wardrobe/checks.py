@@ -1272,6 +1272,37 @@ def _render():
     return app
 
 
+def check_typography() -> str:
+    """One prose face, one data face, one display face, and no leftovers.
+
+    Swapping a font by search and replace leaves half the rules on the old one,
+    which looks like nothing much and reads as two apps stitched together.
+    """
+    from . import ui
+
+    css = ui.CSS + ui.SHOP_CSS
+    prose, data, display = "IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"
+
+    assert f"font-family: '{prose}'" in css, "the prose face is not set"
+    assert f"family=IBM+Plex+Sans" in css, "the prose face is never fetched"
+    assert f"family=IBM+Plex+Mono" in css, "the data face is never fetched"
+    assert f"family=Bodoni+Moda" in css, "the display face is never fetched"
+
+    for gone in ("Karla", "Helvetica", "Arial", "Inter"):
+        assert gone not in css, f"{gone} lingers in the stylesheet"
+
+    # Georgia may survive only as the fallback behind the serif display face.
+    for line in css.splitlines():
+        if "Georgia" in line:
+            assert display in line, f"Georgia is set as something other than a fallback: {line.strip()}"
+
+    # Numbers and labels stay monospaced, or the docket stops lining up.
+    for rule in (".docket dt", ".docket dd", ".look-cap", ".eyebrow"):
+        block = css.split(rule, 1)[1].split("}", 1)[0] if rule in css else ""
+        assert data in block or "monospace" in block, f"{rule} is not monospaced"
+    return f"{prose} for prose, {data} for data, {display} for display"
+
+
 def check_app_renders_empty() -> str:
     app = _render()
     labels = [t.label for t in app.tabs]
@@ -1653,6 +1684,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Subject reaches the image prompt", check_subject_in_prompt),
     (PROMPTS, "Outfit prompt carries garments and photo roles", check_outfit_prompt),
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
+    (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
