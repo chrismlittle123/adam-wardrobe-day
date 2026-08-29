@@ -31,6 +31,7 @@ from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
     ASPIRATIONAL, NONE, OWNED, RETIRED, STATUSES, Inventory, Item,
     categories, fabric_options, fits, garments, grades, schemes_for, size_scheme,
+    takes_fit, takes_grade,
 )
 from wardrobe.outfits import (
     Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
@@ -508,17 +509,30 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
     if item.fabric == NONE:
         item.fabric = ""
 
-    # Grade and fit are what let a sourcing route be precise. Without them a
-    # heavyweight tee and a plain one are the same garment to the plan.
-    g1, g2 = st.columns(2)
-    item.grade = g1.selectbox(
-        "Grade", grades(), index=grades().index(item.grade) if item.grade in grades() else 0,
-        key=f"{key}-grade",
-        help="What kind of thing it is within its type. This is what separates a "
-             "heavyweight tee from a plain one when both are T-shirts.")
-    item.fit = g2.selectbox(
-        "Fit", fits(), index=fits().index(item.fit) if item.fit in fits() else 0,
-        key=f"{key}-fit", help="How it is cut.")
+    # Grade and fit are what let a sourcing route be precise, but neither means
+    # anything on every garment: there is no heavyweight belt, and a watch is not
+    # cut to a shape. Which garments carry which is set in the catalogue.
+    wants_grade, wants_fit = takes_grade(garment), takes_fit(garment)
+    if wants_grade or wants_fit:
+        columns = st.columns(2 if wants_grade and wants_fit else 1)
+        column = iter(columns)
+        if wants_grade:
+            item.grade = next(column).selectbox(
+                "Grade", grades(),
+                index=grades().index(item.grade) if item.grade in grades() else 0,
+                key=f"{key}-grade",
+                help="What kind of thing it is within its type. This is what "
+                     "separates a heavyweight tee from a plain one when both are "
+                     "T-shirts.")
+        if wants_fit:
+            item.fit = next(column).selectbox(
+                "Fit", fits(),
+                index=fits().index(item.fit) if item.fit in fits() else 0,
+                key=f"{key}-fit", help="How it is cut.")
+    if not wants_grade:
+        item.grade = ""
+    if not wants_fit:
+        item.fit = ""
     boxes = size_scheme(garment, scheme)
     if boxes:
         st.markdown(f'<div class="look-cap">Sizes, as this {garment.lower()} is '
@@ -1293,6 +1307,8 @@ def garment_section(vocab, inventory: Inventory) -> None:
         "Garment": g.name,
         "Category": g.category,
         "Sized as": ", ".join(g.schemes) or "—",
+        "Carries": ", ".join(
+            a for a, on in (("grade", g.takes_grade), ("fit", g.takes_fit)) if on) or "—",
         "In the wardrobe": str(counts[g.name]) if counts[g.name] else "—",
     } for g in vocab.garments], numeric=("In the wardrobe",))
 
@@ -1317,6 +1333,14 @@ def garment_section(vocab, inventory: Inventory) -> None:
             default=[x for x in garment.schemes if x in vocabulary.SCHEMES],
             key=f"gs-{chosen}",
             help="Most specific first. The first is what a new piece defaults to.")
+        a1, a2 = st.columns(2)
+        garment.takes_grade = a1.checkbox(
+            "Carries a grade", garment.takes_grade, key=f"gg-{chosen}",
+            help="Knitted, heavyweight, fine. Tops only, as a rule: there is no "
+                 "heavyweight belt.")
+        garment.takes_fit = a2.checkbox(
+            "Carries a fit", garment.takes_fit, key=f"gf-{chosen}",
+            help="How it is cut. Tops, blazers and trousers.")
         st.markdown(
             '<div class="dict-row"><span class="meta">Boxes on the form: </span>'
             + " ".join(f'<span class="dict-chip on">{f.label}</span>'
@@ -1866,12 +1890,13 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             c1, c2, c3 = st.columns([3, 2, 1])
             name = c1.text_input("Name")
             garment = c2.selectbox("Garment", garments(), key="asp-garment")
-            grade = c3.selectbox("Grade", grades(), key="asp-grade")
+            grade = (c3.selectbox("Grade", grades(), key="asp-grade")
+                     if takes_grade(garment) else "")
             c4, c6 = st.columns(2)
             colour = c4.selectbox("Colour", ["", *colour_names()], key="asp-colour")
             colour_hex = hex_for(colour) if colour else "#CCCCCC"
             fabric = c6.selectbox("Fabric", fabric_options(), key="asp-fabric")
-            fit = st.selectbox("Fit", fits(), key="asp-fit")
+            fit = st.selectbox("Fit", fits(), key="asp-fit") if takes_fit(garment) else ""
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
@@ -2390,6 +2415,26 @@ def where_to_buy_tab(inventory: Inventory) -> None:
         '<div class="look-cap"><a href="?shops=all" target="_blank">'
         'Open the retailer catalogue &#8599;</a> to add a shop, change what it '
         'sells, or drop one you never use.</div>', unsafe_allow_html=True)
+
+    impossible = [
+        r for r in plan.routes
+        if (r.grade and not takes_grade(r.garment))
+        or (r.fit and not takes_fit(r.garment))
+    ]
+    if impossible:
+        st.error(
+            "These routes can never match, because they ask for something the "
+            "garment does not carry: "
+            + "; ".join(
+                f"**{r.label}** wants "
+                + " and ".join(
+                    f"{axis} on a {r.garment.lower()}"
+                    for axis, on in (("a grade", r.grade and not takes_grade(r.garment)),
+                                     ("a fit", r.fit and not takes_fit(r.garment))) if on)
+                for r in impossible)
+            + ". Either give that garment the axis in the Garment Catalogue, or "
+              "match the route on something it does carry."
+        )
 
     unrouted = [i for i in inventory.items
                 if i.status == ASPIRATIONAL and not sourcing.route_for(i, plan)]

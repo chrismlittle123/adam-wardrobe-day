@@ -1,0 +1,94 @@
+[[items]]
+id = "ecru-oxford-cotton-shirt"
+name = "Ecru Oxford cotton shirt"
+category = "Top"
+garment = "Shirt"
+colour = "Ecru"
+colour_hex = "#E8DFC8"
+fabric = "Oxford cotton"
+grade = "Smart"
+fit = "Slim"
+scheme = "Collar and sleeve"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = true
+product_photo = "out/products/ecru-oxford-cotton-shirt.png"
+product_copy = ""
+
+[items.sizes]
+collar = "15.5\""
+sleeve = "34\""
+
+[[items]]
+id = "tobacco-brown-blazer"
+name = "Tobacco brown blazer"
+category = "Outerwear"
+garment = "Blazer"
+colour = "Tobacco"
+colour_hex = "#7E5835"
+fabric = "Linen-wool"
+grade = "Dress"
+fit = "Slim"
+scheme = "Chest and length"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = true
+product_photo = "out/products/tobacco-brown-blazer.png"
+product_copy = ""
+
+[items.sizes]
+chest = "38"
+length = "Regular"
+
+[[items]]
+id = "tobacco-suit-trousers"
+name = "Tobacco suit trousers"
+category = "Bottom"
+garment = "Trousers"
+colour = "Tobacco"
+colour_hex = "#7E5835"
+fabric = "Linen-wool"
+grade = "Smart"
+fit = "Slim"
+scheme = "Waist and leg"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = true
+product_photo = "out/products/tobacco-suit-trousers.png"
+product_copy = ""
+
+[items.sizes]
+waist = "30\""
+leg = "32\""
+
+[[items]]
+id = "cognac-leather-derbies"
+name = "Cognac Leather Derbies"
+category = "Shoes"
+garment = "Derbies"
+colour = "Cognac"
+colour_hex = "#9C5A2D"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Shoe"
+status = "aspirational"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = true
+product_photo = "out/products/cognac-leather-derbies.png"
+product_copy = ""
+
+[items.sizes]
+uk = "9"

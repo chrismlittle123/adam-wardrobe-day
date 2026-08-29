@@ -75,6 +75,14 @@ def schemes_for(garment: str) -> tuple[str, ...]:
     return current().schemes_for(garment)
 
 
+def takes_grade(garment: str) -> bool:
+    return current().takes_grade(garment)
+
+
+def takes_fit(garment: str) -> bool:
+    return current().takes_fit(garment)
+
+
 def size_scheme(garment: str, scheme: str = "") -> tuple[SizeField, ...]:
     """The size boxes for this garment, in whichever scheme its label used."""
     return current().scheme_for(garment, scheme)
@@ -199,6 +207,12 @@ class Item:
                 continue
             kept[key] = value
         self.sizes = kept
+        # The same for the axes: a grade on a belt is a value nothing will ever
+        # read, and it would keep matching sourcing routes from beyond the grave.
+        if not current().takes_grade(self.garment):
+            self.grade = ""
+        if not current().takes_fit(self.garment):
+            self.fit = ""
 
     def searchable(self) -> str:
         return " ".join(

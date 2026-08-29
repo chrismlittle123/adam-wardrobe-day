@@ -259,6 +259,55 @@ def check_estimated_flag() -> str:
 
 # --- Inventory ----------------------------------------------------------------
 
+def check_grade_and_fit_only_where_they_mean_something() -> str:
+    """A grade belongs on a top and a fit on anything cut to a shape.
+
+    There is no heavyweight belt and a watch is not cut. Carrying either
+    everywhere put two dead boxes on most forms and, worse, let a piece hold a
+    value that a sourcing route would go on matching against for ever.
+    """
+    from .inventory import Inventory, Item, garments, takes_fit, takes_grade, category_for
+    from .sourcing import Plan
+
+    graded = [g for g in garments() if takes_grade(g)]
+    fitted = [g for g in garments() if takes_fit(g)]
+    assert set(graded) == {g for g in garments() if category_for(g) == "Top"}, \
+        f"grade is not confined to tops: {sorted(graded)}"
+    assert "Blazer" in fitted and "Trousers" in fitted and "Shirt" in fitted, \
+        "fit is missing from tops, blazers or trousers"
+    for nothing in ("Belt", "Watch", "Bag", "Sunglasses"):
+        assert not takes_grade(nothing) and not takes_fit(nothing), \
+            f"{nothing} still carries an axis it has no use for"
+    assert not takes_grade("Blazer"), "a blazer is not graded"
+    assert not takes_fit("Boots"), "a boot is not cut to a fit"
+
+    # A value on a garment that does not carry the axis is dropped on save, or a
+    # route keeps matching it long after the form stopped showing it.
+    inventory = Inventory.load()
+    belt = inventory.add(Item(name="Test belt", garment="Belt",
+                              grade="Smart", fit="Slim"))
+    inventory.save()
+    back = Inventory.load().by_id(belt.id)
+    assert not back.grade and not back.fit, \
+        f"a belt kept its grade and fit: {back.grade!r} {back.fit!r}"
+
+    tee = inventory.add(Item(name="Test tee", garment="T-shirt",
+                             grade="Heavyweight", fit="Relaxed"))
+    inventory.save()
+    kept = Inventory.load().by_id(tee.id)
+    assert kept.grade == "Heavyweight" and kept.fit == "Relaxed", \
+        "a top lost the axes it does carry"
+
+    # And a route asking for an axis its garment does not carry can never fire,
+    # which the plan page has to be able to name.
+    impossible = [r for r in Plan.load().routes
+                  if (r.grade and not takes_grade(r.garment))
+                  or (r.fit and not takes_fit(r.garment))]
+    assert all(r.garment for r in impossible), "an impossible route has no garment"
+    return (f"{len(graded)} garments carry a grade, {len(fitted)} a fit; "
+            f"{len(impossible)} route(s) now ask for one that is not there")
+
+
 def check_garment_colour_comes_from_the_catalogue() -> str:
     """A garment's colour is picked from the catalogue, never typed or mixed.
 
@@ -1862,12 +1911,15 @@ def check_word_lists_are_guarded() -> str:
     assert any(counts.values()), "no grade is counted as used"
     assert set(in_use) <= set(counts), "a grade in use is not counted"
 
-    # And the orphan case has to be detectable after the fact.
-    vocab.grades = [g for g in vocab.grades if g != "Smart"]
+    # And the orphan case has to be detectable after the fact. The grade is
+    # picked from what the fixture actually uses, so trimming the sample data
+    # cannot quietly turn this into a test of nothing.
+    doomed = next(g for g, n in counts.items() if n)
+    vocab.grades = [g for g in vocab.grades if g != doomed]
     vocab.save()
     orphaned = [i for i in Inventory.load().items if i.grade and i.grade not in grades()]
-    assert orphaned, "removing a grade in use left nothing to detect"
-    assert all(i.grade == "Smart" for i in orphaned), "the wrong pieces were orphaned"
+    assert orphaned, f"removing {doomed}, which {counts[doomed]} pieces use, left nothing"
+    assert all(i.grade == doomed for i in orphaned), "the wrong pieces were orphaned"
     return (f"{len(counts)} grades counted against the wardrobe; "
             f"removing one in use leaves {len(orphaned)} detectable orphans")
 
@@ -2199,6 +2251,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (FIT, "Trouser break and flat measurements", check_break_and_flat),
     (FIT, "Estimated and measured told apart", check_estimated_flag),
     (FIT, "Lean and athletic is not read as lean", check_build_matching),
+    (INVENTORY, "Grade and fit only where they mean something",
+     check_grade_and_fit_only_where_they_mean_something),
     (INVENTORY, "Garment colour comes from the catalogue",
      check_garment_colour_comes_from_the_catalogue),
     (INVENTORY, "Pattern is gone from items", check_pattern_removed),

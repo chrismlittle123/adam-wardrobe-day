@@ -1,0 +1,29 @@
+[[principles]]
+id = "ensure-all-your-trousers-have-a-mid-"
+text = "Ensure all your trousers have a mid or high rise, sitting at your natural waist."
+reason = "This is the permanent solution to your untucked shirts and it creates the elongated proportions central to the 60s Milanese look you admire."
+group = "Proportion"
+
+[[principles]]
+id = "every-jacket-and-top-must-follow-you"
+text = "Every jacket and top must follow your natural shoulder line and be tailored to define your waist."
+reason = "This is the most effective way to accentuate the athletic frame you want your clothes to highlight."
+group = "Silhouette"
+
+[[principles]]
+id = "choose-only-natural-fibres-like-cott"
+text = "Choose only natural fibres like cotton, linen, and wool over their synthetic alternatives."
+reason = "Since you rated comfort a 10 and aesthetics a 7, this prioritises both the superior feel and the timeless look you want."
+group = "Fabric"
+
+[[principles]]
+id = "build-every-outfit-from-cream-brown-"
+text = "Build every outfit from cream, brown, and navy, using only one other colour from your palette."
+reason = "This guarantees the 'tight, repeatable palette' and 'coherent' look you asked for while complementing your skin tone."
+group = "Colour"
+
+[[principles]]
+id = "let-the-cut-and-fabric-be-the-focus-"
+text = "Let the cut and fabric be the focus; limit accessories to your gold jewellery, a watch, and sunglasses."
+reason = "The sophisticated Milanese style you admire relies on the quiet confidence of the clothes themselves, not on additional statements."
+group = "Restraint"

@@ -197,6 +197,14 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
 }
 
 
+# Grade applies to tops: knitted, heavyweight, fine. Fit applies to anything
+# that is cut to a shape, which is tops, blazers and trousers. Everywhere else
+# both boxes are noise on a form, so they are not shown.
+GRADED_CATEGORIES: tuple[str, ...] = ("Top",)
+FITTED_CATEGORIES: tuple[str, ...] = ("Top", "Bottom")
+FITTED_EXTRAS: tuple[str, ...] = ("Blazer",)
+
+
 # Which schemes can apply to each garment, most specific first. The first is
 # what a new item defaults to; the rest are there because the next label will
 # disagree with the last one. A trouser is 32/32 from one maker and M from the
@@ -229,6 +237,11 @@ class Garment:
     name: str = ""
     category: str = "Top"
     schemes: list[str] = field(default_factory=lambda: ["Free text"])
+    # Not every axis means anything on every garment. A grade separates a
+    # heavyweight tee from a plain one; there is no such distinction on a belt.
+    # A fit describes how something is cut, which a watch is not.
+    takes_grade: bool = False
+    takes_fit: bool = False
 
     @property
     def default_scheme(self) -> str:
@@ -261,7 +274,9 @@ class Vocabulary:
     def defaults(cls, path: Path | None = None) -> "Vocabulary":
         garments = [
             Garment(name=name, category=category,
-                    schemes=list(DEFAULT_SCHEMES.get(name, ("Free text",))))
+                    schemes=list(DEFAULT_SCHEMES.get(name, ("Free text",))),
+                    takes_grade=category in GRADED_CATEGORIES,
+                    takes_fit=category in FITTED_CATEGORIES or name in FITTED_EXTRAS)
             for category, names in DEFAULT_CATEGORIES.items() for name in names
         ]
         fabrics = [Fabric(name=name, family=family)
@@ -343,6 +358,14 @@ class Vocabulary:
             garment.schemes = list(dict.fromkeys(
                 SCHEME_ALIASES.get(s, s) for s in garment.schemes))
         return self
+
+    def takes_grade(self, name: str) -> bool:
+        found = self.garment(name)
+        return bool(found and found.takes_grade)
+
+    def takes_fit(self, name: str) -> bool:
+        found = self.garment(name)
+        return bool(found and found.takes_fit)
 
     def schemes_for(self, name: str) -> tuple[str, ...]:
         """Every scheme that can apply to this garment, most specific first."""
