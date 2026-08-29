@@ -5,10 +5,21 @@ works out where a garment of this type at this price could sensibly come from;
 this file records where he has already decided it comes from, and why.
 
 A route is finer-grained than a garment type, which is the whole difficulty. A
-heavyweight tee and a plain tee are both "T-shirt" and come from different
-shops; a dress shirt and a linen shirt are both "Shirt". So a route carries
-keywords, and the most specific match wins. Where a garment has one route with
-no keywords, that route is simply the default for the type.
+heavyweight tee and a plain tee are both "T-shirt" and come from different shops;
+a dress shirt and a linen shirt are both "Shirt". So a route is selected on three
+optional axes rather than by guessing at words in a name:
+
+  grade    what kind of thing it is within its type. Heavyweight, Dress, Smart,
+           Branded, Knitted, Everyday.
+  fabric   either an exact cloth ("Oxford cotton") or a whole family ("Wool"),
+           so one line covers flannel, worsted and hopsack at once.
+  fit      Slim, Regular, Relaxed, Oversized.
+
+A route states only the constraints it cares about, and matches only if the
+garment satisfies every one of them. Among the routes that match, the one
+stating the most constraints wins, so a route with none is simply the default
+for its type. Nothing is inferred from spelling, which means a garment named
+badly still goes to the right shop and a garment nobody has classified says so.
 
 Everything here is his list, encoded. Where the plan says a condition ("Very
 Good or above") or a timing ("on sale") or a specification ("200 gsm"), it is
@@ -31,7 +42,10 @@ class Route:
     label: str                       # how he says it: "Heavyweight t-shirt"
     garment: str                     # the type the app tracks
     stores: tuple[str, ...]          # retailer ids, in order of preference
-    match: tuple[str, ...] = ()      # keywords that pick this over the default
+    grade: str = ""                  # "" means the grade does not matter
+    fabric: str = ""                 # an exact cloth
+    family: str = ""                 # or a whole fabric family
+    fit: str = ""                    # Slim, Regular, Relaxed, Oversized
     condition: str = ""              # what to accept, on the secondhand sites
     timing: str = ""                 # when to buy
     spec: str = ""                   # what to insist on in the product
@@ -46,19 +60,39 @@ class Route:
         return " or ".join(r.name for r in self.retailers) or "unset"
 
     @property
+    def constraints(self) -> dict[str, str]:
+        """The axes this route actually cares about."""
+        return {k: v for k, v in (("Grade", self.grade), ("Fabric", self.fabric),
+                                  ("Family", self.family), ("Fit", self.fit)) if v}
+
+    @property
+    def precision(self) -> int:
+        return len(self.constraints)
+
+    @property
     def terms(self) -> str:
-        """Condition, timing and specification as one readable clause."""
         return ", ".join(b for b in (self.condition, self.timing, self.spec) if b)
 
     @property
     def summary(self) -> str:
         return f"{self.where}{f' · {self.terms}' if self.terms else ''}"
 
+    def matches(self, item) -> bool:
+        """Every stated constraint must hold. Unstated ones are not consulted."""
+        if item.garment != self.garment:
+            return False
+        if self.grade and item.grade != self.grade:
+            return False
+        if self.fabric and item.fabric != self.fabric:
+            return False
+        if self.family and item.family != self.family:
+            return False
+        return not (self.fit and item.fit != self.fit)
+
 
 # His plan. Order within a garment does not matter; specificity decides.
 ROUTES: tuple[Route, ...] = (
-    Route("Heavyweight t-shirt", "T-shirt", ("asos", "next"),
-          match=("heavy", "heavyweight", "gsm", "thick", "boxy"),
+    Route("Heavyweight t-shirt", "T-shirt", ("asos", "next"), grade="Heavyweight",
           spec="100% cotton, 200 gsm or heavier",
           note="The weight is the whole point. Anything thinner drapes like a vest."),
     Route("Plain t-shirt", "T-shirt", ("uniqlo",),
@@ -72,18 +106,14 @@ ROUTES: tuple[Route, ...] = (
     Route("Boots", "Boots", ("vinted",), condition=VINTED_VG),
     Route("Overcoat", "Overcoat", ("vinted",), condition=VINTED_VG),
 
-    Route("Dress shirt", "Shirt", ("tyrwhitt",),
-          match=("dress", "poplin", "oxford", "formal", "business", "twill"),
-          timing=ON_SALE,
+    Route("Dress shirt", "Shirt", ("tyrwhitt",), grade="Dress", timing=ON_SALE,
           note="Sized by collar and sleeve, which is the only sane way to buy one."),
-    Route("Linen shirt", "Shirt", ("mango",), match=("linen",), timing=ON_SALE),
-    Route("Linen trousers", "Trousers", ("mango",), match=("linen",), timing=ON_SALE),
-    Route("Wool trousers", "Trousers", ("marks", "next"),
-          match=("wool", "flannel", "worsted", "tweed", "hopsack", "merino"),
+    Route("Linen shirt", "Shirt", ("mango",), family="Linen and hemp", timing=ON_SALE),
+    Route("Linen trousers", "Trousers", ("mango",), family="Linen and hemp", timing=ON_SALE),
+    Route("Wool trousers", "Trousers", ("marks", "next"), family="Wool",
           note="The nine months of the year linen cannot do. Check the composition: "
                "a wool blend below about 60% drapes like a school trouser."),
-    Route("Knitted polo", "Polo", ("mango",),
-          match=("knit", "knitted", "merino", "wool"), timing=ON_SALE),
+    Route("Knitted polo", "Polo", ("mango",), grade="Knitted", timing=ON_SALE),
 
     Route("Polo", "Polo", ("uniqlo",), spec="Piqué cotton"),
     Route("Chinos", "Chinos", ("uniqlo",)),
@@ -91,12 +121,10 @@ ROUTES: tuple[Route, ...] = (
     Route("Overshirt", "Overshirt", ("uniqlo",)),
     Route("Jumper", "Knitwear", ("marks", "uniqlo")),
 
-    Route("Smart trainers", "Trainers", ("vinted",), condition=VINTED_NWT,
-          match=("smart", "leather", "white", "minimal", "plain"),
+    Route("Smart trainers", "Trainers", ("vinted",), grade="Smart", condition=VINTED_NWT,
           note="New with tags only. A worn sole has already taken someone else's gait."),
     Route("Branded trainers", "Trainers", ("adidas", "newbalance", "nike"),
-          match=("adidas", "nike", "new balance", "samba", "gazelle", "branded", "suede"),
-          timing=ON_SALE,
+          grade="Branded", timing=ON_SALE,
           note="Check the outlet section before the sale section."),
 
     Route("Suit", "Suit", ("marks",), timing="then have it altered",
@@ -110,27 +138,24 @@ for _route in ROUTES:
 
 
 def route_for(item) -> Route | None:
-    """The route this specific garment follows.
+    """The route this garment follows, or None if the plan does not cover it.
 
-    Keyword matches beat the garment's default, and the default beats a keyword
-    route whose keywords are absent. So a "linen shirt" goes to Mango, a "white
-    oxford" to Tyrwhitt, and a shirt described as neither still lands somewhere.
+    The most constrained matching route wins. A dress shirt satisfies both the
+    dress route and the type's default, and the dress route states more, so it
+    takes it.
     """
-    candidates = BY_GARMENT.get(item.garment)
-    if not candidates:
+    matching = [r for r in BY_GARMENT.get(item.garment, []) if r.matches(item)]
+    if not matching:
         return None
-    haystack = " ".join(
-        str(x) for x in (item.name, item.fabric, item.description, item.colour)
-    ).lower()
+    return max(matching, key=lambda r: r.precision)
 
-    def score(route: Route) -> int:
-        if not route.match:
-            return 1                                    # the default for the type
-        hits = sum(1 for keyword in route.match if keyword in haystack)
-        return 2 + hits if hits else 0                  # matched, or ruled out
 
-    ranked = sorted(candidates, key=score, reverse=True)
-    return ranked[0] if score(ranked[0]) else None
+def why(item, route: Route) -> str:
+    """Which constraints put this garment on this route. Shown on the page, so
+    the choice can be argued with rather than trusted."""
+    if not route.constraints:
+        return f"the default for {item.garment.lower()}"
+    return ", ".join(f"{axis.lower()} {value}" for axis, value in route.constraints.items())
 
 
 def covered() -> set[str]:

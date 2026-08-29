@@ -80,10 +80,20 @@ suits from M&S and then altered.
 
 A route is finer-grained than a garment type, which is the hard part: a
 heavyweight tee and a plain tee are both "T-shirt" and come from different shops,
-as do a dress shirt and a linen one. So routes carry keywords and the most
-specific match wins, with a keyword-free route acting as the default for the
-type. A garment with no matching route says so rather than being pushed down the
-wrong one.
+as do a dress shirt and a linen one. So a route is selected on three optional
+axes rather than by guessing at words in a name:
+
+- **Grade** — what kind of thing it is within its type: Heavyweight, Dress,
+  Smart, Knitted, Branded, Everyday.
+- **Fabric** — either an exact cloth (`Oxford cotton`) or a whole family
+  (`Wool`), so one line covers flannel, worsted and hopsack at once.
+- **Fit** — Slim, Regular, Relaxed, Oversized.
+
+A route states only the constraints it cares about and matches only if the
+garment satisfies every one of them. Among matching routes the one stating the
+most wins, so a route with none is the type's default. A garment matching nothing
+says so rather than being pushed down the nearest line, and the product page
+prints which constraints put it where it went.
 
 ### Where to buy, and how not to pay retail
 

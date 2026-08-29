@@ -66,10 +66,20 @@ def _range(start: float, stop: float, step: float, suffix: str = "") -> tuple[st
 
 NONE = "—"
 ALPHA = (NONE, "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL")
-CUT = (NONE, "Slim", "Regular", "Relaxed", "Oversized")
+
+# Grade says what kind of thing it is within its type: the axis that separates a
+# heavyweight tee from a plain one, or a dress shirt from a casual one. Together
+# with fabric and fit it is what makes a sourcing route precise instead of a
+# guess at keywords in a name.
+GRADES: tuple[str, ...] = (
+    "", "Everyday", "Heavyweight", "Knitted", "Smart", "Dress", "Branded",
+)
+
+# How it is cut. Kept on the item rather than in the size scheme, because it is
+# a property of the garment and not a number on a label.
+FITS: tuple[str, ...] = ("", "Slim", "Regular", "Relaxed", "Oversized")
 
 _alpha = SizeField("alpha", "Size", ALPHA)
-_cut = SizeField("cut", "Cut", CUT, "How the maker describes it, not how it fits you.")
 _collar = SizeField("collar", "Collar", (NONE, *_range(13.5, 18.5, 0.5, '"')),
                     "Neck measurement on the label. The number that matters on a shirt.")
 _sleeve = SizeField("sleeve", "Sleeve", (NONE, *_range(31, 37, 1, '"')),
@@ -89,9 +99,9 @@ _us_shoe = SizeField("us", "US", (NONE, *_range(6, 15, 0.5)))
 _width = SizeField("width", "Width", (NONE, "Narrow", "Standard", "Wide", "D", "E", "F", "G"))
 
 SHOE_SCHEME = (_uk_shoe, _eu_shoe, _us_shoe, _width)
-JACKET_SCHEME = (_chest, _jkt_len, _eu_jkt, _cut)
-TROUSER_SCHEME = (_waist, _leg, _cut)
-TOP_SCHEME = (_alpha, _cut)
+JACKET_SCHEME = (_chest, _jkt_len, _eu_jkt)
+TROUSER_SCHEME = (_waist, _leg)
+TOP_SCHEME = (_alpha,)
 DEFAULT_SCHEME = (SizeField("size", "Size", (), "However this one happens to be sized."),)
 
 SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
@@ -101,14 +111,14 @@ SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
     "Socks": (SizeField("socks", "Size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
     "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME, "Suit": JACKET_SCHEME,
-    "Jacket": (_alpha, _chest, _cut), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
+    "Jacket": (_alpha, _chest), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
     "Waistcoat": (_chest, _alpha),
     "Chinos": TROUSER_SCHEME, "Jeans": TROUSER_SCHEME, "Trousers": TROUSER_SCHEME,
-    "Shorts": (_waist, _cut),
+    "Shorts": (_waist,),
     "Boots": SHOE_SCHEME, "Derbies": SHOE_SCHEME, "Loafers": SHOE_SCHEME,
     "Sandals": SHOE_SCHEME, "Trainers": SHOE_SCHEME,
     "Knitwear": TOP_SCHEME, "Polo": TOP_SCHEME, "Sweatshirt": TOP_SCHEME, "T-shirt": TOP_SCHEME,
-    "Shirt": (_collar, _alpha, _sleeve, _cut),
+    "Shirt": (_collar, _alpha, _sleeve),
 }
 
 
@@ -155,6 +165,10 @@ class Item:
     colour: str = ""
     colour_hex: str = "#CCCCCC"
     fabric: str = ""
+    # The three axes a sourcing route matches on. Each is optional; the more of
+    # them are set, the more precisely the right shop can be chosen.
+    grade: str = ""
+    fit: str = ""
     status: str = OWNED
     photo: str = ""
     description: str = ""
@@ -206,6 +220,15 @@ class Item:
             line = f"{line} ({self.description})"
         return line
 
+    @property
+    def family(self) -> str:
+        """Which fabric family this cloth belongs to, for route matching."""
+        return fabric_family(self.fabric)
+
+    def spec_line(self) -> str:
+        """Grade, fit and fabric as one line: what he is actually looking for."""
+        return " · ".join(b for b in (self.grade, self.fit, self.fabric) if b)
+
     def size_line(self) -> str:
         """The sizes as one readable line, in this garment's own scheme."""
         labels = {f.key: f.label for f in size_scheme(self.garment)}
@@ -226,8 +249,8 @@ class Item:
 
     def searchable(self) -> str:
         return " ".join(
-            [self.name, self.colour, self.fabric, self.garment,
-             self.category, self.description, *self.sizes.values()]
+            [self.name, self.colour, self.fabric, self.garment, self.grade,
+             self.fit, self.category, self.description, *self.sizes.values()]
         ).lower()
 
 

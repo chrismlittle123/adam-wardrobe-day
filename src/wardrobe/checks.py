@@ -853,58 +853,63 @@ def check_tactics() -> str:
 
 
 def check_sourcing_routes() -> str:
-    """His plan, and the disambiguation it depends on.
+    """His plan, and the three axes it selects on.
 
-    A heavyweight tee and a plain tee are both "T-shirt" and come from different
-    shops, so the keyword match is the load-bearing part. If it breaks, every
-    shirt goes to the same place and the plan is decoration.
+    Grade, fabric and fit are what make a route precise. If the matching breaks,
+    every shirt goes to the same shop and the plan is decoration.
     """
-    from .inventory import GARMENTS, Item
+    from .inventory import GARMENTS, GRADES, FITS, Item
     from .retailers import BY_ID
-    from .sourcing import BY_GARMENT, ROUTES, route_for, uncovered
+    from .sourcing import BY_GARMENT, ROUTES, route_for, uncovered, why
 
     for route in ROUTES:
         assert route.stores, f"{route.label} names no shop"
         assert all(i in BY_ID for i in route.stores), \
-            f"{route.label} points at a retailer that does not exist: {route.stores}"
+            f"{route.label} points at a retailer that does not exist"
         assert route.garment in GARMENTS, f"{route.label} is for an unknown garment"
-        assert route.retailers, f"{route.label} resolved to nothing"
+        assert not route.grade or route.grade in GRADES, f"{route.label} has an unknown grade"
+        assert not route.fit or route.fit in FITS, f"{route.label} has an unknown fit"
+        assert not (route.fabric and route.family), \
+            f"{route.label} constrains both an exact fabric and a family"
 
-    def where(name, garment, fabric="", colour=""):
-        found = route_for(Item(name=name, garment=garment, fabric=fabric, colour=colour))
+    def where(garment, grade="", fabric="", fit=""):
+        found = route_for(Item(name="x", garment=garment, grade=grade,
+                               fabric=fabric, fit=fit))
         return found.where if found else None
 
-    assert where("Heavyweight boxy tee", "T-shirt") == "Asos or Next", "heavyweight tee misrouted"
-    assert where("Plain white tee", "T-shirt") == "Uniqlo", "plain tee misrouted"
-    assert where("White oxford shirt", "Shirt", "Oxford cotton") == "Charles Tyrwhitt", \
+    assert where("T-shirt", grade="Heavyweight") == "Asos or Next", "heavyweight tee misrouted"
+    assert where("T-shirt") == "Uniqlo", "the plain tee default did not apply"
+    assert where("Shirt", grade="Dress", fabric="Oxford cotton") == "Charles Tyrwhitt", \
         "dress shirt misrouted"
-    assert where("Ecru shirt", "Shirt", "Linen") == "Mango", "linen shirt misrouted"
-    assert where("Knit polo", "Polo", "Merino wool") == "Mango", "knitted polo misrouted"
-    assert where("Piqué polo", "Polo", "Cotton piqué") == "Uniqlo", "plain polo misrouted"
-    assert where("Adidas Samba", "Trainers", "Suede") != "Vinted", "branded trainer sent to Vinted"
-    assert where("White leather trainers", "Trainers", "Calf leather") == "Vinted", \
-        "smart trainers not routed to Vinted"
+    assert where("Shirt", fabric="Linen") == "Mango", "linen shirt misrouted"
+    assert where("Trousers", fabric="Wool flannel") == "Marks & Spencer or Next", \
+        "wool trousers misrouted"
+    assert where("Trousers", fabric="Worsted wool") == "Marks & Spencer or Next", \
+        "the family match does not cover the whole family"
+    assert where("Trousers", fabric="Linen") == "Mango", "the wool route swallowed the linen one"
+    assert where("Polo", grade="Knitted") == "Mango", "knitted polo misrouted"
+    assert where("Polo") == "Uniqlo", "the plain polo default did not apply"
+    assert where("Trainers", grade="Smart") == "Vinted", "smart trainers misrouted"
+    assert where("Trainers", grade="Branded") != "Vinted", "branded trainer sent to Vinted"
 
-    smart = route_for(Item(name="White leather trainers", garment="Trainers"))
-    assert "New with tags" in smart.condition, "the new-with-tags condition was lost"
-    blazer = route_for(Item(name="Navy blazer", garment="Blazer"))
-    assert "Very Good" in blazer.condition, "the Very Good condition was lost"
-    heavy = route_for(Item(name="Heavy tee", garment="T-shirt"))
-    assert "200 gsm" in heavy.spec, "the gsm specification was lost"
+    # Nothing is inferred from spelling any more: a garment named "heavyweight"
+    # but graded plain must follow its grade, not its name.
+    misnamed = Item(name="heavyweight boxy tee", garment="T-shirt", grade="Everyday")
+    assert route_for(misnamed).where == "Uniqlo", "the name overrode the grade"
 
-    assert where("Grey flannel trousers", "Trousers", "Wool flannel") == \
-        "Marks & Spencer or Next", "wool trousers misrouted"
-    assert where("Stone trousers", "Trousers", "Linen") == "Mango", \
-        "the wool route swallowed the linen one"
+    # The most constrained match wins, and an unconstrained route is the default.
+    dress = route_for(Item(name="x", garment="Shirt", grade="Dress"))
+    assert dress.precision == 1 and "grade" in why(Item(name="x", garment="Shirt",
+                                                        grade="Dress"), dress), \
+        "the route did not explain what it matched on"
 
-    # A garment whose type has only keyword routes and no default must return
-    # nothing rather than being quietly forced down the nearest one.
-    assert route_for(Item(name="Cotton twill trousers", garment="Trousers",
-                          fabric="Cotton twill")) is None, \
+    # A type whose routes all state constraints must return nothing when none
+    # hold, rather than being pushed down the nearest one.
+    assert route_for(Item(name="x", garment="Trousers", fabric="Cotton twill")) is None, \
         "an unmatched trouser was pushed down a route it does not belong to"
     assert "Loafers" in uncovered(GARMENTS), "a known gap stopped being reported"
-    return (f"{len(ROUTES)} routes over {len(BY_GARMENT)} garment types; "
-            f"tee, shirt, polo and trainer splits all land")
+    return (f"{len(ROUTES)} routes over {len(BY_GARMENT)} types, selected on grade, "
+            f"fabric and fit; name no longer decides anything")
 
 
 def check_product_prompts() -> str:
@@ -1162,6 +1167,7 @@ def check_item_page_opens() -> str:
     assert "vinted.co.uk" in page, "no Vinted link on an expensive coat"
     assert "Where to buy it" in page, "the retailer section is missing"
     assert "your plan" in page, "the sourcing route did not reach the product page"
+    assert "Matched on" in page, "the page does not say why this route was chosen"
     assert "Very Good" in page, "the Vinted condition did not reach the product page"
     assert "How to get it cheaply" in page, "the tactics section is missing"
     assert "Outfits waiting on it" in page, "the outfits section is missing"

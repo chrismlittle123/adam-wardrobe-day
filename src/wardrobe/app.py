@@ -27,8 +27,8 @@ from wardrobe import (
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
-    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, GARMENTS, NONE, OWNED, RETIRED,
-    STATUSES, Inventory, Item, size_scheme,
+    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, FITS, GARMENTS, GRADES, NONE,
+    OWNED, RETIRED, STATUSES, Inventory, Item, size_scheme,
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.palette import (
@@ -405,6 +405,18 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
              "the image model three different shirts.")
     if item.fabric == NONE:
         item.fabric = ""
+
+    # Grade and fit are what let a sourcing route be precise. Without them a
+    # heavyweight tee and a plain one are the same garment to the plan.
+    g1, g2 = st.columns(2)
+    item.grade = g1.selectbox(
+        "Grade", GRADES, index=GRADES.index(item.grade) if item.grade in GRADES else 0,
+        key=f"{key}-grade",
+        help="What kind of thing it is within its type. This is what separates a "
+             "heavyweight tee from a plain one when both are T-shirts.")
+    item.fit = g2.selectbox(
+        "Fit", FITS, index=FITS.index(item.fit) if item.fit in FITS else 0,
+        key=f"{key}-fit", help="How it is cut.")
     if status == ASPIRATIONAL:
         item.price = st.number_input(
             "Estimated price £", 0.0, 100000.0, float(item.price), step=10.0,
@@ -888,10 +900,13 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             colour = c4.text_input("Colour", placeholder="camel")
             colour_hex = c5.color_picker("Swatch", "#C19A6B", key="asp-hex")
             fabric = c6.selectbox("Fabric", FABRIC_OPTIONS, key="asp-fabric")
+            c7, c8 = st.columns(2)
+            grade = c7.selectbox("Grade", GRADES, key="asp-grade")
+            fit = c8.selectbox("Fit", FITS, key="asp-fit")
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
-                    colour=colour, colour_hex=colour_hex,
+                    colour=colour, colour_hex=colour_hex, grade=grade, fit=fit,
                     fabric="" if fabric == NONE else fabric,
                     status=ASPIRATIONAL, price=price,
                 ))
@@ -1453,11 +1468,16 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             + ". They fall back to the generic ranking until you add a line."
         )
     with st.expander("The sourcing plan"):
-        ui.blurb("Where each kind of thing comes from, and on what terms. The most "
-                 "specific match wins, so a linen shirt goes to Mango and an oxford "
-                 "to Tyrwhitt even though both are shirts.")
+        ui.blurb("Where each kind of thing comes from, and on what terms. Routes are "
+                 "selected on grade, fabric and fit, each optional. A route states only "
+                 "what it cares about and matches only if the garment satisfies all of "
+                 "it; the most constrained match wins, so a linen shirt goes to Mango "
+                 "and a dress shirt to Tyrwhitt though both are shirts.")
         ui.table([{
-            "Garment": route.label,
+            "Route": route.label,
+            "Garment": route.garment,
+            "Matched on": ", ".join(f"{k.lower()} {v}" for k, v in route.constraints.items())
+                          or "any",
             "Where": route.where,
             "Terms": route.terms or "—",
         } for route in sourcing.plan()])
@@ -1536,7 +1556,8 @@ def item_view(profile: Profile, item_id: str) -> None:
 
     outfits = Outfits.load()
     principles = Principles.load()
-    detail = " · ".join(b for b in (item.garment, item.fabric, item.colour) if b)
+    detail = " · ".join(b for b in (item.garment, item.grade, item.fit,
+                                    item.fabric, item.colour) if b)
     st.markdown(
         f'<div class="masthead"><h1>{item.name or item.garment}</h1>'
         f'<div class="sub">{detail}</div></div>', unsafe_allow_html=True)
@@ -1617,11 +1638,16 @@ def item_view(profile: Profile, item_id: str) -> None:
         st.markdown(
             f'<div class="route-card"><div class="hd"><div class="who">{route.where}</div>'
             f'<div class="kind">your plan · {route.label}</div></div>'
+            f'<div class="term"><b>Matched on</b> {sourcing.why(item, route)}</div>'
             f'{terms}{f"<div class=why>{route.note}</div>" if route.note else ""}'
             f'<div class="links">{links}</div></div>', unsafe_allow_html=True)
     else:
-        st.info(f"No line in the sourcing plan for {item.garment.lower()}. "
-                "Falling back to the generic ranking below.")
+        st.info(
+            f"No line in the sourcing plan matches this {item.garment.lower()}"
+            f"{f' ({item.spec_line()})' if item.spec_line() else ''}. Set its grade, "
+            "fabric or fit in the inventory, or add a route. Falling back to the "
+            "generic ranking below."
+        )
 
     ui.eyebrow("Other options" if route else "Ranked options")
     ui.blurb(
