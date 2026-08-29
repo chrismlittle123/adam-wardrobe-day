@@ -1326,6 +1326,13 @@ def check_typography() -> str:
         block = css.split(figures, 1)[1].split("}", 1)[0] if figures in css else ""
         assert "var(--data)" in block, f"{figures} is not monospaced"
 
+    # Small text sits above boxes. With no bottom margin it presses against the
+    # expander below it and reads as part of the box rather than a label on it.
+    caption = css.split(".look-cap {", 1)[1].split("}", 1)[0]
+    assert "margin-bottom" in caption, "small captions have no space beneath them"
+    assert ":last-child" in css.split(".look-cap {", 1)[1][:600], \
+        "the last caption in a card still pads the card"
+
     counts = {role: css.count(f"var(--{role})") for role in roles}
     assert all(counts.values()), f"a role is unused: {counts}"
     return " · ".join(f"{r} {n}" for r, n in counts.items())

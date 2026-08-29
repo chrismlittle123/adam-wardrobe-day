@@ -64,6 +64,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 .masthead .sub {
   font-family: var(--chrome); font-size: .68rem; letter-spacing: .22em;
   text-transform: uppercase; color: var(--muted); margin-top: .6rem;
+  margin-bottom: .2rem;
 }
 
 .eyebrow {
@@ -223,8 +224,14 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 
 .empty { border: 1px dashed var(--line); padding: 2.4rem 1.6rem; text-align: center;
          color: var(--muted); font-size: .88rem; }
+/* Small text sits above things: an expander, a plate, a table. Without a bottom
+   margin it presses against the box below and reads as part of it. */
 .look-cap { font-family: var(--chrome); font-size: .64rem; letter-spacing: .1em;
-            color: var(--muted); padding-top: .45rem; line-height: 1.6; }
+            color: var(--muted); padding-top: .45rem; margin-bottom: .55rem;
+            line-height: 1.6; }
+/* Except as the last line inside a card, where it would pad the card instead. */
+.item .look-cap:last-child, .product .look-cap:last-child,
+.step .look-cap:last-child, .docket .look-cap:last-child { margin-bottom: 0; }
 .look-cap a, .answer-nav a { color: var(--brass); text-decoration: none; border-bottom: 1px solid transparent; }
 .look-cap a:hover, .answer-nav a:hover { border-bottom-color: var(--brass); }
 
@@ -254,7 +261,8 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .alloc .s3 { background: #584820; }
 .alloc-read {
   font-family: var(--chrome); font-size: .64rem; letter-spacing: .14em;
-  text-transform: uppercase; color: var(--muted); display: flex; justify-content: space-between;
+  text-transform: uppercase; color: var(--muted); display: flex;
+  justify-content: space-between; margin-bottom: .6rem;
 }
 .alloc-read b { color: var(--cream); font-weight: 500; }
 .alloc-read.off b { color: var(--bad); }
