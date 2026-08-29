@@ -393,7 +393,7 @@ def version_panel() -> None:
         ui.blurb("Every edit and every rewrite keeps what it replaced. Restoring one "
                  "also keeps the current version, so this only ever adds.")
         for version in history[:12]:
-            c1, c2 = st.columns([4, 1])
+            c1, c2 = st.columns([4, 1], vertical_alignment="center")
             c1.markdown(f'<div class="look-cap">{version.label} &middot; '
                         f'{version.words:,} words</div>', unsafe_allow_html=True)
             if c2.button("Restore", key=f"gv-{version.path.name}", type="secondary"):
@@ -750,7 +750,7 @@ def ideas_panel(profile: Profile, answers: Answers, principles: Principles) -> N
         return
 
     for n, idea in enumerate(ideas):
-        c1, c2, c3 = st.columns([8, 1, 1])
+        c1, c2, c3 = st.columns([8, 1, 1], vertical_alignment="center")
         c1.markdown(
             f'<div class="step"><div class="pieces">{idea.text}</div>'
             f'<div class="why">{idea.group} &middot; {idea.reason}</div></div>',
@@ -773,7 +773,7 @@ def kept_panel(principles: Principles) -> None:
     for group, group_principles in principles.by_group().items():
         st.markdown(f'<div class="look-cap">{group}</div>', unsafe_allow_html=True)
         for p in group_principles:
-            c1, c2 = st.columns([9, 1])
+            c1, c2 = st.columns([9, 1], vertical_alignment="center")
             c1.markdown(
                 f'<div class="step"><div class="pieces">{p.text}</div>'
                 f'<div class="why">{p.reason}</div></div>', unsafe_allow_html=True)
@@ -874,7 +874,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
                     unsafe_allow_html=True)
         st.markdown(ui.swatch_strip(colours), unsafe_allow_html=True)
         for colour in colours:
-            c1, c2 = st.columns([9, 1])
+            c1, c2 = st.columns([9, 1], vertical_alignment="center")
             verdict, why = colour.verdict(skin)
             note_line = f"<br>{colour.note}" if colour.note else ""
             c1.markdown(
@@ -1441,11 +1441,11 @@ def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) ->
         ui.empty("Nothing here yet.")
     for word in words:
         used = counts.get(word, 0)
-        c1, c2 = st.columns([5, 1])
+        c1, c2 = st.columns([3, 1], vertical_alignment="center")
         c1.markdown(
-            f'<div class="look-cap">{word}'
-            f'{f" &middot; on {used} piece(s)" if used else " &middot; unused"}</div>',
-            unsafe_allow_html=True)
+            f'<div class="dict-row">{word}'
+            f'<span class="meta">{f" · on {used} piece(s)" if used else " · unused"}'
+            f'</span></div>', unsafe_allow_html=True)
         if c2.button("Drop", key=f"{field}-drop-{word}", type="secondary"):
             if used:
                 st.warning(f"{used} piece(s) are marked {word}. Change them first, "
@@ -1464,7 +1464,7 @@ def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) ->
             + ", which is not on this list. Add the word back, or edit those pieces.")
 
     with st.form(f"add-{field}", clear_on_submit=True):
-        c1, c2 = st.columns([4, 1])
+        c1, c2 = st.columns([4, 1], vertical_alignment="bottom")
         fresh = c1.text_input("Add one", key=f"{field}-new", label_visibility="collapsed")
         if c2.form_submit_button("Add") and fresh.strip():
             if fresh.strip() in words:
@@ -2130,7 +2130,7 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
 
     ui.eyebrow("Star what you will actually buy")
     for l in plan.leverage:
-        c1, c2 = st.columns([5, 1])
+        c1, c2 = st.columns([4, 1], vertical_alignment="center")
         c1.markdown(
             f'<div class="look-cap">{l.item.name or l.item.garment} &middot; '
             f'in {l.appearances} blocked outfit(s)</div>', unsafe_allow_html=True)

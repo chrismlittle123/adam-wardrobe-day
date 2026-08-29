@@ -122,8 +122,11 @@ div[data-baseweb="select"] > div, div[data-baseweb="input"] {
 }
 .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
   background: var(--brass); color: #17110E; border: none; border-radius: 0;
-  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .16em;
-  text-transform: uppercase; padding: .6rem 1.2rem; font-weight: 500;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .12em;
+  text-transform: uppercase; padding: .6rem .9rem; font-weight: 500;
+  /* A label must never wrap. "Drop" came back as "DR / OP" in a narrow column,
+     and a two-line button reads as two buttons. */
+  white-space: nowrap; min-width: 0;
   transition: background .18s ease, transform .18s ease;
 }
 .stButton > button:hover, .stFormSubmitButton > button:hover, .stDownloadButton > button:hover {
