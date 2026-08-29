@@ -229,9 +229,14 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
    Hide them one by one, never the whole toolbar: the button that puts a
    collapsed sidebar back lives inside it, so display:none on the bar left no
    way of getting the navigation back short of reloading the page. */
-[data-testid="stAppDeployButton"], [data-testid="stMainMenu"],
-[data-testid="stToolbarActions"], [data-testid="stDecoration"],
-[data-testid="stStatusWidget"], #MainMenu, footer { display: none !important; }
+/* The deploy button belongs to the framework and says nothing to anyone using
+   this. The hamburger stays: Rerun and Clear cache live in it, and hiding it
+   left no way to clear a cache when something on the page looked stale. */
+[data-testid="stAppDeployButton"], [data-testid="stDecoration"],
+[data-testid="stStatusWidget"], footer { display: none !important; }
+[data-testid="stMainMenu"] { display: inline-flex !important; visibility: visible !important; }
+[data-testid="stMainMenu"] button { color: var(--muted) !important; }
+[data-testid="stMainMenu"] button:hover { color: var(--brass) !important; }
 [data-testid="stToolbar"] { display: flex !important; background: transparent; }
 [data-testid="stExpandSidebarButton"] {
   display: flex !important; visibility: visible !important;
@@ -375,6 +380,22 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 .step .look-cap:last-child, .docket .look-cap:last-child { margin-bottom: 0; }
 .look-cap a, .answer-nav a { color: var(--brass); text-decoration: none; border-bottom: 1px solid transparent; }
 .look-cap a:hover, .answer-nav a:hover { border-bottom-color: var(--brass); }
+
+/* The way home, at the top of every page that has no sidebar ------------- */
+/* These were built for a second monitor, on the assumption they would always
+   open in a new tab. Opened in the same one they have no sidebar and no page
+   list, so the only route back was a small link at the very foot of the page,
+   and the answers index did not even have that. */
+.way-home {
+  display: flex; align-items: center; gap: 1rem;
+  font-family: var(--chrome); font-size: 0.72rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+  padding-bottom: .7rem; margin-bottom: 1.6rem;
+  border-bottom: 1px solid var(--line);
+}
+.way-home a { color: var(--brass); text-decoration: none; }
+.way-home a:hover { text-decoration: underline; }
+.way-home .sep { color: var(--line); }
 
 /* Single-answer view ------------------------------------------------------ */
 .answer-q {
@@ -537,6 +558,20 @@ def table(rows: list[dict[str, str]], numeric: tuple[str, ...] = ()) -> None:
 
 MULTI_SWATCH = ("linear-gradient(135deg,#B5613F 0 25%,#26303F 25% 50%,"
                 "#5F6146 50% 75%,#F2E9D8 75% 100%)")
+
+
+def way_home(back_to: str = "", label: str = "") -> None:
+    """A link back into the app, at the top where a person looks for one.
+
+    Standalone pages draw no sidebar, so without this there is no navigation on
+    them at all. It returns to the page that owns the view rather than to the
+    front, because coming back from a garment should land you in the wardrobe.
+    """
+    where = f"./?page={back_to}" if back_to else "./"
+    named = f'<span class="sep">/</span><span>{label}</span>' if label else ""
+    st.markdown(
+        f'<div class="way-home"><a href="{where}" target="_self">&#8592; '
+        f'Wardrobe Studio</a>{named}</div>', unsafe_allow_html=True)
 
 
 def swatch_for(name: str, hex_code: str) -> str:

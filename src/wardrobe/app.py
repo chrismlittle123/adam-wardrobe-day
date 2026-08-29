@@ -151,6 +151,21 @@ PAGES: tuple[tuple[str, str], ...] = (
     ("diagnostics", "Diagnostics"),
 )
 PAGE_TITLES: dict[str, str] = dict(PAGES)
+
+# Which page a standalone view belongs to. Coming back from a garment should
+# land in the wardrobe, not on the front page, which is where every one of these
+# used to drop you.
+HOME_FOR: dict[str, str] = {
+    "item": "inventory", "outfit": "gallery", "compare": "gallery",
+    "garments": "garments", "colours": "colour", "shops": "where-to-buy",
+    "answer": "style-guide",
+}
+
+
+def home_for(view: str) -> str:
+    """Where the back link goes, honouring ?from= when a link supplied it."""
+    asked = st.query_params.get("from", "")
+    return asked if asked in PAGE_TITLES else HOME_FOR.get(view, "")
 WORKSHOP = "diagnostics"
 
 
@@ -298,6 +313,7 @@ def subject_editor(profile: Profile) -> None:
 def answer_view(profile: Profile, answers: Answers, focus: str) -> None:
     """One saved answer, on its own, in its own browser tab."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("answer"), "Saved answers")
     answered = [q for q in BY_ID.values() if answers.get(q.id)]
 
     if focus == "all" or focus not in BY_ID:
@@ -1093,6 +1109,7 @@ def season_panel(palette: Palette) -> None:
 def outfit_view(profile: Profile, outfit_id: str) -> None:
     """One outfit on its own page, with a way to vary it and a way to compare."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("outfit"), "Outfit")
     st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
     inventory, outfits = Inventory.load(), Outfits.load()
     principles = Principles.load()
@@ -1290,6 +1307,7 @@ def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
 def compare_view(pair: str) -> None:
     """Two outfits, side by side, with what changed named underneath."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("compare"), "Comparison")
     inventory, outfits = Inventory.load(), Outfits.load()
     ids = [i.strip() for i in pair.split(",") if i.strip()][:2]
     chosen = [outfits.by_id(i) for i in ids]
@@ -1366,6 +1384,7 @@ def compare_view(pair: str) -> None:
 def garment_catalogue_view() -> None:
     """The same dictionary, on a page of its own, for a second monitor."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("garments"), "Garment catalogue")
     vocab = vocabulary.Vocabulary.load()
     st.markdown(
         '<div class="masthead"><h1>Garment <em>catalogue</em></h1>'
@@ -1731,6 +1750,7 @@ def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) ->
 def retailer_catalogue_view() -> None:
     """Every shop the plan can point at, on its own page, editable."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("shops"), "Retailer catalogue")
     catalogue = retailers.Catalogue.load()
     plan = sourcing.Plan.load()
     in_use = {store for route in plan.routes for store in route.stores}
@@ -1846,6 +1866,7 @@ def colour_catalogue_view(palette: Palette) -> None:
     therefore whether he can wear it at the collar.
     """
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("colours"), "Colour catalogue")
     skin = Profile.load().subject.skin_tone_hex
     mine = {c.hex.upper(): c for c in palette.colours}
     st.markdown(
@@ -2888,6 +2909,7 @@ def _buy_row(suggestion) -> None:
 def item_view(profile: Profile, item_id: str) -> None:
     """One garment on its own page, in its own browser tab."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    ui.way_home(home_for("item"), "Garment")
     st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
     inventory = Inventory.load()
     item = inventory.by_id(item_id)

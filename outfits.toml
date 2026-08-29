@@ -1,0 +1,20 @@
+[[outfits]]
+id = "white-t-shirt-charcoal-flannel-trous"
+name = "White T Shirt, Charcoal flannel trousers, Hendersons Very Dark Brown"
+item_ids = [
+    "white-t-shirt",
+    "charcoal-flannel-trousers",
+    "hendersons-very-dark-brown",
+]
+tags = []
+notes = ""
+images = [
+    "out/looks/20260829-190612-white-t-shirt-charcoal-flannel-tro.png",
+]
+loved = false
+created = "2026-08-29T19:06:33"
+prompt = "Ultra photorealistic, high-definition full-colour fashion photograph of the man in the reference image.\n\nTHE MAN. 1.80 m (5 ft 11 in), very lean and athletic, narrow waist, defined shoulders, around 8% body fat, long arms for his height, waist 75 cm, neck 38 cm. warm medium-deep brown with a red-gold undertone skin (#A0583C), short dark natural curls, cropped close at the sides, light moustache and short stubble along the jaw, dark brown eyes, small gold stud earring, thin gold chain necklace.\nAdam is 1.80 m and very lean, under 8% body fat by the tape, with the build of someone who climbs: defined shoulders, a narrow waist, no bulk anywhere. His skin is a warm medium-deep brown with a red-gold undertone. Short dark natural curls cropped close at the sides, a light moustache and short stubble along the jaw, dark brown eyes. He wears a small gold stud earring and a thin gold chain.\n\nHis arms are long for his height. Standing with his hands at his sides his fingertips come almost to mid-thigh, which is the single proportion that most often makes a garment look wrong on him: a sleeve cut to his height leaves his wrists out, and a jacket that fits the shoulder finishes short on the arm. Buy for the shoulder and have the sleeve let down.\n\nKeep his face, head shape, hair, skin tone and facial hair exactly as the reference image. This must read as the same person. Do not restyle his face.\nKeep his body exactly as described: he is 1.80 m and very lean and athletic, narrow waist, defined shoulders, so the clothes hang on a lean frame. Do not elongate him into a fashion-model silhouette and do not broaden him. His arms are long for his height: with his hands at his sides the sleeves should sit accordingly, and the cuffs must not ride up his forearms.\n\nTHE OUTFIT. He is wearing exactly these pieces and nothing else:\n- White Cotton jersey t-shirt\n- Charcoal Wool flannel trousers\n- Brown Calf leather boots\nStanding style direction: Relaxed European tailoring. Natural shoulder, nothing boxy, nothing skinny.\nAvoid: Baggy fits, loud logos, novelty prints, black-on-black.\nReference image 1 is the man. The next 1 reference image is the actual garment. Reproduce it faithfully: the exact colour, cloth, pattern and cut. Take only the clothing, never the background, the lighting or any person in the picture.\n\nTHE SHOT. Full-length shot, head to feet, standing square to the camera. The entire outfit including the shoes is in frame with room above the head. Plain seamless pure white studio background. Soft even professional studio lighting, sharp focus throughout the garments, natural skin texture, visible weave and drape in the fabric, true-to-life colour, 50mm lens, high-resolution editorial photograph.\n\nNo text, no watermark, no logos, no collage, no extra people, no mirror."
+shot = "Full length"
+background = "White studio"
+extra = ""
+parent = ""

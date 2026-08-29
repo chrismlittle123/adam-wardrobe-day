@@ -503,8 +503,58 @@ waist = "30\""
 leg = "32\""
 
 [[items]]
-id = "dark-brown-henderson-boots"
-name = "Dark Brown Henderson Boots"
+id = "hudson-1990-leather-boots"
+name = "Hudson 1990 Leather Boots"
+category = "Shoes"
+garment = "Boots"
+colours = [
+    "Black",
+]
+colour_hex = "#1B1918"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Shoe"
+status = "owned"
+photo = "inventory/photos/hudson-1990-leather-boots.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/hudson-1990-leather-boots.png"
+product_copy = ""
+
+[items.sizes]
+uk = "9"
+
+[[items]]
+id = "samuel-windsor-chelsea-brogues"
+name = "Samuel Windsor Henderson Brogues"
+category = "Shoes"
+garment = "Boots"
+colours = [
+    "Black",
+]
+colour_hex = "#1B1918"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Shoe"
+status = "owned"
+photo = "inventory/photos/samuel-windsor-chelsea-brogues.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/samuel-windsor-chelsea-brogues.png"
+product_copy = ""
+
+[items.sizes]
+uk = "9"
+
+[[items]]
+id = "hendersons-very-dark-brown"
+name = "Hendersons Very Dark Brown"
 category = "Shoes"
 garment = "Boots"
 colours = [
@@ -516,13 +566,37 @@ grade = ""
 fit = ""
 scheme = "Shoe"
 status = "owned"
+photo = "inventory/photos/hendersons-very-dark-brown.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/hendersons-very-dark-brown.png"
+product_copy = ""
+
+[items.sizes]
+uk = "9"
+
+[[items]]
+id = "white-t-shirt"
+name = "White T Shirt"
+category = "Top"
+garment = "T-shirt"
+colours = [
+    "White",
+]
+colour_hex = "#F6F4EF"
+fabric = "Cotton jersey"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
 photo = ""
 description = ""
 starred = false
 link = ""
 wait_for_sale = false
-product_photo = ""
+product_photo = "out/products/white-t-shirt.png"
 product_copy = ""
 
 [items.sizes]
-uk = "9"

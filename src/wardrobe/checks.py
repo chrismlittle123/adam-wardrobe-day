@@ -1884,6 +1884,66 @@ def _every_page():
     return {slug: "\n".join(m.value for m in _render(slug).markdown) for slug, _ in pages}
 
 
+def check_no_page_is_a_dead_end() -> str:
+    """Every page can be left without editing the URL.
+
+    The standalone views draw no sidebar, because they were built for a second
+    monitor on the assumption they would always open in a new tab. Opened in the
+    same one they had no navigation at all: the only way out was a small link at
+    the foot of the page, and the answers index did not have even that. The way
+    back also went to the front page, so returning from a garment did not put
+    you in the wardrobe.
+    """
+    import importlib
+    from streamlit.testing.v1 import AppTest
+    app_mod = importlib.reload(importlib.import_module("wardrobe.app"))
+    from .inventory import Inventory, Item
+    from .outfits import Outfit, Outfits
+
+    inventory, outfits = _seeded()
+    item = inventory.items[0]
+    outfit = outfits.outfits[0]
+
+    views = {
+        "item": item.id, "outfit": outfit.id, "garments": "all",
+        "colours": "all", "shops": "all", "answer": "all",
+    }
+    for view, value in views.items():
+        page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+        page.query_params[view] = value
+        page = page.run()
+        assert not page.exception, f"?{view}={value} raised: {page.exception[0].value}"
+        body = "\n".join(m.value for m in page.markdown)
+        assert "way-home" in body, f"?{view}={value} has no way back into the app"
+        home = app_mod.HOME_FOR[view]
+        assert f"./?page={home}" in body, \
+            f"?{view}={value} does not return you to {home}"
+        assert not [r for r in page.radio if r.label == "Section"], \
+            f"?{view}={value} drew the app navigation as well"
+
+    # Coming back from a garment lands in the wardrobe, not on the front page.
+    assert app_mod.HOME_FOR["item"] == "inventory", "a garment does not lead back to the wardrobe"
+    assert app_mod.HOME_FOR["outfit"] == "gallery", "an outfit does not lead back to the gallery"
+    assert app_mod.HOME_FOR["colours"] == "colour", "the colours do not lead back to colour"
+
+    # A link may say where it came from, and that wins.
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["colours"] = "all"
+    page.query_params["from"] = "shop"
+    page = page.run()
+    body = "\n".join(m.value for m in page.markdown)
+    assert "./?page=shop" in body, "a stated origin was ignored"
+
+    # And a nonsense origin falls back rather than producing a broken link.
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["colours"] = "all"
+    page.query_params["from"] = "not-a-page"
+    page = page.run()
+    body = "\n".join(m.value for m in page.markdown)
+    assert "./?page=colour" in body, "a bad origin was not ignored"
+    return f"{len(views)} standalone views, each with a way back to the page that owns it"
+
+
 def check_page_survives_a_rerun() -> str:
     """Saving something must leave you where you were.
 
@@ -2051,6 +2111,14 @@ def check_no_dead_style_hooks() -> str:
                 "hiding the whole toolbar also hides the button that reopens the sidebar"
     assert '[data-testid="stExpandSidebarButton"]' in ui.CSS, \
         "nothing keeps the reopen-sidebar button visible"
+
+    # Rerun and Clear cache live in the hamburger. Hiding it left no way to
+    # clear a cache when the page looked stale, which is the same mistake as
+    # hiding the whole toolbar.
+    for line in ui.CSS.splitlines():
+        rule, _, body = line.partition("{")
+        if '[data-testid="stMainMenu"]' in rule and "display: none" in body:
+            raise AssertionError("hiding the main menu also hides Rerun and Clear cache")
 
     # The hooks the layout actually depends on, spelled once so a rename is loud.
     for needed in ('[data-testid="stTab"]', '[data-testid="stSelectbox"]',
@@ -2877,6 +2945,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),
+    (APP, "No page is a dead end", check_no_page_is_a_dead_end),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
     (APP, "No function shadows an imported module", check_no_module_shadowing),
