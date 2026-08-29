@@ -1,0 +1,291 @@
+fabrics = [
+    { name = "Boiled wool", family = "Wool" },
+    { name = "Calf leather", family = "Leather" },
+    { name = "Cashmere", family = "Wool" },
+    { name = "Chambray", family = "Cotton" },
+    { name = "Cordovan", family = "Leather" },
+    { name = "Corduroy", family = "Cotton" },
+    { name = "Cotton canvas", family = "Cotton" },
+    { name = "Cotton jersey", family = "Cotton" },
+    { name = "Cotton piqué", family = "Cotton" },
+    { name = "Cotton poplin", family = "Cotton" },
+    { name = "Cotton twill", family = "Cotton" },
+    { name = "Cotton-silk", family = "Silk and fine" },
+    { name = "Donegal tweed", family = "Wool" },
+    { name = "Fleece", family = "Technical" },
+    { name = "Fresco", family = "Wool" },
+    { name = "Harris tweed", family = "Wool" },
+    { name = "Hemp", family = "Linen and hemp" },
+    { name = "Irish linen", family = "Linen and hemp" },
+    { name = "Lambswool", family = "Wool" },
+    { name = "Linen", family = "Linen and hemp" },
+    { name = "Linen-cotton", family = "Linen and hemp" },
+    { name = "Linen-wool", family = "Linen and hemp" },
+    { name = "Merino wool", family = "Wool" },
+    { name = "Mohair", family = "Wool" },
+    { name = "Moleskin", family = "Cotton" },
+    { name = "Nubuck", family = "Leather" },
+    { name = "Nylon", family = "Technical" },
+    { name = "Oxford cotton", family = "Cotton" },
+    { name = "Polyester", family = "Technical" },
+    { name = "Raw denim", family = "Denim" },
+    { name = "Ripstop", family = "Technical" },
+    { name = "Seersucker", family = "Cotton" },
+    { name = "Selvedge denim", family = "Denim" },
+    { name = "Shearling", family = "Leather" },
+    { name = "Silk", family = "Silk and fine" },
+    { name = "Suede", family = "Leather" },
+    { name = "Technical shell", family = "Technical" },
+    { name = "Terry towelling", family = "Cotton" },
+    { name = "Washed denim", family = "Denim" },
+    { name = "Waxed cotton", family = "Technical" },
+    { name = "Wool flannel", family = "Wool" },
+    { name = "Wool hopsack", family = "Wool" },
+    { name = "Wool melton", family = "Wool" },
+    { name = "Wool-silk-linen", family = "Silk and fine" },
+    { name = "Worsted wool", family = "Wool" },
+]
+fits = [
+    "",
+    "Slim",
+    "Regular",
+    "Relaxed",
+    "Oversized",
+]
+grades = [
+    "",
+    "Everyday",
+    "Heavyweight",
+    "Knitted",
+    "Smart",
+    "Dress",
+    "Branded",
+]
+
+[[garments]]
+name = "Bag"
+category = "Accessory"
+schemes = [
+    "One size",
+]
+
+[[garments]]
+name = "Belt"
+category = "Accessory"
+schemes = [
+    "Waist",
+    "Alpha",
+]
+
+[[garments]]
+name = "Blazer"
+category = "Outerwear"
+schemes = [
+    "Chest and length",
+    "Chest",
+    "Alpha",
+]
+
+[[garments]]
+name = "Boots"
+category = "Shoes"
+schemes = [
+    "Shoe",
+]
+
+[[garments]]
+name = "Chinos"
+category = "Bottom"
+schemes = [
+    "Waist and leg",
+    "Waist",
+    "Alpha",
+]
+
+[[garments]]
+name = "Derbies"
+category = "Shoes"
+schemes = [
+    "Shoe",
+]
+
+[[garments]]
+name = "Gilet"
+category = "Outerwear"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "Hat"
+category = "Accessory"
+schemes = [
+    "Head",
+    "Alpha",
+]
+
+[[garments]]
+name = "Heavyweight T Shirt"
+category = "Top"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "Jacket"
+category = "Outerwear"
+schemes = [
+    "Alpha",
+    "Chest",
+]
+
+[[garments]]
+name = "Jeans"
+category = "Bottom"
+schemes = [
+    "Waist and leg",
+    "Waist",
+]
+
+[[garments]]
+name = "Jewellery"
+category = "Accessory"
+schemes = [
+    "One size",
+]
+
+[[garments]]
+name = "Knitwear"
+category = "Top"
+schemes = [
+    "Alpha",
+    "Chest",
+]
+
+[[garments]]
+name = "Loafers"
+category = "Shoes"
+schemes = [
+    "Shoe",
+]
+
+[[garments]]
+name = "Overcoat"
+category = "Outerwear"
+schemes = [
+    "Chest and length",
+    "Chest",
+    "Alpha",
+]
+
+[[garments]]
+name = "Overshirt"
+category = "Outerwear"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "Polo"
+category = "Top"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "Sandals"
+category = "Shoes"
+schemes = [
+    "Shoe",
+]
+
+[[garments]]
+name = "Scarf"
+category = "Accessory"
+schemes = [
+    "One size",
+]
+
+[[garments]]
+name = "Shirt"
+category = "Top"
+schemes = [
+    "Collar and sleeve",
+    "Collar",
+    "Alpha",
+]
+
+[[garments]]
+name = "Shorts"
+category = "Bottom"
+schemes = [
+    "Waist",
+    "Alpha",
+]
+
+[[garments]]
+name = "Socks"
+category = "Accessory"
+schemes = [
+    "Sock",
+]
+
+[[garments]]
+name = "Suit"
+category = "Outerwear"
+schemes = [
+    "Chest and length",
+    "Chest",
+]
+
+[[garments]]
+name = "Sunglasses"
+category = "Accessory"
+schemes = [
+    "One size",
+]
+
+[[garments]]
+name = "Sweatshirt"
+category = "Top"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "T-shirt"
+category = "Top"
+schemes = [
+    "Alpha",
+]
+
+[[garments]]
+name = "Trainers"
+category = "Shoes"
+schemes = [
+    "Shoe",
+]
+
+[[garments]]
+name = "Trousers"
+category = "Bottom"
+schemes = [
+    "Waist and leg",
+    "Waist",
+    "Alpha",
+]
+
+[[garments]]
+name = "Waistcoat"
+category = "Top"
+schemes = [
+    "Chest",
+    "Alpha",
+]
+
+[[garments]]
+name = "Watch"
+category = "Accessory"
+schemes = [
+    "Watch case",
+]

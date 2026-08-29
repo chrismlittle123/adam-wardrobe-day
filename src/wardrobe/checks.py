@@ -1681,6 +1681,64 @@ def check_unreadable_image_does_not_crash() -> str:
     return "corrupt image degraded to a placeholder, page still rendered"
 
 
+def check_scheme_list_has_no_duplicates() -> str:
+    """No scheme may be another with an optional field taken away.
+
+    There was a "Chest" as well as a "Chest and length", and the same for collar
+    and waist. The second field was already optional, so the shorter one was the
+    longer one with a box left blank: three concepts for nothing.
+    """
+    from .vocabulary import SCHEMES, SCHEME_ALIASES, Vocabulary, Garment
+
+    keys = {name: {f.key for f in fields} for name, fields in SCHEMES.items()}
+    for name, fields in keys.items():
+        for other, others in keys.items():
+            if name != other and fields and fields < others:
+                optional = all(f.options and f.options[0] == "—"
+                               for f in SCHEMES[other] if f.key in others - fields)
+                assert not optional, (
+                    f"{name} is {other} with an optional field removed, "
+                    "which is the same scheme twice")
+
+    for gone, survivor in SCHEME_ALIASES.items():
+        assert gone not in SCHEMES, f"{gone} was merged away and is back"
+        assert survivor in SCHEMES, f"{gone} points at a scheme that does not exist"
+
+    # A catalogue written before the merge must still resolve.
+    vocab = Vocabulary.load()
+    vocab.garments.append(Garment(name="Cardigan", category="Top",
+                                  schemes=["Chest", "Alpha"]))
+    vocab.save()
+    assert Vocabulary.load().schemes_for("Cardigan") == ("Chest and length", "Alpha"), \
+        "an old scheme name did not migrate on load"
+    return f"{len(SCHEMES)} schemes, none a duplicate of another, old names migrate"
+
+
+def check_word_lists_are_guarded() -> str:
+    """Removing a fit or a grade must not silently orphan the pieces using it."""
+    from . import vocabulary as v
+    from .inventory import Inventory, grades
+
+    inventory, _ = _seeded()
+    vocab = v.Vocabulary.load()
+    in_use = {i.grade for i in inventory.items if i.grade}
+    assert in_use, "the fixture has no graded pieces, so this proves nothing"
+
+    # The page must be able to tell used from unused, or it cannot warn.
+    counts = {g: sum(1 for i in inventory.items if i.grade == g) for g in vocab.grades if g}
+    assert any(counts.values()), "no grade is counted as used"
+    assert set(in_use) <= set(counts), "a grade in use is not counted"
+
+    # And the orphan case has to be detectable after the fact.
+    vocab.grades = [g for g in vocab.grades if g != "Smart"]
+    vocab.save()
+    orphaned = [i for i in Inventory.load().items if i.grade and i.grade not in grades()]
+    assert orphaned, "removing a grade in use left nothing to detect"
+    assert all(i.grade == "Smart" for i in orphaned), "the wrong pieces were orphaned"
+    return (f"{len(counts)} grades counted against the wardrobe; "
+            f"removing one in use leaves {len(orphaned)} detectable orphans")
+
+
 def check_garment_catalogue() -> str:
     """The vocabularies are data, and the app reads them as they are now.
 
@@ -1699,7 +1757,7 @@ def check_garment_catalogue() -> str:
     assert "Blazer" in garments() and "Wool flannel" in fabric_options()
 
     vocab.add_garment(vocabulary.Garment(name="Cardigan", category="Top",
-                                        schemes=["Alpha", "Chest"]))
+                                        schemes=["Alpha", "Chest and length"]))
     vocab.add_fabric(vocabulary.Fabric(name="Cotton lyocell", family="Cotton"))
     vocab.fits = ["", "Slim", "Regular", "Relaxed", "Oversized", "Cropped"]
     vocab.grades = ["", "Everyday", "Dress", "Souvenir"]
@@ -1713,8 +1771,8 @@ def check_garment_catalogue() -> str:
     assert "Cardigan" in categories()["Top"], "the new garment landed in no category"
     assert [f.label for f in size_scheme("Cardigan")] == ["Size"], \
         f"the new garment got the wrong scheme: {[f.label for f in size_scheme('Cardigan')]}"
-    assert [f.label for f in size_scheme("Cardigan", "Chest")] == ["Chest"], \
-        "the alternative scheme is not reachable"
+    assert [f.label for f in size_scheme("Cardigan", "Chest and length")] == \
+        ["Chest", "Length"], "the alternative scheme is not reachable"
 
     vocabulary.Vocabulary.load().restore_defaults()
     assert "Cardigan" not in garments(), "restoring defaults did not undo the edit"
@@ -1737,11 +1795,12 @@ def check_garment_catalogue() -> str:
         + [getattr(e, "label", "") for e in page.get("expander") or []]
         + [w.label for w in page.text_area]
     )
-    for word in ("Blazer", "Wool flannel", "Fits and grades", "Garments", "Fabrics"):
+    for word in ("Blazer", "Wool flannel", "Grade", "Fit", "Garments", "Fabrics"):
         assert word in body, f"{word} is missing from the catalogue"
     buttons = [b.label for b in page.button]
     assert "Add garment" in buttons and "Add fabric" in buttons, "no way to add"
-    assert "Save fits and grades" in buttons, "no way to edit fits or grades"
+    assert buttons.count("Add") >= 2, "no way to add a fit or a grade"
+    assert "Save fits and grades" not in buttons, "the free-text boxes are back"
     return (f"{before} garments, {len(vocab.fabrics)} fabrics; tab 2 and a page "
             f"of its own, edits visible at once")
 
@@ -2040,6 +2099,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
     (APP, "The retailer catalogue opens and edits", check_shop_catalogue_opens),
     (INVENTORY, "The garment catalogue is editable data", check_garment_catalogue),
+    (INVENTORY, "No size scheme duplicates another", check_scheme_list_has_no_duplicates),
+    (INVENTORY, "Fits and grades know what uses them", check_word_lists_are_guarded),
     (APP, "An outfit opens, varies and compares", check_outfit_page_and_comparison),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),

@@ -1344,22 +1344,22 @@ def garment_catalogue_panel() -> None:
                     vocab.save()
                     st.rerun()
 
-    ui.eyebrow("Fits and grades")
-    ui.blurb("Grade says what kind of thing it is within its type, which is what "
-             "separates a heavyweight tee from a plain one when both are T-shirts. "
-             "Fit says how it is cut. One per line; the blank first line is the "
-             "“not set” option and is kept for you.")
-    with st.form("fits-grades"):
-        c1, c2 = st.columns(2)
-        fits_text = c1.text_area("Fits", "\n".join(f for f in vocab.fits if f),
-                                 height=180, key="v-fits")
-        grades_text = c2.text_area("Grades", "\n".join(g for g in vocab.grades if g),
-                                   height=180, key="v-grades")
-        if st.form_submit_button("Save fits and grades"):
-            vocab.fits = ["", *[line.strip() for line in fits_text.splitlines() if line.strip()]]
-            vocab.grades = ["", *[line.strip() for line in grades_text.splitlines() if line.strip()]]
-            vocab.save()
-            st.rerun()
+    ui.eyebrow("Grade")
+    ui.blurb(
+        "Grade separates two garments of the same type that come from different "
+        "shops. A heavyweight tee and a plain tee are both T-shirts; the grade is "
+        "what sends one to Asos and the other to Uniqlo. It is the axis the sourcing "
+        "plan matches on, so a grade nobody uses is dead weight and a grade you "
+        "delete takes its routing with it."
+    )
+    word_list_panel(vocab, "grades", inventory, "grade")
+
+    ui.eyebrow("Fit")
+    ui.blurb(
+        "How the garment is cut, as the maker describes it. Recorded on the piece "
+        "and available to the sourcing plan in the same way as grade."
+    )
+    word_list_panel(vocab, "fits", inventory, "fit")
 
     with st.expander("Start again"):
         ui.blurb("Throws away every change and reloads the vocabulary the app ships "
@@ -1370,6 +1370,60 @@ def garment_catalogue_panel() -> None:
                              "vocabulary")
             vocab.restore_defaults()
             st.rerun()
+
+
+def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) -> None:
+    """A short editable vocabulary, with what uses each word and a guard on removal.
+
+    This was two free-text boxes, one word a line, with a blank first line that
+    had to be explained. Which meant deleting a word silently orphaned every
+    piece carrying it: the form then showed blank for those pieces and the next
+    save wiped the value. A list you can see the consequences of is both easier
+    to read and harder to break.
+    """
+    words = [w for w in getattr(vocab, field) if w]
+    counts: dict[str, int] = {}
+    for item in inventory.items:
+        value = getattr(item, item_field, "")
+        if value:
+            counts[value] = counts.get(value, 0) + 1
+
+    if not words:
+        ui.empty("Nothing here yet.")
+    for word in words:
+        used = counts.get(word, 0)
+        c1, c2 = st.columns([5, 1])
+        c1.markdown(
+            f'<div class="look-cap">{word}'
+            f'{f" &middot; on {used} piece(s)" if used else " &middot; unused"}</div>',
+            unsafe_allow_html=True)
+        if c2.button("Drop", key=f"{field}-drop-{word}", type="secondary"):
+            if used:
+                st.warning(f"{used} piece(s) are marked {word}. Change them first, "
+                           "or they will be left holding a word the catalogue has "
+                           "forgotten.")
+            else:
+                reset_mod.before(f"before removing the {item_field} {word}", "vocabulary")
+                setattr(vocab, field, [w for w in getattr(vocab, field) if w != word])
+                vocab.save()
+                st.rerun()
+
+    orphans = sorted(v for v in counts if v not in words)
+    if orphans:
+        st.warning(
+            "Pieces are carrying " + ", ".join(f"**{o}** ({counts[o]})" for o in orphans)
+            + ", which is not on this list. Add the word back, or edit those pieces.")
+
+    with st.form(f"add-{field}", clear_on_submit=True):
+        c1, c2 = st.columns([4, 1])
+        fresh = c1.text_input("Add one", key=f"{field}-new", label_visibility="collapsed")
+        if c2.form_submit_button("Add") and fresh.strip():
+            if fresh.strip() in words:
+                st.warning(f"{fresh.strip()} is already there.")
+            else:
+                getattr(vocab, field).append(fresh.strip())
+                vocab.save()
+                st.rerun()
 
 
 def retailer_catalogue_view() -> None:

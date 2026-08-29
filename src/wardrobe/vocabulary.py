@@ -111,11 +111,8 @@ _free = SizeField("size", "Size", (), "However this one happens to be sized.")
 # apply to it; an item records which one its own label actually used.
 SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Alpha": (_alpha,),
-    "Chest": (_chest,),
     "Chest and length": (_chest, _jkt_len),
-    "Collar": (_collar,),
     "Collar and sleeve": (_collar, _sleeve),
-    "Waist": (_waist,),
     "Waist and leg": (_waist, _leg),
     "Shoe": (_uk_shoe, _width),
     "Head": (_head,),
@@ -123,6 +120,16 @@ SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Watch case": (_case,),
     "One size": (),
     "Free text": (_free,),
+}
+
+# There used to be a "Chest" as well as a "Chest and length", and the same for
+# collar and for waist. They were the same scheme with the second field taken
+# away, and that field was already optional, so a label that does not quote a
+# length is entered by leaving the length blank. Three schemes for nothing.
+SCHEME_ALIASES: dict[str, str] = {
+    "Chest": "Chest and length",
+    "Collar": "Collar and sleeve",
+    "Waist": "Waist and leg",
 }
 
 
@@ -159,22 +166,22 @@ DEFAULT_SCHEMES: dict[str, tuple[str, ...]] = {
     "Bag": ("One size",), "Jewellery": ("One size",), "Scarf": ("One size",),
     "Sunglasses": ("One size",),
     "Watch": ("Watch case",), "Socks": ("Sock",),
-    "Belt": ("Waist", "Alpha"), "Hat": ("Head", "Alpha"),
-    "Blazer": ("Chest and length", "Chest", "Alpha"),
-    "Suit": ("Chest and length", "Chest"),
-    "Overcoat": ("Chest and length", "Chest", "Alpha"),
-    "Jacket": ("Alpha", "Chest"),
-    "Waistcoat": ("Chest", "Alpha"),
+    "Belt": ("Waist and leg", "Alpha"), "Hat": ("Head", "Alpha"),
+    "Blazer": ("Chest and length", "Alpha"),
+    "Suit": ("Chest and length",),
+    "Overcoat": ("Chest and length", "Alpha"),
+    "Jacket": ("Alpha", "Chest and length"),
+    "Waistcoat": ("Chest and length", "Alpha"),
     "Overshirt": ("Alpha",), "Gilet": ("Alpha",),
-    "Chinos": ("Waist and leg", "Waist", "Alpha"),
-    "Jeans": ("Waist and leg", "Waist"),
-    "Trousers": ("Waist and leg", "Waist", "Alpha"),
-    "Shorts": ("Waist", "Alpha"),
+    "Chinos": ("Waist and leg", "Alpha"),
+    "Jeans": ("Waist and leg",),
+    "Trousers": ("Waist and leg", "Alpha"),
+    "Shorts": ("Waist and leg", "Alpha"),
     "Boots": ("Shoe",), "Derbies": ("Shoe",), "Loafers": ("Shoe",),
     "Sandals": ("Shoe",), "Trainers": ("Shoe",),
-    "Knitwear": ("Alpha", "Chest"), "Polo": ("Alpha",),
+    "Knitwear": ("Alpha", "Chest and length"), "Polo": ("Alpha",),
     "Sweatshirt": ("Alpha",), "T-shirt": ("Alpha",),
-    "Shirt": ("Collar and sleeve", "Collar", "Alpha"),
+    "Shirt": ("Collar and sleeve", "Alpha"),
 }
 
 
@@ -215,7 +222,7 @@ class Vocabulary:
         return cls(garments=sorted(garments, key=lambda g: g.name),
                    fabrics=sorted(fabrics, key=lambda f: f.name),
                    fits=list(DEFAULT_FITS), grades=list(DEFAULT_GRADES),
-                   path=path or paths.vocabulary())
+                   path=path or paths.vocabulary()).tidy()
 
     @classmethod
     def load(cls, path: Path | str | None = None) -> "Vocabulary":
@@ -233,7 +240,7 @@ class Vocabulary:
             fits=list(raw.get("fits", DEFAULT_FITS)),
             grades=list(raw.get("grades", DEFAULT_GRADES)),
             path=path,
-        )
+        ).tidy()
 
     def save(self) -> Path:
         self.garments.sort(key=lambda g: g.name)
@@ -273,6 +280,13 @@ class Vocabulary:
     def category_for(self, name: str) -> str:
         found = self.garment(name)
         return found.category if found else "Accessory"
+
+    def tidy(self) -> "Vocabulary":
+        """Point any garment at a scheme that has since been merged away."""
+        for garment in self.garments:
+            garment.schemes = list(dict.fromkeys(
+                SCHEME_ALIASES.get(s, s) for s in garment.schemes))
+        return self
 
     def schemes_for(self, name: str) -> tuple[str, ...]:
         """Every scheme that can apply to this garment, most specific first."""
