@@ -44,6 +44,8 @@ Six tabs, in the order the work happens.
    you the raw markdown. Every save keeps the version it replaced, and any of
    them can be restored, so nothing here can lose an afternoon.
 2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
+   restaged onto white the moment they are uploaded, so a wardrobe photographed
+   on a bedroom floor still reads as a wardrobe worth browsing
    and sizes in whatever scheme that garment actually uses: a collar for a
    shirt, chest and a length letter for a jacket, waist and leg for trousers,
    three disagreeing national systems for a shoe. Only wanted pieces carry a

@@ -94,8 +94,23 @@ def generate_copy(profile: Profile, item: Item, principles: str = "") -> str:
                          system=COPY_SYSTEM, temperature=0.6)
 
 
+# Shared by both prompts: what a catalogue shot looks like, said the way the
+# model reliably follows.
+PRESENTATION = (
+    "Ghost mannequin presentation: the garment holds its shape as if worn, with "
+    "no person, no mannequin and no hanger visible. Centred, front view, filling "
+    "the frame with even margins.\n\n"
+    "Plain seamless pure white background. Soft even studio lighting from both "
+    "sides, a soft natural shadow beneath. Sharp focus throughout, true-to-life "
+    "colour, visible weave and texture in the cloth, natural drape at the seams. "
+    "High-resolution catalogue photograph in the style of a good online shop.\n\n"
+    "No text, no watermark, no logos, no labels, no props, no person, no hands, "
+    "no second garment, no collage."
+)
+
+
 def photo_prompt(item: Item) -> str:
-    """A catalogue shot of the garment alone. No model, no room, no styling.
+    """A catalogue shot built from the description, when there is no photograph.
 
     Product photography is a genre with rules, and the model follows them better
     when they are named: one garment, centred, seamless white, soft even light.
@@ -104,28 +119,47 @@ def photo_prompt(item: Item) -> str:
     detail = f" {item.description.strip()}" if item.description.strip() else ""
     return (
         f"E-commerce product photograph of a single {described}, and nothing else."
-        f"{detail}\n\n"
-        "Ghost mannequin presentation: the garment holds its shape as if worn, with "
-        "no person, no mannequin and no hanger visible. Centred, front view, filling "
-        "the frame with even margins.\n\n"
-        "Plain seamless pure white background. Soft even studio lighting from both "
-        "sides, a soft natural shadow beneath. Sharp focus throughout, true-to-life "
-        "colour, visible weave and texture in the cloth, natural drape at the seams. "
-        "High-resolution catalogue photograph in the style of a good online shop.\n\n"
-        "No text, no watermark, no logos, no labels, no props, no person, no hands, "
-        "no second garment, no collage."
+        f"{detail}\n\n{PRESENTATION}"
+    )
+
+
+def restage_prompt(item: Item) -> str:
+    """A catalogue shot of the garment in the reference photograph.
+
+    A different job from drawing one from a description, and the difference has
+    to be stated or the model treats the photograph as inspiration and invents a
+    nicer garment. This is a restaging: the same piece, the same cloth, the same
+    cut, the same wear, moved onto a white background.
+    """
+    described = " ".join(b for b in (item.colour, item.fabric, item.garment.lower()) if b)
+    detail = f"\n\nWhat it is: {item.description.strip()}" if item.description.strip() else ""
+    return (
+        "Photograph THE EXACT GARMENT in the reference image, restaged as an "
+        "e-commerce product shot. This is not a new garment inspired by the "
+        f"reference; it is that {described or item.garment.lower()}, the same "
+        "piece, photographed again.\n\n"
+        "Reproduce it faithfully: its exact colour and shade, its cloth and weave, "
+        "its cut and proportions, its collar, buttons, pockets, seams and any "
+        "pattern, exactly as they appear. Do not tidy it, do not restyle it, do "
+        "not make it smarter or newer than it is. If it is faded or creased or "
+        "worn, it stays that way.\n\n"
+        "Take only the garment from the reference. Discard the background, the "
+        "room, the lighting, the hanger and any person wearing it."
+        f"{detail}\n\n{PRESENTATION}"
     )
 
 
 def generate_photo(item: Item, *, count: int = 1) -> list[Path]:
-    written = generate_images(
-        photo_prompt(item),
+    """A catalogue shot: restaged from his photograph if there is one, drawn from
+    the description if there is not."""
+    from_photo = item.has_photo
+    return generate_images(
+        restage_prompt(item) if from_photo else photo_prompt(item),
         out_prefix=paths.products() / item.id,
-        reference_images=[Path(item.photo)] if item.has_photo else None,
+        reference_images=[Path(item.photo)] if from_photo else None,
         count=count,
         settings=Settings.from_env(),
     )
-    return written
 
 
 def refresh(profile: Profile, item: Item, inventory: Inventory, *,

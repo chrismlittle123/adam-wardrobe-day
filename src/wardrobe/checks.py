@@ -1096,6 +1096,75 @@ def check_plan_is_editable() -> str:
     return f"{len(DEFAULT_ROUTES)} defaults; add, edit, delete and restore all persist"
 
 
+def check_restaging_uses_the_photograph() -> str:
+    """An uploaded photograph is the subject, not a hint.
+
+    Left on the description-led prompt the model treats the photograph as
+    inspiration and produces a nicer garment than the one he owns, which is the
+    one thing a wardrobe inventory must never do.
+    """
+    import io as _io
+
+    from PIL import Image
+
+    from . import shop as shop_mod
+    from .inventory import Inventory, Item, save_photo
+
+    class Upload:
+        def __init__(self, name, data):
+            self.name, self._data = name, data
+
+        def getvalue(self):
+            return self._data
+
+    buffer = _io.BytesIO()
+    Image.new("RGB", (900, 1200), (240, 233, 216)).save(buffer, "PNG")
+
+    inventory = Inventory.load()
+    item = inventory.add(Item(name="Cream camp-collar shirt", garment="Shirt",
+                              colour="Cream", fabric="Cotton poplin",
+                              description="Gold chain-stitch trim on the collar"))
+    described = shop_mod.photo_prompt(item)
+    assert not item.has_photo, "the fixture already has a photograph"
+
+    item.photo = save_photo(item.id, Upload("shirt.png", buffer.getvalue()))
+    inventory.save()
+    restaged = shop_mod.restage_prompt(item)
+    assert restaged != described, "the two prompts are the same"
+    for phrase in ("EXACT GARMENT", "not a new garment", "same piece",
+                   "Discard the background", "Cream", "Cotton poplin"):
+        assert phrase in restaged, f"{phrase!r} missing from the restaging prompt"
+    assert "chain-stitch" in restaged, "his own description did not survive"
+    assert "seamless pure white" in restaged and "no person" in restaged, \
+        "the restaging prompt lost the presentation rules"
+    assert "Do not tidy it" in restaged, "nothing stops the model improving the garment"
+
+    # And the right prompt must actually be the one that goes out.
+    seen: dict[str, object] = {}
+
+    def stub(prompt, *, out_prefix, reference_images=None, count=1, settings=None):
+        seen["prompt"], seen["refs"] = prompt, list(reference_images or [])
+        out_prefix.parent.mkdir(parents=True, exist_ok=True)
+        target = out_prefix.with_suffix(".png")
+        Image.new("RGB", (64, 96), (200, 150, 120)).save(target, "PNG")
+        return [target]
+
+    real = shop_mod.generate_images
+    shop_mod.generate_images = stub
+    try:
+        shop_mod.generate_photo(item)
+        assert "EXACT GARMENT" in seen["prompt"], "a photographed garment was described, not restaged"
+        assert seen["refs"] == [Path(item.photo)], "the photograph was not sent as a reference"
+
+        bare = Item(name="Camel overcoat", garment="Overcoat", colour="Camel")
+        shop_mod.generate_photo(bare)
+        assert "EXACT GARMENT" not in seen["prompt"], "a garment with no photo was restaged"
+        assert not seen["refs"], "a reference was sent for a garment with no photograph"
+    finally:
+        shop_mod.generate_images = real
+    return "photographed garments are restaged from the photo, the rest drawn from words"
+
+
 def check_product_prompts() -> str:
     """The product shot must ask for the garment alone, and the copy for his size."""
     from .inventory import Item
@@ -1502,6 +1571,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
     (SHOP, "The sourcing plan routes each garment", check_sourcing_routes),
     (SHOP, "The plan is editable and persists", check_plan_is_editable),
+    (SHOP, "An uploaded photo is restaged, not described", check_restaging_uses_the_photograph),
     (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),

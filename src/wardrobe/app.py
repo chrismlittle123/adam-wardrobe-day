@@ -540,6 +540,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
                         except ValueError as exc:
                             st.warning(str(exc))
                     inventory.save()
+                    restage(added, inventory)
                     st.rerun()
 
     if not inventory.items:
@@ -569,6 +570,27 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
                 item_card(item, inventory, outfits)
 
 
+def restage(item: Item, inventory: Inventory) -> None:
+    """Turn his snapshot of a garment into a catalogue shot of the same garment.
+
+    Done on upload rather than on request, because a wardrobe photographed on a
+    bedroom floor and a wardrobe photographed on white are two different things
+    to look at, and only one of them is worth browsing.
+    """
+    if not item.has_photo:
+        return
+    with st.spinner("Putting it on a white background…"):
+        try:
+            written = shop_mod.generate_photo(item)
+        except GEMINI_ERRORS as exc:
+            st.warning(f"Kept your photograph; could not restage it. {exc}")
+            return
+    if written:
+        item.product_photo = str(written[0])
+        inventory.update(item)
+        inventory.save()
+
+
 def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
     """One garment in the grid: its picture, its spec, and a way into its page."""
     st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
@@ -586,12 +608,14 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
         f'<a class="view" href="?item={item.id}" target="_blank">Open &#8599;</a>'
         f'</div></div>', unsafe_allow_html=True)
 
-    if not item.shop_photo:
-        if st.button("Draw it from the description", key=f"draw-{item.id}",
+    if not item.product_photo:
+        label = ("Put it on a white background" if item.has_photo
+                 else "Draw it from the description")
+        if st.button(label, key=f"draw-{item.id}",
                      type="secondary", use_container_width=True,
-                     help="Generates a catalogue photograph from the colour, cloth and "
-                          "description. Upload a real photo instead if you have one."):
-            with st.spinner("Drawing…"):
+                     help="Restages your photograph as a catalogue shot, or draws one "
+                          "from the colour and cloth if there is no photograph."):
+            with st.spinner("Photographing…"):
                 try:
                     written = shop_mod.generate_photo(item)
                 except GEMINI_ERRORS as exc:
@@ -618,13 +642,17 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
             save = c1.form_submit_button("Save")
             delete = c2.form_submit_button("Delete")
             if save:
+                uploaded = False
                 if new_photo:
                     try:
                         edited.photo = inv_mod.save_photo(edited.id, new_photo)
+                        uploaded = True
                     except ValueError as exc:
                         st.warning(str(exc))
                 inventory.update(edited)
                 inventory.save()
+                if uploaded:
+                    restage(edited, inventory)
                 st.rerun()
             if delete:
                 # Cascade, or the outfits keep an id that resolves to nothing and

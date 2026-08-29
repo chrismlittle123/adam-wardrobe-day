@@ -3,59 +3,62 @@ id = "white-cotton-tee"
 name = "White cotton tee"
 category = "Top"
 garment = "T-shirt"
-colour = "white"
+colour = ""
 colour_hex = "#F4F2ED"
-fabric = "heavy jersey"
-pattern = "Solid"
+fabric = ""
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = "out/products/white-cotton-tee.png"
+product_copy = "**The cloth**\nA heavy cotton jersey, at least 220gsm, with a dry hand-feel. The weight gives it substance, so it hangs cleanly from the shoulders rather than clinging to the body. It should be completely opaque and have a visible, tight-knit texture. The cloth will soften with washing but hold its shape.\n\n**The cut**\nA long-sleeved T-shirt with a straight, structured fit. The shoulder seam should sit on the point of the shoulder. It is cut with room in the chest and biceps to accommodate an athletic frame, tapering slightly towards the waist to avoid a boxy shape. The hem should finish at the hip.\n\n**What to check**\n*   The shoulder seam must sit exactly on the edge of the shoulder bone.\n*   The fabric should feel substantial and not be see-through when held to the light.\n*   The body should hang straight down from the armpit without pulling at the waist or flaring out at the hem.\n*   The sleeve should end at the wrist bone and have enough room in the bicep for movement without being baggy.\n\n**Wrong version**\nThe wrong version is made from thin, clingy cloth with too much elastane that fits like a base layer."
 
 [items.sizes]
 alpha = "M"
-cut = "Regular"
 
 [[items]]
 id = "cream-camp-collar-shirt"
 name = "Cream camp-collar shirt"
 category = "Top"
 garment = "Shirt"
-colour = "cream"
+colour = ""
 colour_hex = "#F2E9D8"
-fabric = "cotton"
-pattern = "Solid"
+fabric = ""
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = "out/products/cream-camp-collar-shirt.png"
+product_copy = "**The cloth**\nA medium-weight cotton with a soft finish and some visible texture, like a slub or a fine weave. It needs enough body to hang from the shoulders without clinging, but enough drape to move easily and not look boxy. It will soften with wear and should not feel starchy or stiff off the rail.\n\n**The cut**\nA straight cut through the body, not a tapered 'slim fit'. The shoulders should be structured and sit squarely on your own, with the seam on the bone. From there, it should fall cleanly to a straight hem, with enough room in the chest and waist to not pull or feel restrictive. The camp collar should lie flat and open, forming a V-shape at the chest.\n\n**What to check**\n*   The shoulder seam. It must sit exactly on the point of your shoulder bone. If it’s right, the rest can be altered; if it’s wrong, put it back.\n*   The colour. It should be a warm, off-white cream, not a yellow-toned custard or a cold, stark white. Hold it against your skin.\n*   The transparency. Hold a single layer of the cloth up to the light. It should be opaque enough that your skin does not show through clearly.\n*   The collar's shape. The lapels should lie flat against the chest without curling up at the points or buckling away from the body.\n\n**Wrong version**\nThe wrong version is cut like a box, with no shape from the armpit to the hem, making you look wider than you are."
 
 [items.sizes]
 collar = "15.5\""
 alpha = "M"
-cut = "Regular"
 
 [[items]]
 id = "pale-blue-oxford"
 name = "Pale blue oxford"
 category = "Top"
 garment = "Shirt"
-colour = "pale blue"
+colour = ""
 colour_hex = "#BFD3E6"
-fabric = "oxford cotton"
-pattern = "Solid"
+fabric = ""
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 collar = "15.5\""
 alpha = "M"
-cut = "Regular"
 
 [[items]]
 id = "dark-indigo-jeans"
@@ -65,17 +68,18 @@ garment = "Jeans"
 colour = "indigo"
 colour_hex = "#2B3A4F"
 fabric = "13oz denim"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = "out/products/dark-indigo-jeans.png"
+product_copy = ""
 
 [items.sizes]
 waist = "31\""
 leg = "32\""
-cut = "Slim"
 
 [[items]]
 id = "navy-merino-crewneck"
@@ -85,16 +89,17 @@ garment = "Knitwear"
 colour = "navy"
 colour_hex = "#26303F"
 fabric = "merino wool"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 alpha = "M"
-cut = "Regular"
 
 [[items]]
 id = "white-leather-trainers"
@@ -104,12 +109,14 @@ garment = "Trainers"
 colour = "white"
 colour_hex = "#EDEAE3"
 fabric = "leather"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 uk = "9"
@@ -124,12 +131,14 @@ garment = "Boots"
 colour = "black"
 colour_hex = "#1B1918"
 fabric = "calf leather"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 uk = "9"
@@ -144,18 +153,18 @@ garment = "Blazer"
 colour = "navy"
 colour_hex = "#232C3B"
 fabric = "wool hopsack"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
-chest = "38\""
 length = "Regular"
 eu = "48"
-cut = "Slim"
 
 [[items]]
 id = "steel-dive-watch"
@@ -165,12 +174,14 @@ garment = "Watch"
 colour = "steel"
 colour_hex = "#9AA0A6"
 fabric = "steel"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 case = "40mm"
@@ -183,12 +194,14 @@ garment = "Belt"
 colour = "chocolate"
 colour_hex = "#5A3A22"
 fabric = "leather"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "owned"
 photo = ""
 description = ""
 starred = false
-price = 0.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 waist = "32\""
@@ -202,17 +215,18 @@ garment = "Trousers"
 colour = "mid grey"
 colour_hex = "#7A7A78"
 fabric = "wool flannel"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 150.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 waist = "31\""
 leg = "32\""
-cut = "Regular"
 
 [[items]]
 id = "brown-suede-loafers"
@@ -222,12 +236,14 @@ garment = "Loafers"
 colour = "chocolate"
 colour_hex = "#6B4426"
 fabric = "suede"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 220.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 uk = "9"
@@ -242,18 +258,18 @@ garment = "Overcoat"
 colour = "camel"
 colour_hex = "#C19A6B"
 fabric = "wool melton"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 420.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
-chest = "38\""
 length = "Regular"
 eu = "48"
-cut = "Regular"
 
 [[items]]
 id = "olive-linen-overshirt"
@@ -263,16 +279,17 @@ garment = "Overshirt"
 colour = "olive"
 colour_hex = "#6B6B47"
 fabric = "linen"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 110.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 alpha = "M"
-cut = "Relaxed"
 
 [[items]]
 id = "ecru-knit-polo"
@@ -282,16 +299,17 @@ garment = "Polo"
 colour = "ecru"
 colour_hex = "#E8DFC8"
 fabric = "cotton knit"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 95.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
 alpha = "M"
-cut = "Regular"
 
 [[items]]
 id = "camel-wool-overcoat-2"
@@ -301,11 +319,13 @@ garment = "Overcoat"
 colour = ""
 colour_hex = "#C19A6B"
 fabric = "wool"
-pattern = "Solid"
+grade = ""
+fit = ""
 status = "aspirational"
 photo = ""
 description = ""
 starred = false
-price = 40.0
+product_photo = ""
+product_copy = ""
 
 [items.sizes]
