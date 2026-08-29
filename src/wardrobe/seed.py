@@ -12,7 +12,7 @@ from __future__ import annotations
 from .inventory import ASPIRATIONAL, Inventory, Item, category_for
 from .outfits import Outfit, Outfits
 from .philosophy import Answers
-from .principles import Principle, Principles
+from .principles import CONFIRMED as prin_mod_CONFIRMED, Principle, Principles
 
 # name, garment, colour, hex, fabric, sizes, wanted, grade, fit
 # name, garment, colour, hex, fabric, sizes, wanted, grade, fit
@@ -153,7 +153,11 @@ COLOURS: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
 def seed_palette(palette=None):
     from .palette import Colour, Palette
     palette = palette if palette is not None else Palette.load()
+    held = {c.hex.lower() for c in palette.colours}
     for name, hex_code, role, categories, seasons in COLOURS:
+        if hex_code.lower() in held:
+            continue
+        held.add(hex_code.lower())
         palette.add(Colour(name=name, hex=hex_code, role=role,
                            categories=list(categories), seasons=list(seasons)))
     palette.save()
@@ -162,7 +166,11 @@ def seed_palette(palette=None):
 
 def seed_inventory(inventory: Inventory | None = None) -> Inventory:
     inventory = inventory if inventory is not None else Inventory.load()
+    held = {i.name for i in inventory.items}
     for name, garment, colour, hex_code, fabric, sizes, wanted, grade, fit in ITEMS:
+        if name in held:
+            continue
+        held.add(name)
         inventory.add(Item(
             name=name, garment=garment, category=category_for(garment),
             colour=colour, colour_hex=hex_code, fabric=fabric, sizes=dict(sizes),
@@ -175,7 +183,11 @@ def seed_inventory(inventory: Inventory | None = None) -> Inventory:
 def seed_outfits(inventory: Inventory, outfits: Outfits | None = None) -> Outfits:
     outfits = outfits if outfits is not None else Outfits.load()
     by_name = {i.name: i.id for i in inventory.items}
+    held = {o.name for o in outfits.outfits}
     for name, item_names, tags, loved in LOOKS:
+        if name in held:
+            continue
+        held.add(name)
         ids = [by_name[n] for n in item_names if n in by_name]
         outfits.add(Outfit(name=name, item_ids=ids, tags=list(tags), loved=loved))
     outfits.save()
@@ -192,14 +204,17 @@ def seed_answers(answers: Answers | None = None) -> Answers:
 def seed_principles(principles: Principles | None = None) -> Principles:
     principles = principles if principles is not None else Principles.load()
     for group, text, reason in PRINCIPLES:
-        principles.add(Principle(text=text, reason=reason, group=group))
+        principles.add(Principle(text=text, reason=reason, group=group,
+                                 status=prin_mod_CONFIRMED))
     principles.save()
     return principles
 
 
 def seed_all() -> dict[str, int]:
-    """Fill everything. Adds to whatever is already there rather than replacing,
-    so run it against an empty wardrobe or reset first."""
+    """Fill everything, idempotently. Running it twice is a no-op: every seeder
+    skips a row it already holds, matching on name (items, outfits, principles)
+    or hex (colours). It used to append blindly, which quietly grew the wardrobe
+    to 247 items and the principles to 142 over seventeen smoke runs."""
     inventory = seed_inventory()
     outfits = seed_outfits(inventory)
     answers = seed_answers()

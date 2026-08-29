@@ -162,6 +162,50 @@ def check_principles_round_trip() -> str:
     return "stored and parsed, noise ignored"
 
 
+def check_seeding_is_idempotent() -> str:
+    """The bug that grew the wardrobe to 247 items and the principles to 142.
+
+    Every seeder appended blindly, so each smoke run piled another copy of the
+    sample data on top. Seeding is "make sure this is present", not "add it
+    again": running it twice must change nothing.
+    """
+    from . import seed
+    first = seed.seed_all()
+    for _ in range(3):
+        again = seed.seed_all()
+    assert again == first, f"seeding four times grew the data: {first} -> {again}"
+    assert all(n > 0 for n in first.values()), f"a seeder produced nothing: {first}"
+    return f"stable over four runs at {first['items']} items, {first['principles']} principles"
+
+
+def check_suggestions_are_separate() -> str:
+    """A suggestion is not a principle until it is confirmed.
+
+    It must not be counted, must not appear under a group, and above all must not
+    reach the outfit prompts, which are what principles exist to steer.
+    """
+    from .principles import CONFIRMED, Principle, Principles, SUGGESTED
+    p = Principles.load()
+    p.add(Principle(text="Buy the shoulder.", reason="It cannot be altered."))
+    p.offer([Principle(text="Wear more beige.", reason="No."),
+             Principle(text="Buy the shoulder.", reason="Duplicate of a confirmed one.")])
+    assert [x.text for x in p.suggested()] == ["Wear more beige."], \
+        "offered back a principle that is already confirmed"
+    assert len(p.confirmed()) == 1, "a suggestion was counted as confirmed"
+    assert "beige" not in p.as_prompt_block(), "an unconfirmed suggestion reached the prompt"
+    assert all(x.status == CONFIRMED for g in p.by_group().values() for x in g), \
+        "a suggestion showed up under a group"
+
+    p.offer([Principle(text="Only linen.", reason="Summer.")])
+    assert [x.text for x in p.suggested()] == ["Only linen."], \
+        "generating added to the pending batch instead of replacing it"
+    p.confirm(p.suggested()[0].id)
+    assert len(p.confirmed()) == 2 and not p.suggested(), "confirm did not move it across"
+    p.add(Principle(text="only  linen", reason="said twice"))
+    assert len(p.confirmed()) == 2, "add is not idempotent on text"
+    return "suggestions held apart, batch replaced, confirm moves across"
+
+
 # --- Fit engine ---------------------------------------------------------------
 
 def check_body_measurement_set() -> str:
@@ -2195,6 +2239,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (DATA, "Item sizes survive a save", check_inventory_round_trip),
     (DATA, "Outfits keep tags and love", check_outfits_round_trip),
     (DATA, "Principles store and parse", check_principles_round_trip),
+    (DATA, "Seeding twice changes nothing", check_seeding_is_idempotent),
+    (DATA, "Suggestions are held apart from confirmed", check_suggestions_are_separate),
     (FIT, "Body is the ten takeable measurements", check_body_measurement_set),
     (FIT, "Body estimate is anatomically sane", check_body_estimate),
     (FIT, "Trouser spec keeps its leg opening", check_trouser_spec_survives_derived),

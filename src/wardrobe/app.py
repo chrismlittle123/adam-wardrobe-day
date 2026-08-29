@@ -744,9 +744,10 @@ def principles_tab(profile: Profile, answers: Answers, principles: Principles) -
         "Not the style guide. The guide is a document you read once; these are the "
         f"lines you hold in your head while getting dressed. Aim for about {TARGET}. "
         "Every one has to be checkable: you should be able to look at an outfit and "
-        "say whether it obeys or breaks it. They are fed into every generated look."
+        "say whether it obeys or breaks it. Only confirmed ones are fed into a "
+        "generated look; a suggestion sits on the table until you say yes."
     )
-    ui.meter(len(principles.principles), TARGET, "Kept")
+    ui.meter(len(principles.confirmed()), TARGET, "Confirmed")
 
     ideas_panel(profile, answers, principles)
     kept_panel(principles)
@@ -754,51 +755,55 @@ def principles_tab(profile: Profile, answers: Answers, principles: Principles) -
 
 
 def ideas_panel(profile: Profile, answers: Answers, principles: Principles) -> None:
-    ui.eyebrow("Inspiration")
+    ui.eyebrow("Suggestions")
     ui.blurb(
-        f"{BATCH} suggestions at a time. Keep the ones that ring true, bin the rest. "
-        "Asking for ten in one go gets you four that are true and six that are "
-        "padding, and padding in a list this short is worse than a gap. Each round "
-        "is told what you have already kept, so it goes somewhere new."
+        f"{BATCH} at a time. Confirm the ones that ring true, bin the rest. Asking "
+        "for ten in one go gets you four that are true and six that are padding, "
+        "and padding in a list this short is worse than a gap. Each round is told "
+        "what you have already confirmed, so it goes somewhere new. Generating "
+        "replaces whatever is on the table rather than adding to it."
     )
     if st.button(f"Suggest {BATCH} more", type="primary"):
         guide = paths.guide().read_text() if paths.guide().is_file() else ""
         with st.spinner("Thinking…"):
             try:
-                st.session_state["principle_ideas"] = prin_mod.generate(
-                    profile, answers, guide, BATCH, principles.principles)
+                ideas = prin_mod.generate(profile, answers, guide, BATCH,
+                                          principles.confirmed())
             except (ValueError, *GEMINI_ERRORS) as exc:
                 st.error(str(exc))
                 return
+        reset_mod.before("before replacing the pending suggestions", "principles")
+        principles.offer(ideas)
+        principles.save()
         st.rerun()
 
-    ideas: list[Principle] = st.session_state.get("principle_ideas", [])
-    if not ideas:
-        st.markdown('<div class="look-cap">No suggestions on the table. '
-                    'Generating again replaces whatever is here.</div>',
+    pending = principles.suggested()
+    if not pending:
+        st.markdown('<div class="look-cap">Nothing on the table.</div>',
                     unsafe_allow_html=True)
         return
 
-    for n, idea in enumerate(ideas):
+    for p in pending:
         c1, c2, c3 = st.columns([8, 1, 1], vertical_alignment="center")
         c1.markdown(
-            f'<div class="step"><div class="pieces">{idea.text}</div>'
-            f'<div class="why">{idea.group} &middot; {idea.reason}</div></div>',
+            f'<div class="step"><div class="pieces">{p.text}</div>'
+            f'<div class="why">{p.group} &middot; {p.reason}</div></div>',
             unsafe_allow_html=True)
-        if c2.button("Keep", key=f"keep-{n}"):
-            principles.add(Principle(text=idea.text, reason=idea.reason, group=idea.group))
+        if c2.button("Confirm", key=f"confirm-{p.id}"):
+            principles.confirm(p.id)
             principles.save()
-            st.session_state["principle_ideas"] = [i for i in ideas if i is not idea]
             st.rerun()
-        if c3.button("Bin", key=f"bin-{n}", type="secondary"):
-            st.session_state["principle_ideas"] = [i for i in ideas if i is not idea]
+        if c3.button("Bin", key=f"bin-{p.id}", type="secondary"):
+            reset_mod.before(f"before binning the suggestion “{p.text[:48]}”", "principles")
+            principles.remove(p.id)
+            principles.save()
             st.rerun()
 
 
 def kept_panel(principles: Principles) -> None:
-    ui.eyebrow("Kept")
-    if not principles.principles:
-        ui.empty("Nothing kept yet. Take a suggestion above, or write your own below.")
+    ui.eyebrow("Confirmed")
+    if not principles.confirmed():
+        ui.empty("Nothing confirmed yet. Take a suggestion above, or write your own below.")
         return
     for group, group_principles in principles.by_group().items():
         st.markdown(f'<div class="look-cap">{group}</div>', unsafe_allow_html=True)
