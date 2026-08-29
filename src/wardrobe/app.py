@@ -20,6 +20,7 @@ from wardrobe import (
     palette as pal_mod,
     retailers,
     shop as shop_mod,
+    sourcing,
     checks as check_mod, fitspec, inventory as inv_mod, paths,
     principles as prin_mod, reset as reset_mod, seed as seed_mod, shopping, ui,
 )
@@ -1444,6 +1445,23 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         "look for, and where to find it."
     )
 
+    routeless = [i for i in wanted if not sourcing.route_for(i)]
+    if routeless:
+        st.warning(
+            "No route in the sourcing plan for: "
+            + ", ".join(f"**{i.name or i.garment}** ({i.garment})" for i in routeless)
+            + ". They fall back to the generic ranking until you add a line."
+        )
+    with st.expander("The sourcing plan"):
+        ui.blurb("Where each kind of thing comes from, and on what terms. The most "
+                 "specific match wins, so a linen shirt goes to Mango and an oxford "
+                 "to Tyrwhitt even though both are shirts.")
+        ui.table([{
+            "Garment": route.label,
+            "Where": route.where,
+            "Terms": route.terms or "—",
+        } for route in sourcing.plan()])
+
     plan_panel(inventory, outfits)
 
     ui.eyebrow("The list")
@@ -1587,10 +1605,29 @@ def item_view(profile: Profile, item_id: str) -> None:
                         unsafe_allow_html=True)
 
     ui.eyebrow("Where to buy it")
+    route = sourcing.route_for(item)
+    if route:
+        terms = "".join(
+            f'<div class="term"><b>{label}</b> {value}</div>'
+            for label, value in (("Condition", route.condition), ("Timing", route.timing),
+                                 ("Insist on", route.spec)) if value)
+        links = " ".join(
+            f'<a href="{shop.url(retailers.query_for(item))}" target="_blank" '
+            f'rel="noopener">{shop.name} &#8599;</a>' for shop in route.retailers)
+        st.markdown(
+            f'<div class="route-card"><div class="hd"><div class="who">{route.where}</div>'
+            f'<div class="kind">your plan · {route.label}</div></div>'
+            f'{terms}{f"<div class=why>{route.note}</div>" if route.note else ""}'
+            f'<div class="links">{links}</div></div>', unsafe_allow_html=True)
+    else:
+        st.info(f"No line in the sourcing plan for {item.garment.lower()}. "
+                "Falling back to the generic ranking below.")
+
+    ui.eyebrow("Other options" if route else "Ranked options")
     ui.blurb(
-        f"Ranked for this garment at this price. Anything at "
-        f"£{retailers.SECONDHAND_THRESHOLD:.0f} or over goes to the secondhand sites "
-        "first, and the more rarely a thing is worn the harder that rule bites."
+        f"Ranked for this garment at this price. Anything from "
+        f"£{retailers.SECONDHAND_THRESHOLD:.0f} goes to the secondhand sites first, "
+        "and the more rarely a thing is worn the harder that rule bites."
     )
     for suggestion in retailers.suggest(item, limit=8):
         st.markdown(

@@ -33,7 +33,7 @@ STATUSES: tuple[str, ...] = (OWNED, ASPIRATIONAL, RETIRED)
 CATEGORIES: dict[str, tuple[str, ...]] = {
     "Accessory": ("Bag", "Belt", "Hat", "Jewellery", "Scarf", "Socks", "Sunglasses", "Watch"),
     "Bottom": ("Chinos", "Jeans", "Shorts", "Trousers"),
-    "Outerwear": ("Blazer", "Gilet", "Jacket", "Overcoat", "Overshirt"),
+    "Outerwear": ("Blazer", "Gilet", "Jacket", "Overcoat", "Overshirt", "Suit"),
     "Shoes": ("Boots", "Derbies", "Loafers", "Sandals", "Trainers"),
     "Top": ("Knitwear", "Polo", "Shirt", "Sweatshirt", "T-shirt", "Waistcoat"),
 }
@@ -100,7 +100,7 @@ SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Belt": (SizeField("waist", "Waist", (NONE, *_range(26, 44, 1, '"'))), _alpha),
     "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
     "Socks": (SizeField("socks", "Size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
-    "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME,
+    "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME, "Suit": JACKET_SCHEME,
     "Jacket": (_alpha, _chest, _cut), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
     "Waistcoat": (_chest, _alpha),
     "Chinos": TROUSER_SCHEME, "Jeans": TROUSER_SCHEME, "Trousers": TROUSER_SCHEME,

@@ -55,7 +55,7 @@ class Retailer:
 
 TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Overshirt")
 BOTTOMS = ("Trousers", "Chinos", "Jeans", "Shorts")
-OUTER = ("Blazer", "Jacket", "Overcoat", "Overshirt", "Gilet")
+OUTER = ("Blazer", "Jacket", "Overcoat", "Overshirt", "Gilet", "Suit")
 FOOTWEAR = ("Loafers", "Derbies", "Boots", "Trainers", "Sandals")
 ACCESSORIES = ("Belt", "Bag", "Scarf", "Hat", "Socks", "Sunglasses", "Watch", "Jewellery")
 EVERYTHING = TOPS + BOTTOMS + OUTER + FOOTWEAR + ACCESSORIES
@@ -100,9 +100,23 @@ RETAILERS: tuple[Retailer, ...] = (
     Retailer("next", "Next", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 15, 120,
              "https://www.next.co.uk/search?w={q}",
              "Wide sizing and fast delivery. Quality is a lottery, so read the composition."),
-    Retailer("marks", "Marks & Spencer", HIGH_STREET, TOPS + BOTTOMS + OUTER, 20, 150,
+    Retailer("marks", "Marks & Spencer", HIGH_STREET, TOPS + BOTTOMS + OUTER + ("Trainers", "Belt"), 20, 150,
              "https://www.marksandspencer.com/search?q={q}",
              "Better than its reputation for knitwear and chinos."),
+
+    Retailer("asos", "Asos", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 10, 120,
+             "https://www.asos.com/men/search/?q={q}",
+             "Enormous range, so filter hard by composition. Own-brand heavyweight "
+             "jersey is the reason to come here."),
+    Retailer("adidas", "Adidas", ONLINE, ("Trainers",), 60, 160,
+             "https://www.adidas.co.uk/search?q={q}",
+             "Check the outlet section before the sale section; it is usually cheaper."),
+    Retailer("newbalance", "New Balance", ONLINE, ("Trainers",), 70, 180,
+             "https://www.newbalance.co.uk/search?q={q}",
+             "Sales are seasonal and deep. The outlet runs all year."),
+    Retailer("nike", "Nike", ONLINE, ("Trainers",), 60, 170,
+             "https://www.nike.com/gb/w?q={q}",
+             "Members get the sale early, which is the only reason to sign up."),
 
     Retailer("moss", "Moss", TAILORING, ("Blazer", "Waistcoat", "Trousers", "Shirt"), 60, 350,
              "https://www.moss.co.uk/search?q={q}",

@@ -168,6 +168,11 @@ EASE: dict[str, dict[str, dict[str, float]]] = {
         "Regular": {"chest": 14, "waist": 14, "hip": 14, "shoulder": 1.5, "bicep": 13},
         "Relaxed": {"chest": 18, "waist": 20, "hip": 18, "shoulder": 3.0, "bicep": 16},
     },
+    "Suit": {
+        "Slim":    {"chest": 10, "waist": 8,  "hip": 10, "shoulder": 0.5, "bicep": 10},
+        "Regular": {"chest": 14, "waist": 14, "hip": 14, "shoulder": 1.5, "bicep": 13},
+        "Relaxed": {"chest": 18, "waist": 20, "hip": 18, "shoulder": 3.0, "bicep": 16},
+    },
     "Overcoat": {
         "Slim":    {"chest": 20, "waist": 20, "hip": 18, "shoulder": 2.5, "bicep": 16},
         "Regular": {"chest": 25, "waist": 26, "hip": 24, "shoulder": 3.5, "bicep": 19},
@@ -193,6 +198,7 @@ LENGTH_RATIOS: dict[str, dict[str, float]] = {
     "Polo":     {"Body": 0.402},
     "Knitwear": {"Body": 0.395},
     "Blazer":   {"Body": 0.415},
+    "Suit":     {"Body": 0.415},
     "Overcoat": {"Mid-thigh": 0.545, "Knee": 0.620},
 }
 

@@ -68,6 +68,23 @@ Six tabs, in the order the work happens.
    how that garment usually goes wrong, the finished measurements on his body,
    the outfits waiting on it, where to buy it, and how not to pay retail.
 
+### The sourcing plan
+
+`sourcing.py` holds the decisions rather than the ranking: heavyweight tees from
+Asos or Next at 200 gsm, plain ones from Uniqlo in supima; blazers, jackets,
+dress shoes, boots and overcoats from Vinted in Very Good condition or above;
+dress shirts from Charles Tyrwhitt on sale, linen from Mango; chinos, jeans,
+overshirts and plain polos from Uniqlo; jumpers from M&S or Uniqlo; smart
+trainers from Vinted new with tags only, branded ones from the brand's own sale;
+suits from M&S and then altered.
+
+A route is finer-grained than a garment type, which is the hard part: a
+heavyweight tee and a plain tee are both "T-shirt" and come from different shops,
+as do a dress shirt and a linen one. So routes carry keywords and the most
+specific match wins, with a keyword-free route acting as the default for the
+type. A garment with no matching route says so rather than being pushed down the
+wrong one.
+
 ### Where to buy, and how not to pay retail
 
 Anything from **£50 goes secondhand first**. Not out of thrift, but because

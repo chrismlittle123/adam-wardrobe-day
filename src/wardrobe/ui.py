@@ -420,6 +420,12 @@ SHOP_CSS = """
   font-family: 'IBM Plex Mono', monospace; font-size: 1.05rem; color: var(--cream);
   margin: .6rem 0 .3rem;
 }
+.product .route {
+  font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .1em;
+  color: var(--brass); border-top: 1px solid var(--line); padding-top: .5rem;
+  margin-top: .5rem; line-height: 1.6;
+}
+.product .route.none { color: var(--bad); }
 .product .size {
   font-family: 'IBM Plex Mono', monospace; font-size: .62rem; color: var(--muted);
   line-height: 1.7;
@@ -457,6 +463,29 @@ SHOP_CSS = """
   text-transform: uppercase; color: var(--brass); text-decoration: none;
 }
 .buy a:hover { border-bottom: 1px solid var(--brass); }
+.route-card {
+  background: var(--raise); border: 1px solid var(--brass); padding: 1rem 1.2rem;
+  margin-bottom: 1.2rem;
+}
+.route-card .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.route-card .who { font-family: 'Bodoni Moda', Georgia, serif; font-size: 1.35rem; }
+.route-card .kind {
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--brass);
+}
+.route-card .term {
+  font-family: 'IBM Plex Mono', monospace; font-size: .68rem; color: var(--cream);
+  letter-spacing: .06em; margin-top: .5rem;
+}
+.route-card .term b { color: var(--muted); font-weight: 400; margin-right: .5rem; }
+.route-card .why { color: var(--muted); font-size: .85rem; line-height: 1.6; margin-top: .7rem; }
+.route-card .links { margin-top: .9rem; display: flex; gap: 1.2rem; flex-wrap: wrap; }
+.route-card .links a {
+  font-family: 'IBM Plex Mono', monospace; font-size: .64rem; letter-spacing: .14em;
+  text-transform: uppercase; color: #17110E; background: var(--brass);
+  padding: .5rem .9rem; text-decoration: none;
+}
+.route-card .links a:hover { background: var(--cream); }
 .tactic { border-left: 2px solid rgba(201,162,39,.35); padding: .1rem 0 .1rem 1rem; margin: .8rem 0; }
 .tactic .t { font-size: .95rem; }
 .tactic .d { color: var(--muted); font-size: .84rem; line-height: 1.65; margin-top: .2rem; }

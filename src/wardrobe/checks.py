@@ -825,8 +825,8 @@ def check_retailer_catalogue() -> str:
         assert any(r.name == named for r in RETAILERS), f"{named} is missing"
 
     coverable = {g for r in RETAILERS for g in r.strengths}
-    uncovered = [g for g in GARMENTS if g not in coverable]
-    assert not uncovered, f"no retailer sells: {uncovered}"
+    unsold = [g for g in GARMENTS if g not in coverable]
+    assert not unsold, f"no retailer sells: {unsold}"
     assert query_for(Item(garment="Blazer", colour="navy", fabric="Linen")) == "navy Linen Blazer"
     return f"{len(RETAILERS)} retailers across {len(KINDS)} kinds, every garment covered"
 
@@ -850,6 +850,56 @@ def check_tactics() -> str:
     assert "Save the Vinted search" not in [t.name for t in tactics(tee)], \
         "a £25 tee should not be worth a saved search"
     return f"{len(names)} tactics for the coat, size and season both specific"
+
+
+def check_sourcing_routes() -> str:
+    """His plan, and the disambiguation it depends on.
+
+    A heavyweight tee and a plain tee are both "T-shirt" and come from different
+    shops, so the keyword match is the load-bearing part. If it breaks, every
+    shirt goes to the same place and the plan is decoration.
+    """
+    from .inventory import GARMENTS, Item
+    from .retailers import BY_ID
+    from .sourcing import BY_GARMENT, ROUTES, route_for, uncovered
+
+    for route in ROUTES:
+        assert route.stores, f"{route.label} names no shop"
+        assert all(i in BY_ID for i in route.stores), \
+            f"{route.label} points at a retailer that does not exist: {route.stores}"
+        assert route.garment in GARMENTS, f"{route.label} is for an unknown garment"
+        assert route.retailers, f"{route.label} resolved to nothing"
+
+    def where(name, garment, fabric="", colour=""):
+        found = route_for(Item(name=name, garment=garment, fabric=fabric, colour=colour))
+        return found.where if found else None
+
+    assert where("Heavyweight boxy tee", "T-shirt") == "Asos or Next", "heavyweight tee misrouted"
+    assert where("Plain white tee", "T-shirt") == "Uniqlo", "plain tee misrouted"
+    assert where("White oxford shirt", "Shirt", "Oxford cotton") == "Charles Tyrwhitt", \
+        "dress shirt misrouted"
+    assert where("Ecru shirt", "Shirt", "Linen") == "Mango", "linen shirt misrouted"
+    assert where("Knit polo", "Polo", "Merino wool") == "Mango", "knitted polo misrouted"
+    assert where("Piqué polo", "Polo", "Cotton piqué") == "Uniqlo", "plain polo misrouted"
+    assert where("Adidas Samba", "Trainers", "Suede") != "Vinted", "branded trainer sent to Vinted"
+    assert where("White leather trainers", "Trainers", "Calf leather") == "Vinted", \
+        "smart trainers not routed to Vinted"
+
+    smart = route_for(Item(name="White leather trainers", garment="Trainers"))
+    assert "New with tags" in smart.condition, "the new-with-tags condition was lost"
+    blazer = route_for(Item(name="Navy blazer", garment="Blazer"))
+    assert "Very Good" in blazer.condition, "the Very Good condition was lost"
+    heavy = route_for(Item(name="Heavy tee", garment="T-shirt"))
+    assert "200 gsm" in heavy.spec, "the gsm specification was lost"
+
+    # A garment with only a keyword route and no default must return nothing
+    # rather than being quietly forced down the wrong one.
+    assert route_for(Item(name="Grey flannel trousers", garment="Trousers",
+                          fabric="Wool flannel")) is None, \
+        "a wool trouser was pushed down the linen route"
+    assert "Loafers" in uncovered(GARMENTS), "a known gap stopped being reported"
+    return (f"{len(ROUTES)} routes over {len(BY_GARMENT)} garment types; "
+            f"tee, shirt, polo and trainer splits all land")
 
 
 def check_product_prompts() -> str:
@@ -1106,6 +1156,8 @@ def check_item_page_opens() -> str:
     assert "Camel wool overcoat" in page, "the garment name is missing"
     assert "vinted.co.uk" in page, "no Vinted link on an expensive coat"
     assert "Where to buy it" in page, "the retailer section is missing"
+    assert "your plan" in page, "the sourcing route did not reach the product page"
+    assert "Very Good" in page, "the Vinted condition did not reach the product page"
     assert "How to get it cheaply" in page, "the tactics section is missing"
     assert "Outfits waiting on it" in page, "the outfits section is missing"
     assert "Rain on the King" in page, "the outfit using this coat is not listed"
@@ -1196,6 +1248,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
+    (SHOP, "The sourcing plan routes each garment", check_sourcing_routes),
     (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),
