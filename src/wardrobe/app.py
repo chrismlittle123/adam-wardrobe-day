@@ -876,9 +876,9 @@ def face_rule_panel(palette: Palette, skin: str) -> None:
             f'<div class="hd"><div class="pieces">'
             f'<span class="chip" style="background:{colour.hex}"></span>'
             f'{colour.name}</div><div class="cost">'
-            f'{pal_mod.skin_distance(colour.hex, skin):.0f}</div></div>'
+            f'{pal_mod.distance_line(colour.hex, skin)}</div></div>'
             f'<div class="why">Needs {pal_mod.TOO_CLOSE:.0f} from his skin and has '
-            f'{pal_mod.skin_distance(colour.hex, skin):.0f}, so at the collar it '
+            f'{pal_mod.distance_line(colour.hex, skin)}, so at the collar it '
             f'reads as more of him than as a garment. '
             f'Fine on {elsewhere or "nothing else"}.</div></div>',
             unsafe_allow_html=True)
@@ -946,13 +946,13 @@ def palette_panel(palette: Palette, skin: str) -> None:
         for colour in colours:
             c1, c2 = st.columns([9, 1], vertical_alignment="center")
             note_line = f"<br>{colour.note}" if colour.note else ""
-            distance = pal_mod.skin_distance(colour.hex, skin)
             if not colour.near_the_face:
-                rule_line = (f'<span class="badge">not worn on top</span> {distance:.0f}'
-                             f' from his skin, which does not matter off the face')
+                rule_line = (f'<span class="badge">not worn on top</span> '
+                             f'{pal_mod.distance_line(colour.hex, skin)} from his '
+                             f'skin, which does not matter off the face')
             elif pal_mod.clears_the_face(colour.hex, skin):
                 rule_line = (f'<span class="badge ok">clears the face</span> '
-                             f'{distance:.0f} from his skin')
+                             f'{pal_mod.distance_line(colour.hex, skin)} from his skin')
             else:
                 rule_line = (f'<span class="badge no">breaks the rule</span> '
                              f'{pal_mod.face_rule(colour.hex, skin)[1]}')

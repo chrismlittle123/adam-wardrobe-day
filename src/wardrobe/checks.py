@@ -203,6 +203,14 @@ def check_suggestions_are_separate() -> str:
     assert len(p.confirmed()) == 2 and not p.suggested(), "confirm did not move it across"
     p.add(Principle(text="only  linen", reason="said twice"))
     assert len(p.confirmed()) == 2, "add is not idempotent on text"
+
+    # Writing by hand, or seeding, something that is already sitting on the table
+    # as a suggestion has to promote it rather than quietly do nothing.
+    p.offer([Principle(text="Trousers at the natural waist.", reason="Proportion.")])
+    p.add(Principle(text="trousers at the  natural waist", reason="written by hand",
+                    status=CONFIRMED))
+    assert not p.suggested(), "confirming by hand left the suggestion on the table"
+    assert len(p.confirmed()) == 3, "confirming by hand did not promote the suggestion"
     return "suggestions held apart, batch replaced, confirm moves across"
 
 
@@ -851,6 +859,23 @@ def check_the_one_rule() -> str:
     named = [c.name for c in breaks_the_rule(palette, skin)]
     assert named == ["Terracotta"], f"the rule bit the wrong colours: {named}"
     assert NEAR_THE_FACE == ("Top",), "the rule has quietly changed scope"
+
+    # A colour just under the line must not round up to the threshold on the page
+    # and read as "20, under the 20 minimum".
+    from .palette import distance_line
+    near_miss = "#962D2D"   # 19.9995 from him: breaks the rule, rounds to 20
+    assert TOO_CLOSE - 1 < skin_distance(near_miss, skin) < TOO_CLOSE, \
+        "the near-miss fixture no longer sits just under the line"
+    # The number printed must always agree with the yes or the no beside it, at
+    # every hex, not just at the fixture.
+    import re as _re
+    for hex_code in (near_miss, "#B5613F", "#6E2C33", "#26303F", skin, "#FFFFFF"):
+        passes, why = face_rule(hex_code, skin)
+        shown = float(_re.match(r"[\d.]+", why).group())
+        assert shown == float(distance_line(hex_code, skin)), "two roundings disagree"
+        assert (shown >= TOO_CLOSE) == passes, \
+            f"{hex_code} shows {shown} beside a verdict of {passes}"
+    assert not face_rule(near_miss, skin)[0], "the near miss should break the rule"
 
     # No verdict machinery survives.
     import wardrobe.palette as module

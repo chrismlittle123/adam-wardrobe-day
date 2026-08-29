@@ -203,14 +203,27 @@ def blurs_at_the_collar(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
     return not clears_the_face(hex_code, skin_hex)
 
 
+def distance_line(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
+    """The distance as text, rounded so it can never contradict the verdict.
+
+    Plain rounding puts a colour at 19.9995 on the page as "20 from his skin,
+    under the 20 minimum", which reads as a bug even though the arithmetic is
+    right. So a failing distance always rounds down and a passing one always
+    rounds up: the number shown agrees with the yes or the no beside it.
+    """
+    distance = skin_distance(hex_code, skin_hex)
+    rounded = math.floor(distance) if distance < TOO_CLOSE else math.ceil(distance)
+    return f"{rounded:.0f}"
+
+
 def face_rule(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[bool, str]:
     """(passes, why). The only judgement this module makes about a colour."""
-    distance = skin_distance(hex_code, skin_hex)
-    if distance < TOO_CLOSE:
-        return False, (f"{distance:.0f} from his skin, under the {TOO_CLOSE:.0f} "
-                       "minimum: at the collar this reads as more of him than as "
-                       "a garment")
-    return True, f"{distance:.0f} from his skin, clear of the {TOO_CLOSE:.0f} minimum"
+    if skin_distance(hex_code, skin_hex) < TOO_CLOSE:
+        return False, (f"{distance_line(hex_code, skin_hex)} from his skin, under the "
+                       f"{TOO_CLOSE:.0f} minimum: at the collar this reads as more of "
+                       "him than as a garment")
+    return True, (f"{distance_line(hex_code, skin_hex)} from his skin, clear of the "
+                  f"{TOO_CLOSE:.0f} minimum")
 
 
 def breaks_the_rule(palette: "Palette", skin_hex: str = DEFAULT_SKIN) -> list["Colour"]:
