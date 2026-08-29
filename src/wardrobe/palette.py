@@ -287,28 +287,6 @@ def warmth(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[str, str]:
     return "careful", f"{round(distance)}° away: close enough to relate, far enough to argue"
 
 
-def harmonies(hex_code: str) -> dict[str, list[str]]:
-    """Neighbours on the wheel, as swatches to steal.
-
-    Chroma and lightness are pulled towards wearable ranges on the way out. A
-    mathematically perfect complement at full saturation is a traffic cone.
-    """
-    hue, saturation, light = hsl(hex_code)
-    wearable_s = min(saturation, 0.55)
-
-    def at(offset: float, s_scale: float = 1.0, l_shift: float = 0.0) -> str:
-        return from_hsl(hue + offset, wearable_s * s_scale, light + l_shift)
-
-    return {
-        "Analogous": [at(-30), at(30)],
-        "Complementary": [at(180, 0.75)],
-        "Split complementary": [at(150, 0.75), at(210, 0.75)],
-        "Triadic": [at(120, 0.8), at(240, 0.8)],
-        "Shades": [at(0, 1.0, -0.22), at(0, 1.0, 0.22)],
-        "Muted": [at(0, 0.45), at(0, 0.25, 0.12)],
-    }
-
-
 # --- the palette --------------------------------------------------------------
 
 @dataclass

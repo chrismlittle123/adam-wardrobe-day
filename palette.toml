@@ -1,0 +1,13 @@
+[[colours]]
+id = "sand"
+name = "Sand"
+hex = "#D9C9A8"
+role = "Ground"
+categories = [
+    "Top",
+    "Bottom",
+]
+seasons = [
+    "Summer",
+]
+note = ""

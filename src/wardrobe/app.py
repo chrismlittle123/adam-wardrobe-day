@@ -843,7 +843,6 @@ def colour_tab(profile: Profile, palette: Palette) -> None:
     )
     palette_panel(palette, skin)
     season_panel(palette)
-    harmony_panel(palette, skin)
     rules_panel(palette)
     combination_panel(palette, skin)
 
@@ -895,7 +894,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
             st.rerun()
 
     if not palette.colours:
-        ui.empty("No colours yet. Pick one above, or steal a harmony below.")
+        ui.empty("No colours yet. Add one above, or start from the catalogue.")
         return
 
     for role, colours in palette.by_role().items():
@@ -1741,38 +1740,6 @@ def colour_catalogue_view(palette: Palette) -> None:
 
     st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
                 '</div>', unsafe_allow_html=True)
-
-
-def harmony_panel(palette: Palette, skin: str) -> None:
-    ui.eyebrow("Steal a harmony")
-    ui.blurb(
-        "The wheel put to work. Pick a colour and take its neighbours: analogous "
-        "sits either side, complementary is opposite. Chroma and lightness are "
-        "pulled back into wearable range on the way out, because a mathematically "
-        "perfect complement at full saturation is a traffic cone."
-    )
-    c1, c2 = st.columns([1, 3])
-    base = c1.color_picker("Base", palette.colours[0].hex if palette.colours else "#C19A6B",
-                           key="harm-base")
-    c2.markdown(f'<div class="look-cap">Neighbours of {base}, reads as '
-                f'{pal_mod.hue_name(base)}</div>', unsafe_allow_html=True)
-
-    for scheme, swatches in pal_mod.harmonies(base).items():
-        columns = st.columns([2] + [1] * len(swatches) * 2)
-        columns[0].markdown(f'<div class="look-cap">{scheme}</div>', unsafe_allow_html=True)
-        for n, swatch in enumerate(swatches):
-            verdict, _ = pal_mod.warmth(swatch, skin)
-            columns[1 + n * 2].markdown(
-                f'<div style="background:{swatch};height:2rem;border:1px solid var(--line)" '
-                f'title="{swatch} · {verdict}"></div>', unsafe_allow_html=True)
-            taken = palette.has(swatch)
-            if columns[2 + n * 2].button("In" if taken else "Add",
-                                         key=f"harm-{scheme}-{n}", disabled=taken,
-                                         type="secondary"):
-                palette.add(Colour(name=pal_mod.hue_name(swatch).title(), hex=swatch,
-                                   role=ACCENT if pal_mod.chroma(swatch) > 0.4 else GROUND))
-                palette.save()
-                st.rerun()
 
 
 def rules_panel(palette: Palette) -> None:

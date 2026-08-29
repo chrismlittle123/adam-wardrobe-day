@@ -1,0 +1,43 @@
+[[outfits]]
+id = "autumn-smart-outfit"
+name = "Autumn Smart Outfit"
+item_ids = [
+    "tobacco-brown-blazer",
+    "ecru-oxford-cotton-shirt",
+    "tobacco-suit-trousers",
+    "cognac-leather-derbies",
+]
+tags = []
+notes = ""
+images = [
+    "out/looks/20260829-092136-autumn-smart-outfit.png",
+]
+loved = false
+created = "2026-08-29T09:21:55"
+prompt = "Ultra photorealistic, high-definition full-colour fashion photograph of the man in the reference image.\n\nTHE MAN. 1.76 m (5 ft 9 in), very lean and athletic, narrow waist, defined shoulders, around 10% body fat. warm medium-deep brown with a red-gold undertone skin (#A0583C), short dark natural curls, cropped close at the sides, light moustache and short stubble along the jaw, dark brown eyes, small gold stud earring, thin gold chain necklace.\n\nKeep his face, head shape, hair, skin tone and facial hair exactly as the reference image. This must read as the same person. Do not restyle his face.\nKeep his body exactly as described: he is 1.76 m and very lean and athletic, narrow waist, defined shoulders, so the clothes hang on a lean frame. Do not elongate him into a fashion-model silhouette and do not broaden him.\n\nTHE OUTFIT. He is wearing exactly these pieces and nothing else:\n- Tobacco Linen-wool blazer\n- Ecru Oxford cotton shirt\n- Tobacco Linen-wool trousers\n- Cognac Calf leather derbies\nStanding style direction: Relaxed European tailoring. Natural shoulder, nothing boxy, nothing skinny.\nAvoid: Baggy fits, loud logos, novelty prints, black-on-black.\n\nTHE SHOT. Full-length shot, head to feet, standing square to the camera. The entire outfit including the shoes is in frame with room above the head. Plain seamless pure white studio background. Soft even professional studio lighting, sharp focus throughout the garments, natural skin texture, visible weave and drape in the fabric, true-to-life colour, 50mm lens, high-resolution editorial photograph.\n\nNo text, no watermark, no logos, no collage, no extra people, no mirror."
+shot = "Full length"
+background = "White studio"
+extra = ""
+parent = ""
+
+[[outfits]]
+id = "intellectual-autumn-smart-outfit"
+name = "Intellectual Autumn Smart Outfit"
+item_ids = [
+    "tobacco-brown-blazer",
+    "ecru-oxford-cotton-shirt",
+    "tobacco-suit-trousers",
+    "cognac-leather-derbies",
+]
+tags = []
+notes = ""
+images = [
+    "out/looks/20260829-092253-intellectual-autumn-smart-outfit.png",
+]
+loved = false
+created = "2026-08-29T09:23:13"
+prompt = "Ultra photorealistic, high-definition full-colour fashion photograph of the man in the reference image.\n\nTHE MAN. 1.76 m (5 ft 9 in), very lean and athletic, narrow waist, defined shoulders, around 10% body fat. warm medium-deep brown with a red-gold undertone skin (#A0583C), short dark natural curls, cropped close at the sides, light moustache and short stubble along the jaw, dark brown eyes, small gold stud earring, thin gold chain necklace.\n\nKeep his face, head shape, hair, skin tone and facial hair exactly as the reference image. This must read as the same person. Do not restyle his face.\nKeep his body exactly as described: he is 1.76 m and very lean and athletic, narrow waist, defined shoulders, so the clothes hang on a lean frame. Do not elongate him into a fashion-model silhouette and do not broaden him.\n\nTHE OUTFIT. He is wearing exactly these pieces and nothing else:\n- Tobacco Linen-wool blazer\n- Ecru Oxford cotton shirt\n- Tobacco Linen-wool trousers\n- Cognac Calf leather derbies\nStanding style direction: Relaxed European tailoring. Natural shoulder, nothing boxy, nothing skinny.\nAvoid: Baggy fits, loud logos, novelty prints, black-on-black.\nFollow these wardrobe principles:\n- Ensure all your trousers have a mid or high rise, sitting at your natural waist. This is the permanent solution to your untucked shirts and it creates the elongated proportions central to the 60s Milanese look you admire.\n- Every jacket and top must follow your natural shoulder line and be tailored to define your waist. This is the most effective way to accentuate the athletic frame you want your clothes to highlight.\n- Choose only natural fibres like cotton, linen, and wool over their synthetic alternatives. Since you rated comfort a 10 and aesthetics a 7, this prioritises both the superior feel and the timeless look you want.\n- Build every outfit from cream, brown, and navy, using only one other colour from your palette. This guarantees the 'tight, repeatable palette' and 'coherent' look you asked for while complementing your skin tone.\n- Let the cut and fabric be the focus; limit accessories to your gold jewellery, a watch, and sunglasses. The sophisticated Milanese style you admire relies on the quiet confidence of the clothes themselves, not on additional statements.\n\nsat on a burgundy chesterfield chair reading a book\n\nTHE SHOT. Full-length shot, head to feet, standing square to the camera. The entire outfit including the shoes is in frame with room above the head. Warm domestic interior behind him, softly out of focus. Soft even professional studio lighting, sharp focus throughout the garments, natural skin texture, visible weave and drape in the fabric, true-to-life colour, 50mm lens, high-resolution editorial photograph.\n\nNo text, no watermark, no logos, no collage, no extra people, no mirror."
+shot = "Full length"
+background = "Interior"
+extra = "sat on a burgundy chesterfield chair reading a book"
+parent = "autumn-smart-outfit"

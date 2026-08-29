@@ -816,22 +816,6 @@ def check_warmth_against_skin() -> str:
             f"cobalt {skin_distance('#0F4C9E', skin):.0f} clear")
 
 
-def check_harmonies_are_wearable() -> str:
-    """Neighbours off the wheel, pulled back into clothes."""
-    from .palette import chroma, harmonies, hue_distance
-    base = "#C19A6B"
-    schemes = harmonies(base)
-    for wanted in ("Analogous", "Complementary", "Triadic", "Shades"):
-        assert wanted in schemes, f"{wanted} missing"
-    complement = schemes["Complementary"][0]
-    assert 150 <= hue_distance(base, complement) <= 210, "complement is not opposite"
-    for name, swatches in schemes.items():
-        for swatch in swatches:
-            assert chroma(swatch) <= 0.60, f"{name} returned a traffic cone: {swatch}"
-    assert len(schemes["Analogous"]) == 2, "analogous should give both sides"
-    return f"{len(schemes)} schemes, all under 0.60 chroma"
-
-
 def check_combination_scoring() -> str:
     """The scorer must prefer real outfits and reject muddy ones."""
     from .palette import combinations, coverage, score_combination
@@ -2272,7 +2256,6 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Four seasonal palettes out of one", check_seasons),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
     (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
-    (COLOUR, "Harmonies come back wearable", check_harmonies_are_wearable),
     (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
     (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
     (COLOUR, "Palette round trips", check_palette_round_trip),
