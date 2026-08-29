@@ -59,8 +59,8 @@ Six tabs, in the order the work happens.
    and Accent, each with the garments it is allowed on and the seasons it is worn
    in, which gives four palettes out of one. Every colour carries a name, taken
    from a catalogue of fifty or given by hand, and the catalogue opens in its own
-   tab. Harmonies are stolen off the wheel with one click, patterns are picked
-   from a list, and a grid says which colour goes on which garment. Then every
+   tab. Harmonies are stolen off the wheel with one click, and a grid says which
+   colour goes on which garment. Then every
    recipe the grid permits is enumerated and scored, best first, filterable by
    season, with its reasoning printed next to it.
 5. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece

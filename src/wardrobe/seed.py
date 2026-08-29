@@ -150,18 +150,12 @@ COLOURS: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
     ("Terracotta", "#B5613F", "Accent", ("Accessory", "Top"), ("Spring", "Summer")),
 )
 
-SEED_PATTERNS: tuple[str, ...] = (
-    "Solid", "Marl", "Herringbone", "Birdseye", "Windowpane", "Bengal stripe", "Cable",
-)
-
-
 def seed_palette(palette=None):
     from .palette import Colour, Palette
     palette = palette if palette is not None else Palette.load()
     for name, hex_code, role, categories, seasons in COLOURS:
         palette.add(Colour(name=name, hex=hex_code, role=role,
                            categories=list(categories), seasons=list(seasons)))
-    palette.patterns = list(SEED_PATTERNS)
     palette.save()
     return palette
 

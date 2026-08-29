@@ -127,19 +127,6 @@ def colour_group(colour: str) -> str:
                  if any(n == colour for n, _ in rows)), "")
 
 
-PATTERNS: dict[str, tuple[str, ...]] = {
-    "Plain": ("Solid", "Marl", "Slub", "Birdseye"),
-    "Stripe": ("Bengal stripe", "Breton stripe", "Chalk stripe", "Hairline stripe",
-               "Pinstripe", "Awning stripe"),
-    "Check": ("Gingham", "Glen check", "Graph check", "Madras", "Tattersall",
-              "Windowpane", "Prince of Wales"),
-    "Weave": ("Basketweave", "Herringbone", "Houndstooth", "Nailhead", "Twill"),
-    "Knit": ("Cable", "Fair Isle", "Ribbed", "Waffle"),
-    "Loud": ("Camouflage", "Floral", "Paisley", "Polka dot", "Tartan"),
-}
-PATTERN_OPTIONS: tuple[str, ...] = tuple(p for group in PATTERNS.values() for p in group)
-
-
 # --- colour arithmetic --------------------------------------------------------
 
 def to_rgb(hex_code: str) -> tuple[float, float, float]:
@@ -295,7 +282,6 @@ class Colour:
 @dataclass
 class Palette:
     colours: list[Colour] = field(default_factory=list)
-    patterns: list[str] = field(default_factory=list)
     path: Path = field(default_factory=paths.palette)
 
     @classmethod
@@ -307,13 +293,10 @@ class Palette:
         allowed = {f.name for f in fields(Colour)}
         colours = [Colour(**{k: v for k, v in row.items() if k in allowed})
                    for row in raw.get("colours", [])]
-        return cls(colours=colours, patterns=list(raw.get("patterns", [])), path=path)
+        return cls(colours=colours, path=path)
 
     def save(self) -> Path:
-        self.path.write_text(tomli_w.dumps({
-            "colours": [asdict(c) for c in self.colours],
-            "patterns": self.patterns,
-        }))
+        self.path.write_text(tomli_w.dumps({"colours": [asdict(c) for c in self.colours]}))
         return self.path
 
     def add(self, colour: Colour) -> Colour:

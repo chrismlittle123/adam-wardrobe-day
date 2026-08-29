@@ -34,7 +34,7 @@ from wardrobe.inventory import (
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.palette import (
     ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND,
-    NAMED_COLOURS, PATTERNS, ROLES, SEASONS, Colour, Palette, hex_for,
+    NAMED_COLOURS, ROLES, SEASONS, Colour, Palette, hex_for,
 )
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
@@ -794,7 +794,6 @@ def colour_tab(profile: Profile, palette: Palette) -> None:
     palette_panel(palette, skin)
     season_panel(palette)
     harmony_panel(palette, skin)
-    pattern_panel(palette)
     rules_panel(palette)
     combination_panel(palette, skin)
 
@@ -976,27 +975,6 @@ def harmony_panel(palette: Palette, skin: str) -> None:
                                    role=ACCENT if pal_mod.chroma(swatch) > 0.4 else GROUND))
                 palette.save()
                 st.rerun()
-
-
-def pattern_panel(palette: Palette) -> None:
-    ui.eyebrow("Patterns")
-    ui.blurb("Tick what you would actually wear. These go into the style guide and "
-             "into every generated look, so an unticked pattern is one the model "
-             "will not put you in.")
-    with st.form("patterns"):
-        chosen: list[str] = []
-        columns = st.columns(len(PATTERNS))
-        for column, (family, options) in zip(columns, PATTERNS.items()):
-            with column:
-                st.markdown(f'<div class="look-cap">{family}</div>', unsafe_allow_html=True)
-                for option in options:
-                    if st.checkbox(option, value=option in palette.patterns,
-                                   key=f"pat-{option}"):
-                        chosen.append(option)
-        if st.form_submit_button("Save patterns"):
-            palette.patterns = chosen
-            palette.save()
-            st.rerun()
 
 
 def rules_panel(palette: Palette) -> None:

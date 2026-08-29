@@ -685,14 +685,13 @@ def check_palette_round_trip() -> str:
     from .palette import Colour, GROUND, Palette
     palette = Palette()
     palette.add(Colour(name="Navy", hex="#26303F", role=GROUND, note="flannel only"))
-    palette.patterns = ["Herringbone", "Gingham"]
     palette.save()
     again = Palette.load()
     assert len(again.colours) == 1 and again.colours[0].note == "flannel only", "colour lost"
-    assert again.patterns == ["Herringbone", "Gingham"], "patterns lost"
+    assert not hasattr(again, "patterns"), "the pattern list came back"
     assert again.colours[0].allowed, "a colour with no categories got no role defaults"
     assert again.has("#26303f"), "hex matching is case sensitive"
-    return f"{again.path.name} round trips with notes and patterns"
+    return f"{again.path.name} round trips with its notes and roles"
 
 
 # --- Shopping maths -----------------------------------------------------------
@@ -1555,7 +1554,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Harmonies come back wearable", check_harmonies_are_wearable),
     (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
     (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
-    (COLOUR, "Palette round trips with patterns", check_palette_round_trip),
+    (COLOUR, "Palette round trips", check_palette_round_trip),
     (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
