@@ -22,11 +22,12 @@ from . import paths
 
 APP_FILE = Path(__file__).with_name("app.py")
 
-DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, PROMPTS, APP, LIVE = (
+DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, SHOP, PROMPTS, APP, LIVE = (
     "Data", "Fit engine", "Inventory", "Questionnaire", "Colour",
-    "Shopping maths", "Prompts", "App", "Live Gemini",
+    "Shopping maths", "Shop", "Prompts", "App", "Live Gemini",
 )
-GROUPS: tuple[str, ...] = (DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, PROMPTS, APP, LIVE)
+GROUPS: tuple[str, ...] = (DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, SHOP,
+                           PROMPTS, APP, LIVE)
 
 
 @dataclass
@@ -764,6 +765,108 @@ def check_guide_prompt() -> str:
     return f"{len(text):,} characters, all 24 answers carried"
 
 
+# --- Shop ---------------------------------------------------------------------
+
+def check_secondhand_rule() -> str:
+    """Over the threshold goes secondhand first; under it does not."""
+    from .inventory import Item
+    from .retailers import SECONDHAND, SECONDHAND_THRESHOLD, suggest
+
+    coat = Item(name="Camel wool overcoat", garment="Overcoat", colour="camel",
+                fabric="Wool melton", price=420)
+    top = suggest(coat, limit=3)
+    assert top[0].retailer.name == "Vinted", f"Vinted did not lead: {top[0].retailer.name}"
+    assert all(s.retailer.kind == SECONDHAND for s in top), \
+        "a £420 coat should put secondhand in every top slot"
+    assert "worn rarely" in top[0].reason, "the rarely-worn reason was not given"
+
+    tee = Item(name="White tee", garment="T-shirt", colour="white",
+               fabric="Cotton jersey", price=25)
+    cheap = suggest(tee, limit=3)
+    assert all(s.retailer.kind != SECONDHAND for s in cheap), \
+        "a £25 tee should not send him secondhand"
+
+    edge = Item(name="Knit", garment="Knitwear", colour="navy", price=SECONDHAND_THRESHOLD)
+    assert suggest(edge, limit=1)[0].retailer.kind == SECONDHAND, \
+        f"exactly £{SECONDHAND_THRESHOLD:.0f} should still go secondhand first"
+    return f"£420 coat leads with {top[0].retailer.name}; £25 tee stays on the high street"
+
+
+def check_retailer_catalogue() -> str:
+    """Every retailer is reachable, sane and buildable into a search link."""
+    from .inventory import GARMENTS, Item
+    from .retailers import KINDS, RETAILERS, query_for
+
+    ids = [r.id for r in RETAILERS]
+    assert len(ids) == len(set(ids)), "duplicate retailer id"
+    for r in RETAILERS:
+        assert r.kind in KINDS, f"{r.name} has an unknown kind {r.kind}"
+        assert "{q}" in r.search, f"{r.name} has no query placeholder"
+        assert r.price_low < r.price_high, f"{r.name} has an inverted price band"
+        assert r.strengths, f"{r.name} sells nothing"
+        assert r.url("linen blazer").startswith("https://"), f"{r.name} built a bad url"
+        assert " " not in r.url("linen blazer"), f"{r.name} did not escape the query"
+    for named in ("Vinted", "H&M", "Uniqlo", "Zara", "Next", "Moss", "Clarks",
+                  "Mango", "Base London"):
+        assert any(r.name == named for r in RETAILERS), f"{named} is missing"
+
+    coverable = {g for r in RETAILERS for g in r.strengths}
+    uncovered = [g for g in GARMENTS if g not in coverable]
+    assert not uncovered, f"no retailer sells: {uncovered}"
+    assert query_for(Item(garment="Blazer", colour="navy", fabric="Linen")) == "navy Linen Blazer"
+    return f"{len(RETAILERS)} retailers across {len(KINDS)} kinds, every garment covered"
+
+
+def check_tactics() -> str:
+    """The cheap-buying tactics have to be specific to the garment."""
+    from .inventory import Item
+    from .retailers import tactics
+
+    coat = Item(name="Camel overcoat", garment="Overcoat", colour="camel", price=420,
+                sizes={"chest": '38"'})
+    names = [t.name for t in tactics(coat)]
+    assert "Save the Vinted search" in names, "no saved search for an expensive coat"
+    assert "Buy it out of season" in names, "no seasonal timing for a coat"
+    detail = " ".join(t.detail for t in tactics(coat))
+    assert "February" in detail, "the coat's cheap month is not named"
+    assert '38"' in detail, "his size never reaches the alert advice"
+    assert "£252" in detail, "no walk-away price computed"
+
+    tee = Item(name="Tee", garment="T-shirt", price=25)
+    assert "Save the Vinted search" not in [t.name for t in tactics(tee)], \
+        "a £25 tee should not be worth a saved search"
+    return f"{len(names)} tactics for the coat, size and season both specific"
+
+
+def check_product_prompts() -> str:
+    """The product shot must ask for the garment alone, and the copy for his size."""
+    from .inventory import Item
+    from .profile import Profile
+    from .shop import copy_prompt, photo_prompt, size_line, to_buy
+    from .seed import seed_all
+
+    item = Item(id="camel", name="Camel wool overcoat", garment="Overcoat",
+                colour="camel", fabric="Wool melton", price=420, status="aspirational")
+    shot = photo_prompt(item)
+    for phrase in ("camel", "Wool melton", "overcoat", "no person", "seamless pure white"):
+        assert phrase in shot, f"{phrase!r} missing from the product shot prompt"
+    assert "ghost mannequin" in shot.lower(), "no ghost mannequin instruction"
+
+    profile = Profile.load()
+    words = copy_prompt(profile, item)
+    assert "Wool melton" in words and "£420" in words, "the garment did not reach the copy"
+    assert profile.subject.height_metric in words, "his proportions did not reach the copy"
+    assert "Chest:" in words, "the size targets did not reach the copy"
+    assert size_line(profile, item), "no size line for a coat"
+
+    seed_all()
+    from .inventory import Inventory
+    listed = to_buy(Inventory.load())
+    assert listed and all(i.status == "aspirational" for i in listed), "the list is not wanted-only"
+    assert listed == sorted(listed, key=lambda i: (-i.price, i.name)), "list not dearest first"
+    return f"{len(listed)} on the list, prompts carry cloth, price and size"
+
+
 # --- App ----------------------------------------------------------------------
 
 def _render():
@@ -778,9 +881,11 @@ def check_app_renders_empty() -> str:
     app = _render()
     labels = [t.label for t in app.tabs]
     numbered = [l for l in labels if l[0].isdigit()]
-    assert len(numbered) == 7, f"expected 7 numbered tabs, got {numbered}"
-    assert [l[0] for l in numbered] == list("1234567"), f"tabs out of order: {numbered}"
+    assert len(numbered) == 8, f"expected 8 numbered tabs, got {numbered}"
+    assert [l[0] for l in numbered] == list("12345678"), f"tabs out of order: {numbered}"
     assert "Colour" in numbered[3], f"Colour is not the fourth tab: {numbered[3]}"
+    assert "Body Measurements" in numbered[6], "body measurements did not get its own tab"
+    assert "Shopping" in numbered[7], "shopping guide is not last"
     assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
     return f"{len(labels)} tabs: " + " · ".join(labels)
 
@@ -970,6 +1075,36 @@ def check_answer_view_opens() -> str:
     return "single answer, index, and the app itself all render"
 
 
+def check_item_page_opens() -> str:
+    """A garment must open as its own page, with the shop links on it."""
+    from streamlit.testing.v1 import AppTest
+
+    from .inventory import Inventory
+    _seeded()
+    coat = next(i for i in Inventory.load().items if i.name == "Camel wool overcoat")
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["item"] = coat.id
+    app = app.run()
+    assert not app.exception, f"the item page raised: {app.exception[0].value}"
+    page = "\n".join(m.value for m in app.markdown)
+    assert not app.tabs, "the item page drew the whole app instead"
+    assert "Camel wool overcoat" in page, "the garment name is missing"
+    assert "vinted.co.uk" in page, "no Vinted link on an expensive coat"
+    assert "Where to buy it" in page, "the retailer section is missing"
+    assert "How to get it cheaply" in page, "the tactics section is missing"
+    assert "Outfits waiting on it" in page, "the outfits section is missing"
+    assert "Rain on the King" in page, "the outfit using this coat is not listed"
+
+    missing = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    missing.query_params["item"] = "no-such-garment"
+    missing = missing.run()
+    assert not missing.exception, "an unknown id crashed the page"
+    assert "No garment with the id" in "\n".join(m.value for m in missing.markdown), \
+        "an unknown id did not explain itself"
+    return "product page renders with retailers, tactics and its outfits"
+
+
 def check_reset_round_trip() -> str:
     from .inventory import Inventory
     from . import reset
@@ -1044,6 +1179,10 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
     (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
     (COLOUR, "Palette round trips with patterns", check_palette_round_trip),
+    (SHOP, "Over £70 goes secondhand first", check_secondhand_rule),
+    (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
+    (SHOP, "Cheap-buying tactics are specific", check_tactics),
+    (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),
     (MATHS, "Plan never buys what he owns", check_plan_never_buys_owned),
@@ -1063,6 +1202,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Generate look actually runs when clicked", check_generate_button_runs),
     (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
+    (APP, "A garment opens on its own product page", check_item_page_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),
     (APP, "Snapshots in the same second stay apart", check_snapshots_do_not_collide),
     (LIVE, "Gemini returns text", check_live_text),

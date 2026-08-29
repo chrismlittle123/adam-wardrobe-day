@@ -60,9 +60,32 @@ Six tabs, in the order the work happens.
    image shows *that* jacket.
 6. **Outfit Gallery** — tag, search, love. Each outfit shows its cost split
    between what is already owned and what is still to buy.
-7. **Shopping Guide** — ten body measurements, all takeable on yourself with a
-   tape and a mirror, then the finished garment dimensions derived from them,
-   then a purchase plan.
+7. **Body Measurements** — ten measurements, all takeable on yourself with a tape
+   and a mirror, and the finished garment dimensions derived from them.
+8. **Shopping Guide** — a shop. Each wanted piece is a product card with a
+   generated catalogue photograph, its price and the size to look for. Open one
+   and it fills a browser tab: the cloth, the cut, what to check before buying,
+   how that garment usually goes wrong, the finished measurements on his body,
+   the outfits waiting on it, where to buy it, and how not to pay retail.
+
+### Where to buy, and how not to pay retail
+
+Anything at **£70 or over goes secondhand first**. Not out of thrift, but because
+the garments that cost that much are the ones worn least: a blazer worn twenty
+times a year spends most of its life in a wardrobe whether it was bought new or
+not, and Vinted is full of them barely worn. Below that line the sum flips, and a
+£25 t-shirt is bought new from whoever cuts it well.
+
+36 UK retailers are ranked per garment and price: Vinted, eBay, Vestiaire and
+Watchfinder for secondhand; Uniqlo, Zara, H&M, Mango, COS, Arket, Massimo Dutti,
+Next and M&S on the high street; Moss, Suitsupply and Charles Tyrwhitt for
+tailoring; Clarks, Base London, Loake, Grenson and Solovair for shoes. Each comes
+with its reason and a working search link.
+
+Then the tactics, which are the actual strategy: save the Vinted search with your
+size in it, wishlist rather than buy so the discount comes to you, buy out of
+season (a coat is cheapest in February, linen in late August), and set a
+walk-away price before a sale email arrives.
 
 ### The colour maths
 

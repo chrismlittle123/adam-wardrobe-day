@@ -159,6 +159,9 @@ class Item:
     photo: str = ""
     description: str = ""
     starred: bool = False   # marked for purchase in the shopping guide
+    # Written by the shopping guide: a product shot and the copy to go with it.
+    product_photo: str = ""
+    product_copy: str = ""
     sizes: dict[str, str] = field(default_factory=dict)
     # Only wanted pieces carry a price: it is what the shopping plan spends. What
     # an owned garment once cost is sunk and changes no decision.
@@ -183,6 +186,16 @@ class Item:
     @property
     def has_photo(self) -> bool:
         return bool(self.photo) and Path(self.photo).is_file()
+
+    @property
+    def has_product_photo(self) -> bool:
+        return bool(self.product_photo) and Path(self.product_photo).is_file()
+
+    @property
+    def shop_photo(self) -> str:
+        """The generated product shot if there is one, else his own snap."""
+        return (self.product_photo if self.has_product_photo
+                else self.photo if self.has_photo else "")
 
     def describe(self) -> str:
         """One line for the image prompt. Photographs beat adjectives, but when

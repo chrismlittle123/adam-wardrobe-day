@@ -395,3 +395,86 @@ def swatch_strip(colours, height: str = "2.6rem") -> str:
         f'<div style="flex:1;background:{c.hex};height:{height}" title="{c.name or c.hex}"></div>'
         for c in colours)
     return f'<div style="display:flex;border:1px solid var(--line)">{cells}</div>'
+
+
+SHOP_CSS = """
+<style>
+.product { background: var(--panel); border: 1px solid var(--line); height: 100%; }
+.product .shot { position: relative; background: #F6F4EF; }
+.product .shot img { display: block; width: 100%; }
+.product .none {
+  height: 16rem; display: flex; align-items: center; justify-content: center;
+  color: #8A7767; font-family: 'IBM Plex Mono', monospace; font-size: .66rem;
+  letter-spacing: .16em; text-transform: uppercase; background: var(--raise);
+}
+.product .body { padding: 1rem 1.1rem 1.2rem; }
+.product .nm {
+  font-family: 'Bodoni Moda', Georgia, serif; font-size: 1.25rem; line-height: 1.25;
+  margin-bottom: .2rem;
+}
+.product .kind {
+  font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--muted);
+}
+.product .price {
+  font-family: 'IBM Plex Mono', monospace; font-size: 1.05rem; color: var(--cream);
+  margin: .6rem 0 .3rem;
+}
+.product .size {
+  font-family: 'IBM Plex Mono', monospace; font-size: .62rem; color: var(--muted);
+  line-height: 1.7;
+}
+.product .flag {
+  position: absolute; top: .6rem; left: .6rem; background: var(--brass); color: #17110E;
+  font-family: 'IBM Plex Mono', monospace; font-size: .56rem; letter-spacing: .14em;
+  text-transform: uppercase; padding: .2rem .5rem;
+}
+.product a.view {
+  display: block; text-align: center; padding: .7rem; margin-top: .9rem;
+  background: var(--brass); color: #17110E; text-decoration: none;
+  font-family: 'IBM Plex Mono', monospace; font-size: .66rem; letter-spacing: .16em;
+  text-transform: uppercase;
+}
+.product a.view:hover { background: var(--cream); }
+
+.shopfront { display: flex; gap: 1.2rem; align-items: flex-start; }
+.buy {
+  background: var(--panel); border: 1px solid var(--line); border-left: 2px solid var(--brass);
+  padding: .85rem 1.1rem; margin-bottom: .6rem;
+}
+.buy .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
+.buy .who { font-size: 1rem; }
+.buy .kind {
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+}
+.buy .why {
+  font-family: 'Karla', sans-serif; font-size: .82rem; color: var(--muted);
+  margin-top: .35rem; line-height: 1.6;
+}
+.buy a {
+  font-family: 'IBM Plex Mono', monospace; font-size: .62rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--brass); text-decoration: none;
+}
+.buy a:hover { border-bottom: 1px solid var(--brass); }
+.tactic { border-left: 2px solid rgba(201,162,39,.35); padding: .1rem 0 .1rem 1rem; margin: .8rem 0; }
+.tactic .t { font-size: .95rem; }
+.tactic .d { color: var(--muted); font-size: .84rem; line-height: 1.65; margin-top: .2rem; }
+.tactic .w {
+  font-family: 'IBM Plex Mono', monospace; font-size: .58rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--brass); margin-top: .3rem;
+}
+</style>
+"""
+
+
+def product_shot(path: Path | None, flag: str = "", width: int = 700) -> str:
+    """The image half of a product card, as an HTML fragment."""
+    tag = f'<div class="flag">{flag}</div>' if flag else ""
+    if not path or not Path(path).is_file():
+        return f'<div class="shot">{tag}<div class="none">no photograph yet</div></div>'
+    try:
+        b64 = thumb_b64(str(path), Path(path).stat().st_mtime, width)
+    except (UnidentifiedImageError, OSError, ValueError):
+        return f'<div class="shot">{tag}<div class="none">could not be read</div></div>'
+    return f'<div class="shot">{tag}<img src="data:image/png;base64,{b64}" alt=""></div>'

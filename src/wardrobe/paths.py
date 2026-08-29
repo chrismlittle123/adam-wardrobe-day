@@ -57,6 +57,10 @@ def looks() -> Path:
     return home() / "out" / "looks"
 
 
+def products() -> Path:
+    return home() / "out" / "products"
+
+
 def backups() -> Path:
     return home() / ".wardrobe-backups"
 
@@ -73,6 +77,7 @@ DATA: dict[str, str] = {
     "outfits": "Outfits",
     "photos": "Item photos",
     "looks": "Generated look images",
+    "products": "Generated product shots",
     "profile": "Subject profile",
 }
 
