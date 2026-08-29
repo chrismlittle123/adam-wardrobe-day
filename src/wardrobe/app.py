@@ -25,7 +25,7 @@ from wardrobe import (
     shop as shop_mod,
     sourcing,
     fitspec, inventory as inv_mod, paths,
-    principles as prin_mod, reset as reset_mod, shopping, ui,
+    principles as prin_mod, reset as reset_mod, shopping, ui, verify,
 )
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
@@ -1986,6 +1986,48 @@ def item_picker(label: str, options: list[Item], key: str, multi: bool = False):
     return [chosen] if chosen else []
 
 
+def checked_look(prompt: str, *, out_prefix, portrait, photos, items,
+                 background: str, count: int):
+    """Draw the look, have Gemini check it, and correct it until it holds.
+
+    An image model asked for a man in named clothes on white will usually give
+    you one and occasionally give you a different man in a kitchen. Nothing
+    downstream can tell the difference, so each picture goes back to Gemini with
+    the references it was built from and is asked whether the face is his, the
+    background is empty, and the garments are the ones photographed.
+    """
+    wanted = [i.name or i.garment for i in items]
+    described = BACKGROUNDS.get(background, background)
+    kept, rejected = [], []
+    for n in range(int(count)):
+        prefix = out_prefix if count == 1 else out_prefix.with_name(f"{out_prefix.name}-{n + 1}")
+        picture, history = verify.ensure(
+            prompt, out_prefix=prefix, portrait=Path(portrait),
+            garment_photos=[Path(x) for x in photos], garments=wanted,
+            background=described, settings=Settings.from_env(),
+        )
+        for attempt in history:
+            if attempt.path != picture:
+                rejected.append(attempt)
+        if picture:
+            kept.append(picture)
+    return kept, rejected
+
+
+def report_rejections(rejected, kept_count: int) -> None:
+    """Say what was thrown away and why, rather than quietly keeping the best."""
+    if not rejected:
+        return
+    lines = "<br>".join(
+        f"attempt {n + 1}: {a.report.summary()}" for n, a in enumerate(rejected))
+    st.warning(f"{ui.plural(len(rejected), 'attempt')} rejected and redrawn.")
+    st.markdown(f'<div class="look-cap">{lines}</div>', unsafe_allow_html=True)
+    if not kept_count:
+        st.error("Nothing passed the check, so nothing was saved. The model kept "
+                 "returning a picture that is not him, not on white, or not in "
+                 "those clothes.")
+
+
 def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                   principles: Principles) -> None:
     ui.blurb(
@@ -2089,20 +2131,22 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     if st.button("Generate look", type="primary"):
         stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
         title = name.strip() or ", ".join(i.name or i.garment for i in items[:3])
-        with st.spinner(f"Dressing {profile.subject.name}…"):
+        with st.spinner(f"Dressing {profile.subject.name}, then checking it is him…"):
             try:
                 # Not `paths`: that name is the module, and binding it here would
                 # make it local for the whole function and break paths.looks() above.
-                written = generate_images(
+                written, rejected = checked_look(
                     prompt,
                     out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
-                    reference_images=[portrait, *photos],
-                    count=int(count),
-                    settings=Settings.from_env(),
+                    portrait=portrait, photos=photos, items=items,
+                    background=background, count=int(count),
                 )
             except GEMINI_ERRORS as exc:
                 st.error(str(exc))
                 return
+        report_rejections(rejected, len(written))
+        if not written:
+            return
         made = outfits.add(Outfit(
             name=title, item_ids=[i.id for i in items], tags=list(tag_choice),
             images=[str(w) for w in written], notes=extra, prompt=prompt,

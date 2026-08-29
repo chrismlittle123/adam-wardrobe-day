@@ -1884,6 +1884,95 @@ def _every_page():
     return {slug: "\n".join(m.value for m in _render(slug).markdown) for slug, _ in pages}
 
 
+def check_a_look_is_checked_before_it_is_kept() -> str:
+    """A generated look is shown back to Gemini and rejected if it is not him.
+
+    An image model asked for a man in named clothes on white will usually give
+    you one and occasionally give you a different man in a kitchen. Nothing
+    downstream can tell: a PNG is a PNG. So each picture goes back with the
+    references it was built from and is asked three questions, and a failure is
+    corrected rather than kept.
+
+    The judging itself needs the network. What is checked here is the reading of
+    the verdict, what the correction says, and that the loop stops.
+    """
+    from unittest.mock import patch
+    from . import verify
+
+    passed = verify._read('{"face":{"ok":true,"why":"same man"},'
+                          '"background":{"ok":true,"why":"empty white"},'
+                          '"garments":{"ok":true,"why":"as photographed"}}')
+    assert passed.ok and not passed.failures, "a clean verdict was read as a failure"
+
+    # Anything unclear is a failure, and the reason survives to the page.
+    mixed = verify._read('prose first {"face":{"ok":false,"why":"a different man"},'
+                         '"background":{"ok":false,"why":"a kitchen"},'
+                         '"garments":{"ok":true,"why":"fine"}} and after')
+    assert not mixed.ok, "a picture of a different man passed"
+    assert mixed.failures == ["face", "background"], f"read {mixed.failures}"
+    assert "different man" in mixed.summary() and "kitchen" in mixed.summary(), \
+        "the reason for rejecting it was lost"
+
+    # A missing key is a failure, never a silent pass.
+    assert not verify._read("{}").ok, "an empty verdict passed"
+    try:
+        verify._read("no json here at all")
+    except Exception:
+        pass
+    else:
+        raise AssertionError("unreadable judging was treated as a pass")
+
+    # The correction names only what was wrong, or the model is told to redo
+    # the parts that were already right.
+    fix = mixed.correction("plain seamless pure white, empty")
+    assert "face is wrong" in fix.lower() and "background is wrong" in fix.lower()
+    assert "garments are wrong" not in fix.lower(), "it was told to change what was right"
+    assert "no furniture" in fix and "no shadow gradient" in fix, \
+        "the correction does not say what an empty background means"
+
+    only_clothes = verify._read('{"face":{"ok":true,"why":""},'
+                                '"background":{"ok":true,"why":""},'
+                                '"garments":{"ok":false,"why":"wrong coat"}}')
+    fix = only_clothes.correction()
+    assert "garments are wrong" in fix.lower() and "face is wrong" not in fix.lower(), \
+        "a clothing failure asked for the face to be redrawn"
+
+    # The loop: it corrects, it stops, and it hands back nothing rather than a
+    # picture that never passed.
+    drawn: list[Path] = []
+
+    def draw(prompt, *, out_prefix, reference_images=None, count=1, settings=None):
+        from PIL import Image as _Image
+        out_prefix.parent.mkdir(parents=True, exist_ok=True)
+        target = out_prefix.with_suffix(".png")
+        _Image.new("RGB", (24, 32), (200, 200, 200)).save(target, "PNG")
+        drawn.append(target)
+        return [target]
+
+    verdicts = iter([mixed, mixed, passed])
+    with patch.object(verify, "generate_images", draw), \
+         patch.object(verify, "inspect", lambda *a, **k: next(verdicts)):
+        picture, history = verify.ensure(
+            "a look", out_prefix=paths.looks() / "probe",
+            portrait=paths.looks() / "probe.png", garment_photos=[],
+            garments=["A shirt"], attempts=3)
+    assert picture is not None, "a picture that finally passed was thrown away"
+    assert len(history) == 3, f"the loop ran {len(history)} times, not 3"
+    assert history[-1].report.ok and history[0].corrected is False, "history is wrong"
+    assert history[1].corrected and history[2].corrected, "corrections not marked"
+
+    never = iter([mixed] * 9)
+    with patch.object(verify, "generate_images", draw), \
+         patch.object(verify, "inspect", lambda *a, **k: next(never)):
+        picture, history = verify.ensure(
+            "a look", out_prefix=paths.looks() / "probe2",
+            portrait=paths.looks() / "probe.png", garment_photos=[],
+            garments=["A shirt"], attempts=3)
+    assert picture is None, "a look that never passed was handed back anyway"
+    assert len(history) == 3, f"the loop did not stop: {len(history)} attempts"
+    return "verdict read, correction names only the failures, loop corrects then stops"
+
+
 def check_every_garment_is_shown_to_the_model() -> str:
     """The pieces of an outfit go to the image model as pictures, not as words.
 
@@ -2567,8 +2656,24 @@ def check_generate_button_runs() -> str:
         made.update(prompt=prompt, refs=list(reference_images or []))
         return written
 
+    # The click path runs through verify now: it draws, judges, and corrects.
+    # Stubbing gemini_image alone no longer intercepts it, and leaving the judge
+    # unstubbed would put a real network call in the offline suite.
+    from . import verify as verify_mod
+    from .verify import Report
+
+    def passes(*_args, **_kwargs) -> Report:
+        judged["count"] += 1
+        return Report(face=True, background=True, garments=True,
+                      notes={"face": "same man", "background": "empty white",
+                             "garments": "as photographed"})
+
+    judged = {"count": 0}
     real = gemini_image.generate_images
+    real_draw, real_judge = verify_mod.generate_images, verify_mod.inspect
     gemini_image.generate_images = stub
+    verify_mod.generate_images = stub
+    verify_mod.inspect = passes
     try:
         app = AppTest.from_file(str(APP_FILE), default_timeout=180)
         app.query_params["page"] = "generator"
@@ -2596,8 +2701,10 @@ def check_generate_button_runs() -> str:
             raise AssertionError(f"clicking Generate raised: {app.exception[0].value}")
     finally:
         gemini_image.generate_images = real
+        verify_mod.generate_images, verify_mod.inspect = real_draw, real_judge
 
     assert made.get("prompt"), "the handler never reached image generation"
+    assert judged["count"] >= 1, "the look was saved without being checked"
     assert "white cotton t-shirt" in made["prompt"].lower() or "white" in made["prompt"].lower(), \
         "the chosen garments never reached the prompt"
     assert len(made["refs"]) >= 1, "the portrait was not passed as a reference"
@@ -3085,6 +3192,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),
     (PROMPTS, "Every garment is shown to the model", check_every_garment_is_shown_to_the_model),
+    (PROMPTS, "A look is checked before it is kept", check_a_look_is_checked_before_it_is_kept),
     (APP, "Choosing a garment reshapes the form", check_changing_garment_changes_the_form),
     (APP, "No page is a dead end", check_no_page_is_a_dead_end),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
