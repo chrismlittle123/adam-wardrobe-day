@@ -913,6 +913,34 @@ def _palette():
     return palette
 
 
+def check_fabric_families() -> str:
+    """Every fabric belongs to a family, and the families are about how a cloth
+    behaves rather than what it is chemically.
+
+    Viscose is the case that makes the point: a cellulosic rather than a protein
+    fibre, filed with the silks because it drapes like one, which is the question
+    a wardrobe is actually asking of it.
+    """
+    from .vocabulary import DEFAULT_FABRICS, current
+    vocab = current()
+    names = [f.name for f in vocab.fabrics if f.name]
+    assert len(names) == len(set(names)), "a fabric is listed twice"
+    for fabric in vocab.fabrics:
+        if fabric.name:
+            assert fabric.family, f"{fabric.name} belongs to no family"
+    assert names == sorted(names), "the fabric dropdown is not alphabetical"
+
+    assert "Viscose" in names, "viscose is not offered"
+    family = next(f.family for f in vocab.fabrics if f.name == "Viscose")
+    assert family == "Silk and fine", f"viscose is filed under {family}"
+    for staple in ("Linen", "Merino wool", "Oxford cotton", "Suede", "Silk"):
+        assert staple in names, f"{staple} has gone missing"
+    defined = sum(len(x) for x in DEFAULT_FABRICS.values())
+    assert len(vocab.fabrics) >= defined - 1, \
+        f"the catalogue holds {len(vocab.fabrics)} fabrics against {defined} defined"
+    return f"{len(names)} fabrics in {len(DEFAULT_FABRICS)} families, viscose with the silks"
+
+
 def check_named_colours() -> str:
     """The colours live in the catalogue with the other vocabularies, and can be
     added to like any of them."""
@@ -934,6 +962,24 @@ def check_named_colours() -> str:
     assert all(measurable(n) for n in colour_names() if n not in UNMEASURABLE_COLOURS), \
         "a plain colour was marked unmeasurable"
     assert colour_names() == tuple(sorted(colour_names())), "the dropdown is not alphabetical"
+
+    # A swatch strip is drawn as one continuous band, so the order inside a
+    # group is the point of the grouping. It used to be file order, which put
+    # anything added later on the end: Green arrived between Moss and Olive in
+    # lightness and sat after Bottle.
+    from .palette import lightness
+    for group, rows in named_colours().items():
+        values = [lightness(h) for _, h in rows]
+        assert values == sorted(values, reverse=True), \
+            f"{group} is not light to dark: {[n for n, _ in rows]}"
+    greens = [n for n, _ in named_colours()["Greens"]]
+    assert greens.index("Green") == greens.index("Moss") + 1, \
+        f"Green is not where its lightness puts it: {greens}"
+
+    # The two most recent additions, and what makes each of them awkward.
+    assert "Green" in colour_names(), "the plain green is missing"
+    assert hex_for("Green") not in {hex_for(n) for n in colour_names() if n != "Green"}, \
+        "Green shares a swatch with another colour"
     for name, code in colour_hex().items():
         assert len(code) == 7 and code.startswith("#"), f"{name} has a malformed hex"
         assert code == code.upper(), f"{name} is not upper case"
@@ -2732,6 +2778,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
     (COLOUR, "Fifty named colours, all distinct", check_named_colours),
+    (DATA, "Fabrics are filed by how they behave", check_fabric_families),
     (COLOUR, "Three roles, shoes exempt by slot", check_roles),
     (COLOUR, "Four seasonal palettes out of one", check_seasons),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),

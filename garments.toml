@@ -37,6 +37,7 @@ fabrics = [
     { name = "Suede", family = "Leather" },
     { name = "Technical shell", family = "Technical" },
     { name = "Terry towelling", family = "Cotton" },
+    { name = "Viscose", family = "Silk and fine" },
     { name = "Washed denim", family = "Denim" },
     { name = "Waxed cotton", family = "Technical" },
     { name = "Wool flannel", family = "Wool" },
@@ -97,6 +98,7 @@ colours = [
     { name = "Burgundy", hex = "#6E2C33", group = "Warm accents" },
     { name = "Oxblood", hex = "#4A1F23", group = "Warm accents" },
     { name = "Multicolour", hex = "#8A7767", group = "Not a single colour" },
+    { name = "Green", hex = "#3F7A4F", group = "Greens" },
 ]
 fits = [
     "",

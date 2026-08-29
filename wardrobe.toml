@@ -90,3 +90,72 @@ product_copy = ""
 
 [items.sizes]
 alpha = "M"
+
+[[items]]
+id = "plaid-shirt"
+name = "Plaid Shirt"
+category = "Top"
+garment = "Shirt"
+colour = "Forest"
+colour_hex = "#2F4032"
+fabric = "Cotton jersey"
+grade = "Everyday"
+fit = "Regular"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/plaid-shirt.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/plaid-shirt.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "sand-linen-shirt"
+name = "Sand Linen Shirt"
+category = "Top"
+garment = "Shirt"
+colour = "Sand"
+colour_hex = "#D9C9A8"
+fabric = "Linen"
+grade = "Everyday"
+fit = "Regular"
+scheme = "Alpha"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/sand-linen-shirt.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "sun-black-and-white-viscose-camp-col"
+name = "Sun Black and White Viscose Camp Collar"
+category = "Top"
+garment = "Shirt"
+colour = "Multicolour"
+colour_hex = "#8A7767"
+fabric = ""
+grade = "Everyday"
+fit = "Regular"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/sun-black-and-white-viscose-camp-col.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = ""
+product_copy = ""
+
+[items.sizes]
+alpha = "M"

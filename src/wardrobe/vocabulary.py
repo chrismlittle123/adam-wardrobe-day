@@ -150,7 +150,10 @@ DEFAULT_FABRICS: dict[str, tuple[str, ...]] = {
     "Linen and hemp": ("Hemp", "Irish linen", "Linen", "Linen-cotton", "Linen-wool"),
     "Denim": ("Raw denim", "Selvedge denim", "Washed denim"),
     "Leather": ("Calf leather", "Cordovan", "Nubuck", "Shearling", "Suede"),
-    "Silk and fine": ("Cotton-silk", "Silk", "Wool-silk-linen"),
+    # Filed by how it hangs rather than what it is made of. Viscose is a
+    # cellulosic, not a protein fibre, but it drapes like silk and that is the
+    # question a wardrobe is actually asking of it.
+    "Silk and fine": ("Cotton-silk", "Silk", "Viscose", "Wool-silk-linen"),
     "Technical": ("Fleece", "Nylon", "Polyester", "Ripstop", "Technical shell", "Waxed cotton"),
 }
 
@@ -179,10 +182,13 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
         ("Petrol", "#2E5561"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
         ("Midnight", "#171E2B"),
     ),
+    # Light to dark. The other seven are all greyed or yellowed, which is what
+    # menswear green usually is; "Green" is the plain saturated one, for when a
+    # thing is simply green and calling it moss would be a lie.
     "Greens": (
         ("Mint", "#BFD6C4"), ("Sage", "#A3AF97"), ("Khaki", "#8A8560"),
-        ("Moss", "#6F7A4E"), ("Olive", "#5F6146"), ("Forest", "#2F4032"),
-        ("Bottle", "#1F3A2C"),
+        ("Moss", "#6F7A4E"), ("Green", "#3F7A4F"), ("Olive", "#5F6146"),
+        ("Forest", "#2F4032"), ("Bottle", "#1F3A2C"),
     ),
     "Browns": (
         ("Biscuit", "#D2B48C"), ("Camel", "#C19A6B"), ("Cognac", "#9C5A2D"),
@@ -438,10 +444,21 @@ class Vocabulary:
         return found.group if found else ""
 
     def colour_groups(self) -> dict[str, tuple[tuple[str, str], ...]]:
+        """Grouped, and light to dark inside each group.
+
+        These are drawn as a continuous band of swatches, so the order is the
+        whole point of the grouping. It used to be whatever order the file
+        happened to be in, which meant a colour added later landed on the end:
+        Green arrived darker than Mint and lighter than Olive and sat after
+        Bottle. Sorting on read makes that impossible rather than a thing to
+        remember.
+        """
+        from .palette import lightness
         out: dict[str, list[tuple[str, str]]] = {}
         for colour in self.colours:
             out.setdefault(colour.group or "Unfiled", []).append((colour.name, colour.hex))
-        return {k: tuple(v) for k, v in out.items()}
+        return {k: tuple(sorted(v, key=lambda row: -lightness(row[1])))
+                for k, v in out.items()}
 
     def add_colour(self, colour: NamedColour) -> NamedColour:
         self.colours.append(colour)
