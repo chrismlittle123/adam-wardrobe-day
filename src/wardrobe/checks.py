@@ -634,17 +634,46 @@ def check_warmth_against_skin() -> str:
     # Hue and lightness are separate questions. At his depth a mid-brown can be
     # perfectly harmonious in family and still vanish against him, and the
     # engine has to be able to say both things at once.
-    from .palette import blurs_at_the_collar, value_gap
+    from .palette import (HUE_GAP, VALUE_GAP, blurs_at_the_collar, hue_distance,
+                          separation, separation_reason, value_gap)
     from .profile import Profile
     assert Profile.load().subject.skin_tone_hex == skin, \
         "the profile and the engine disagree about his skin"
     assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should still be in family"
-    assert blurs_at_the_collar("#C19A6B", skin), "camel is too close in value to pass"
-    assert not blurs_at_the_collar("#F2E9D8", skin), "cream is light enough to contrast"
-    assert not blurs_at_the_collar("#26303F", skin), "navy is dark enough to contrast"
-    assert value_gap("#7A7A78", skin) < 0.10, "flat grey should sit almost on his own value"
-    return (f"camel harmonious but blurs at {value_gap('#C19A6B', skin):.2f}; "
-            f"cream and navy both clear the gap")
+
+    # A colour must stand off his skin on one axis, and either will do. What
+    # fails is being close on both, which is exactly brown.
+    assert blurs_at_the_collar("#C19A6B", skin), "camel is close on both axes"
+    assert blurs_at_the_collar("#6B4426", skin), "chocolate is close on both axes"
+    assert blurs_at_the_collar("#7E5835", skin), "tobacco is close on both axes"
+
+    # Far in lightness is enough on its own, at his own warm hue.
+    cream = "#F2E9D8"
+    assert hue_distance(cream, skin) < HUE_GAP, "cream should be close in hue"
+    assert not blurs_at_the_collar(cream, skin), "cream is light enough on its own"
+    assert "lighter than his skin" in separation_reason(cream, skin), \
+        "cream should separate on lightness, and say so"
+
+    # Far round the wheel is enough on its own, at his own lightness. This is
+    # what a lightness-only rule got wrong: cobalt sits as close to him as
+    # chocolate does and reads as a garment, because it could not be him.
+    cobalt = "#0F4C9E"
+    assert value_gap(cobalt, skin) < VALUE_GAP, "cobalt should be close in lightness"
+    assert value_gap(cobalt, skin) < value_gap("#6B4426", skin), \
+        "cobalt should be closer in lightness than the chocolate that fails"
+    assert not blurs_at_the_collar(cobalt, skin), "cobalt separates on hue alone"
+    assert "round the wheel" in separation_reason(cobalt, skin), \
+        "cobalt should separate on hue, and say so"
+    assert not blurs_at_the_collar("#0F7B5F", skin), "emerald separates on hue alone"
+
+    # And the failure names both axes, since that is what went wrong.
+    both = separation_reason("#B5613F", skin)
+    assert "blurs on both axes" in both, f"terracotta's fault is not named: {both}"
+    assert separation("#F2E9D8", skin) > 1 > separation("#B5613F", skin), \
+        "the threshold is not at one"
+    return (f"one axis is enough: cobalt clears on hue at "
+            f"{hue_distance(cobalt, skin):.0f}°, cream on lightness at "
+            f"{value_gap(cream, skin):.2f}; brown clears on neither")
 
 
 def check_harmonies_are_wearable() -> str:

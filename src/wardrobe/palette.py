@@ -40,8 +40,10 @@ from . import paths
 # is only the fallback for calling the maths directly.
 DEFAULT_SKIN = "#A0583C"
 
-# How far a colour's lightness must sit from his before it reads as contrast
-# rather than as a tonal blur next to the face.
+# A colour has to stand off his skin on at least one axis, and either will do.
+# These are the distances at which each one is enough on its own: sixty degrees
+# of hue, or twenty points of lightness.
+HUE_GAP = 60.0
 VALUE_GAP = 0.20
 
 GROUND, FIELD, ACCENT = "Ground", "Field", "Accent"
@@ -206,8 +208,47 @@ def value_gap(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
     return abs(lightness(hex_code) - lightness(skin_hex))
 
 
+def separation(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
+    """How far a colour stands off his skin, on whichever axis does the work.
+
+    Two axes, and either is enough on its own. Far round the wheel separates a
+    colour whatever its lightness: cobalt sits as close to his lightness as
+    chocolate does and reads as a garment, because at 162 degrees it could not
+    be mistaken for him. Far in lightness separates it whatever its hue: cream
+    is the same warm family and reads as a garment because it is half a scale
+    lighter.
+
+    What fails is being close on both, which is exactly brown. One is enough;
+    neither is a blur.
+
+    Returns a ratio: one and above separates, below one does not.
+    """
+    by_hue = hue_distance(hex_code, skin_hex) / HUE_GAP
+    by_value = value_gap(hex_code, skin_hex) / VALUE_GAP
+    return max(by_hue, by_value)
+
+
+def separates_from_skin(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
+    return separation(hex_code, skin_hex) >= 1.0
+
+
 def blurs_at_the_collar(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
-    return value_gap(hex_code, skin_hex) < VALUE_GAP
+    return not separates_from_skin(hex_code, skin_hex)
+
+
+def separation_reason(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
+    """Which axis is doing the work, or why neither is."""
+    hue = hue_distance(hex_code, skin_hex)
+    gap = value_gap(hex_code, skin_hex)
+    if hue / HUE_GAP >= 1.0:
+        return (f"{hue:.0f}° round the wheel from his skin, which separates it "
+                "whatever its lightness")
+    if gap / VALUE_GAP >= 1.0:
+        lighter = "lighter" if lightness(hex_code) > lightness(skin_hex) else "darker"
+        return (f"{gap:.2f} {lighter} than his skin, which separates it whatever "
+                "its hue")
+    return (f"only {hue:.0f}° from his skin hue and {gap:.2f} from his lightness, "
+            "so it blurs on both axes at once")
 
 
 def hue_distance(a: str, b: str) -> float:
@@ -459,13 +500,11 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = DEFAULT_SKIN) -
             faults.append(f"next to the face: {why}")
         else:
             reasons.append(f"next to the face: {why}")
-        gap = value_gap(top.hex, skin_hex)
-        if gap < VALUE_GAP:
+        if blurs_at_the_collar(top.hex, skin_hex):
             score -= 14
-            faults.append(f"only {gap:.2f} from his own lightness, so it blurs at the "
-                          "collar rather than framing the face")
+            faults.append(f"at the collar it {separation_reason(top.hex, skin_hex)}")
         else:
-            reasons.append(f"{gap:.2f} of separation from his own colouring")
+            reasons.append(f"stands off his skin: {separation_reason(top.hex, skin_hex)}")
 
     # 4. Chroma budget. One loud thing may be interesting; two argue. Shoes are
     # exempt: a chestnut shoe is saturated by the numbers and is never the event.
