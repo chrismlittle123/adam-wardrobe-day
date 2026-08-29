@@ -375,3 +375,154 @@ product_copy = ""
 
 [items.sizes]
 alpha = "M"
+
+[[items]]
+id = "indigo-denim-jacket"
+name = "Indigo Denim Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Indigo",
+]
+colour_hex = "#39417A"
+fabric = "Raw denim"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/indigo-denim-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/indigo-denim-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "sand-curdoroy-jacket"
+name = "Sand Curdoroy Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Sand",
+]
+colour_hex = "#D9C9A8"
+fabric = "Corduroy"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/sand-curdoroy-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/sand-curdoroy-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "leather-motorcycle-jacket"
+name = "Leather Motorcycle Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Mid blue",
+]
+colour_hex = "#4A6E96"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/leather-motorcycle-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/leather-motorcycle-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "black-leather-jacket"
+name = "Black Leather Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Black",
+]
+colour_hex = "#1B1918"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/black-leather-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/black-leather-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "charcoal-flannel-trousers"
+name = "Charcoal flannel trousers"
+category = "Bottom"
+garment = "Trousers"
+colours = [
+    "Charcoal",
+]
+colour_hex = "#3C3B3A"
+fabric = "Wool flannel"
+grade = ""
+fit = "Regular"
+scheme = "Waist and leg"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/charcoal-flannel-trousers.png"
+product_copy = ""
+
+[items.sizes]
+waist = "30\""
+leg = "32\""
+
+[[items]]
+id = "dark-brown-henderson-boots"
+name = "Dark Brown Henderson Boots"
+category = "Shoes"
+garment = "Boots"
+colours = [
+    "Brown",
+]
+colour_hex = "#6F4E37"
+fabric = "Calf leather"
+grade = ""
+fit = ""
+scheme = "Shoe"
+status = "owned"
+photo = ""
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = ""
+product_copy = ""
+
+[items.sizes]
+uk = "9"

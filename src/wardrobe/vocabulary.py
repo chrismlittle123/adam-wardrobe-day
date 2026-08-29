@@ -197,6 +197,11 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
     "Browns": (
         ("Biscuit", "#D2B48C"), ("Camel", "#C19A6B"), ("Cognac", "#9C5A2D"),
         ("Tan", "#A9743F"), ("Chestnut", "#8B5A2B"), ("Tobacco", "#7E5835"),
+        # The one people mean when they just say brown. Kept at the honest mid
+        # tone rather than nudged darker to get it past the collar rule: it
+        # lands at 21 against a minimum of 20, which is the truth about brown on
+        # his colouring and not something to design around.
+        ("Brown", "#6F4E37"),
         ("Chocolate", "#6B4426"), ("Espresso", "#3E2A1E"),
     ),
     "Warm accents": (
