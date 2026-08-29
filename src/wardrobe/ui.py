@@ -195,8 +195,9 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 /* Tables ------------------------------------------------------------------ */
 .tbl { width: 100%; border-collapse: collapse; font-family: var(--data); font-size: 0.82rem; }
 .tbl th {
-  text-align: left; color: var(--muted); font-weight: 400; letter-spacing: .14em;
-  text-transform: uppercase; font-size: 0.70rem; padding: .4rem .6rem; border-bottom: 1px solid var(--line);
+  text-align: left; color: var(--muted); font-weight: 400; letter-spacing: .12em;
+  text-transform: uppercase; font-family: var(--chrome); font-size: 0.74rem;
+  padding: .45rem .6rem; border-bottom: 1px solid var(--line);
 }
 .tbl td { padding: .45rem .6rem; border-bottom: 1px solid rgba(240,230,219,.07); }
 .tbl td.num { text-align: right; color: var(--cream); }
@@ -266,6 +267,27 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 }
 .alloc-read b { color: var(--cream); font-weight: 500; }
 .alloc-read.off b { color: var(--bad); }
+
+/* Catalogue lists. These are read down a page rather than glanced at, so they
+   are set at reading size rather than at caption size. */
+.dict-h {
+  font-family: var(--display); font-size: 1.05rem; letter-spacing: .05em;
+  color: var(--cream); margin: 1.4rem 0 .5rem; padding-bottom: .35rem;
+  border-bottom: 1px solid var(--line);
+}
+.dict-h span { font-family: var(--chrome); font-size: 0.74rem; color: var(--muted);
+               letter-spacing: .14em; text-transform: uppercase; margin-left: .6rem; }
+.dict-row { font-family: var(--prose); font-size: 0.86rem; color: var(--cream);
+            padding: .34rem 0; line-height: 1.5; }
+.dict-row .meta { font-family: var(--chrome); font-size: 0.74rem; color: var(--muted);
+                  letter-spacing: .06em; }
+.dict-row .unused { color: var(--muted); }
+.dict-chip {
+  display: inline-block; font-family: var(--chrome); font-size: 0.74rem;
+  letter-spacing: .08em; color: var(--muted); border: 1px solid var(--line);
+  padding: .16rem .5rem; margin: 0 .3rem .3rem 0;
+}
+.dict-chip.on { color: var(--brass); border-color: var(--brass); }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>

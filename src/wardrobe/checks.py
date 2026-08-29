@@ -1788,19 +1788,38 @@ def check_garment_catalogue() -> str:
     page.query_params["garments"] = "all"
     page = page.run()
     assert not page.exception, f"the garment catalogue raised: {page.exception[0].value}"
-    assert not page.tabs, "the standalone catalogue drew the whole app"
+    # "No tabs" used to stand in for "not the whole app". The catalogue has its
+    # own sections now, so the test has to say what it actually means.
+    assert not [t for t in page.tabs if t.label[:1].isdigit()], \
+        "the standalone catalogue drew the numbered app tabs"
     # Garment names sit in expander labels, not markdown, so both are read.
     body = "\n".join(
         [m.value for m in page.markdown]
         + [getattr(e, "label", "") for e in page.get("expander") or []]
-        + [w.label for w in page.text_area]
+        + [t.label for t in page.tabs]
     )
-    for word in ("Blazer", "Wool flannel", "Grade", "Fit", "Garments", "Fabrics"):
+    for word in ("Blazer", "Grade", "Fit", "Garments", "Fabrics"):
         assert word in body, f"{word} is missing from the catalogue"
-    buttons = [b.label for b in page.button]
+    assert len(page.tabs) >= 3, "the catalogue is not split into sections"
+    # Editing sits behind a toggle, so browsing is compact: the add forms are
+    # not on the page until asked for.
+    toggles = [t.label for t in page.toggle]
+    assert "Change the garments" in toggles, "no way to reveal the garment editor"
+    assert "Change the fabrics" in toggles, "no way to reveal the fabric editor"
+    assert "Save fits and grades" not in [b.label for b in page.button], \
+        "the free-text boxes are back"
+
+    opened = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    opened.query_params["garments"] = "all"
+    opened = opened.run()
+    next(t for t in opened.toggle if t.label == "Change the garments").set_value(True)
+    next(t for t in opened.toggle if t.label == "Change the fabrics").set_value(True)
+    opened = opened.run()
+    assert not opened.exception, f"opening the editors raised: {opened.exception[0].value}"
+    buttons = [b.label for b in opened.button]
     assert "Add garment" in buttons and "Add fabric" in buttons, "no way to add"
     assert buttons.count("Add") >= 2, "no way to add a fit or a grade"
-    assert "Save fits and grades" not in buttons, "the free-text boxes are back"
+    assert any("Remove from the catalogue" in b for b in buttons), "no way to remove"
     return (f"{before} garments, {len(vocab.fabrics)} fabrics; tab 2 and a page "
             f"of its own, edits visible at once")
 

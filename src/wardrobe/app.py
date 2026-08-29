@@ -1220,156 +1220,205 @@ def garment_catalogue_view() -> None:
 def garment_catalogue_panel() -> None:
     """The vocabularies the rest of the app is built from, editable.
 
-    Every dropdown in the app is filled from this, which is why it sits second:
-    the dictionary comes before the things written in it.
+    Three sections behind tabs rather than one long scroll: this page used to
+    render twenty-nine expanders for the garments and forty-five rows for the
+    fabrics, one after another, and finding anything meant scrolling past
+    everything. Each section reads as a table by default and only shows its
+    editing controls when asked, because most visits here are to look something
+    up rather than to change it.
     """
     vocab = vocabulary.Vocabulary.load()
     inventory = Inventory.load()
-    used_garments = {i.garment for i in inventory.items}
-    used_fabrics = {i.fabric for i in inventory.items if i.fabric}
 
     ui.stats([
         ("Garments", str(len(vocab.garments))),
         ("Fabrics", str(len(vocab.fabrics))),
-        ("Fits", str(len(vocab.fits) - 1)),
-        ("Grades", str(len(vocab.grades) - 1)),
+        ("Grades", str(len([g for g in vocab.grades if g]))),
+        ("Fits", str(len([f for f in vocab.fits if f]))),
     ], brass_first=True)
     ui.blurb(
-        "Every list the rest of the app is built from. Add a garment nobody thought "
-        "of, retire a fabric you will never own, rename a grade so it means what you "
-        "mean. Anything already in use says so, because deleting it leaves the pieces "
-        "that used it pointing at a word the app no longer knows."
+        "Every list the rest of the app is built from. The garments, their "
+        "categories and the schemes their labels use; the fabrics and their "
+        "families; the grades and fits. Anything already in use says so and refuses "
+        "to be deleted, because removing it leaves those pieces holding a word the "
+        "app no longer knows."
     )
 
-    ui.eyebrow("Garments")
-    ui.blurb("Each one belongs to a category, which decides the outfit slot it fills, "
-             "and allows one or more sizing schemes, which decide the boxes on its "
-             "form. A trouser is 32/32 from one maker and M from the next, so it "
-             "allows both and the piece says which its own label used.")
-    with st.expander("Add a garment"):
-        with st.form("add-garment", clear_on_submit=True):
-            c1, c2, c3 = st.columns([2, 1, 1])
-            name = c1.text_input("Name")
-            category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
-            picked = c3.multiselect("Size schemes", list(vocabulary.SCHEMES),
-                                    default=["Alpha"], key="ag-scheme",
-                                    help="Every scheme a label for this garment might "
-                                         "use. The first is what a new piece defaults "
-                                         "to.")
-            if st.form_submit_button("Add garment"):
-                if not name.strip():
-                    st.warning("Give it a name.")
-                elif vocab.garment(name.strip()):
-                    st.warning(f"{name.strip()} is already in the catalogue.")
-                else:
-                    vocab.add_garment(vocabulary.Garment(
-                        name=name.strip(), category=category,
-                        schemes=list(picked) or ["Free text"]))
-                    vocab.save()
-                    st.rerun()
-
-    for category, names in vocab.categories().items():
-        st.markdown(f'<div class="look-cap">{category} &middot; {len(names)}</div>',
-                    unsafe_allow_html=True)
-        for name in names:
-            garment = vocab.garment(name)
-            in_use = name in used_garments
-            with st.expander(f"{name}  ·  {', '.join(garment.schemes) or 'no scheme'}"
-                             + ("  ·  in use" if in_use else "")):
-                with st.form(f"g-{name}"):
-                    e1, e2 = st.columns(2)
-                    garment.category = e1.selectbox(
-                        "Category", vocab.category_names(),
-                        index=vocab.category_names().index(garment.category)
-                        if garment.category in vocab.category_names() else 0,
-                        key=f"gc-{name}")
-                    garment.schemes = e2.multiselect(
-                        "Size schemes", list(vocabulary.SCHEMES),
-                        default=[x for x in garment.schemes if x in vocabulary.SCHEMES],
-                        key=f"gs-{name}",
-                        help="Most specific first. The first is what a new piece of "
-                             "this kind defaults to.")
-                    b1, b2 = st.columns(2)
-                    if b1.form_submit_button("Save"):
-                        vocab.save()
-                        st.rerun()
-                    if b2.form_submit_button("Remove"):
-                        if in_use:
-                            st.warning(f"{name} is used by pieces in the wardrobe. "
-                                       "Re-classify them first.")
-                        else:
-                            reset_mod.before(f"before removing the garment {name}",
-                                             "vocabulary")
-                            vocab.remove_garment(name)
-                            vocab.save()
-                            st.rerun()
-
-    ui.eyebrow("Fabrics")
-    ui.blurb("The family matters as much as the cloth: a sourcing route can name a "
-             "whole family, so one line covers flannel, worsted and hopsack at once.")
-    with st.expander("Add a fabric"):
-        with st.form("add-fabric", clear_on_submit=True):
-            c1, c2 = st.columns(2)
-            name = c1.text_input("Name")
-            family = c2.selectbox("Family", [*vocab.families(), "New family…"],
-                                  key="af-family")
-            fresh = st.text_input("New family name", key="af-new",
-                                  )
-            if st.form_submit_button("Add fabric"):
-                chosen = fresh.strip() if family == "New family…" else family
-                if not name.strip():
-                    st.warning("Give it a name.")
-                elif not chosen:
-                    st.warning("Give it a family, or a route can never match it.")
-                else:
-                    vocab.add_fabric(vocabulary.Fabric(name=name.strip(), family=chosen))
-                    vocab.save()
-                    st.rerun()
-
-    for family, fabrics in vocab.by_family().items():
-        st.markdown(f'<div class="look-cap">{family} &middot; {len(fabrics)}</div>',
-                    unsafe_allow_html=True)
-        for fabric in fabrics:
-            c1, c2 = st.columns([9, 1])
-            mark = " &middot; in use" if fabric.name in used_fabrics else ""
-            c1.markdown(f'<div class="look-cap">{fabric.name}{mark}</div>',
-                        unsafe_allow_html=True)
-            if c2.button("Drop", key=f"fab-{fabric.name}", type="secondary"):
-                if fabric.name in used_fabrics:
-                    st.warning(f"{fabric.name} is on pieces in the wardrobe.")
-                else:
-                    reset_mod.before(f"before removing the fabric {fabric.name}",
-                                     "vocabulary")
-                    vocab.remove_fabric(fabric.name)
-                    vocab.save()
-                    st.rerun()
-
-    ui.eyebrow("Grade")
-    ui.blurb(
-        "Grade separates two garments of the same type that come from different "
-        "shops. A heavyweight tee and a plain tee are both T-shirts; the grade is "
-        "what sends one to Asos and the other to Uniqlo. It is the axis the sourcing "
-        "plan matches on, so a grade nobody uses is dead weight and a grade you "
-        "delete takes its routing with it."
-    )
-    word_list_panel(vocab, "grades", inventory, "grade")
-
-    ui.eyebrow("Fit")
-    ui.blurb(
-        "How the garment is cut, as the maker describes it. Recorded on the piece "
-        "and available to the sourcing plan in the same way as grade."
-    )
-    word_list_panel(vocab, "fits", inventory, "fit")
+    garments_tab, fabrics_tab, words_tab = st.tabs(
+        ["Garments", "Fabrics", "Grades and fits"])
+    with garments_tab:
+        garment_section(vocab, inventory)
+    with fabrics_tab:
+        fabric_section(vocab, inventory)
+    with words_tab:
+        words_section(vocab, inventory)
 
     with st.expander("Start again"):
         ui.blurb("Throws away every change and reloads the vocabulary the app ships "
                  "with. Pieces naming a garment or fabric you added will be left "
-                 "pointing at a word the catalogue no longer knows.")
+                 "holding a word the catalogue no longer knows.")
         if st.button("Restore the default catalogue", type="secondary"):
             reset_mod.before("before restoring the default garment catalogue",
                              "vocabulary")
             vocab.restore_defaults()
             st.rerun()
+
+
+def garment_section(vocab, inventory: Inventory) -> None:
+    used = {i.garment for i in inventory.items}
+    counts = {g.name: sum(1 for i in inventory.items if i.garment == g.name)
+              for g in vocab.garments}
+
+    ui.table([{
+        "Garment": g.name,
+        "Category": g.category,
+        "Sized as": ", ".join(g.schemes) or "—",
+        "In the wardrobe": str(counts[g.name]) if counts[g.name] else "—",
+    } for g in vocab.garments], numeric=("In the wardrobe",))
+
+    if not st.toggle("Change the garments", key="cat-edit-g",
+                     help="Add one, re-categorise one, change which schemes its "
+                          "labels use, or remove one nothing is using."):
+        return
+
+    ui.eyebrow("Change one")
+    names = [g.name for g in vocab.garments]
+    chosen = st.selectbox("Which garment", names, key="cat-pick-g")
+    garment = vocab.garment(chosen)
+    in_use = counts.get(chosen, 0)
+    with st.form(f"g-{chosen}"):
+        c1, c2 = st.columns([1, 2])
+        garment.category = c1.selectbox(
+            "Category", vocab.category_names(),
+            index=vocab.category_names().index(garment.category)
+            if garment.category in vocab.category_names() else 0, key=f"gc-{chosen}")
+        garment.schemes = c2.multiselect(
+            "Size schemes its labels use", list(vocabulary.SCHEMES),
+            default=[x for x in garment.schemes if x in vocabulary.SCHEMES],
+            key=f"gs-{chosen}",
+            help="Most specific first. The first is what a new piece defaults to.")
+        st.markdown(
+            '<div class="dict-row"><span class="meta">Boxes on the form: </span>'
+            + " ".join(f'<span class="dict-chip on">{f.label}</span>'
+                       for f in vocab.scheme_for(chosen)) + "</div>",
+            unsafe_allow_html=True)
+        b1, b2 = st.columns(2)
+        if b1.form_submit_button("Save"):
+            vocab.save()
+            st.rerun()
+        if b2.form_submit_button("Remove from the catalogue"):
+            if in_use:
+                st.warning(f"{in_use} piece(s) in the wardrobe are {chosen}. "
+                           "Re-classify them first.")
+            else:
+                reset_mod.before(f"before removing the garment {chosen}", "vocabulary")
+                vocab.remove_garment(chosen)
+                vocab.save()
+                st.rerun()
+
+    ui.eyebrow("Add one")
+    with st.form("add-garment", clear_on_submit=True):
+        c1, c2 = st.columns([2, 1])
+        name = c1.text_input("Name")
+        category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
+        picked = st.multiselect("Size schemes its labels use", list(vocabulary.SCHEMES),
+                                default=["Alpha"], key="ag-scheme")
+        if st.form_submit_button("Add garment"):
+            if not name.strip():
+                st.warning("Give it a name.")
+            elif vocab.garment(name.strip()):
+                st.warning(f"{name.strip()} is already in the catalogue.")
+            else:
+                vocab.add_garment(vocabulary.Garment(
+                    name=name.strip(), category=category,
+                    schemes=list(picked) or ["Free text"]))
+                vocab.save()
+                st.rerun()
+
+
+def fabric_section(vocab, inventory: Inventory) -> None:
+    counts = {f.name: sum(1 for i in inventory.items if i.fabric == f.name)
+              for f in vocab.fabrics}
+
+    for family, fabrics in vocab.by_family().items():
+        st.markdown(f'<div class="dict-h">{family}<span>{len(fabrics)}</span></div>',
+                    unsafe_allow_html=True)
+        # Three across, so forty-five fabrics are fifteen rows rather than forty-five.
+        for chunk in (fabrics[i:i + 3] for i in range(0, len(fabrics), 3)):
+            for column, fabric in zip(st.columns(3), chunk):
+                n = counts.get(fabric.name, 0)
+                column.markdown(
+                    f'<div class="dict-row">{fabric.name}'
+                    f'<span class="meta">{f" · on {n}" if n else ""}</span></div>',
+                    unsafe_allow_html=True)
+
+    if not st.toggle("Change the fabrics", key="cat-edit-f",
+                     help="Add one, move one to a different family, or remove one "
+                          "nothing is using."):
+        return
+
+    ui.eyebrow("Change one")
+    names = [f.name for f in vocab.fabrics]
+    chosen = st.selectbox("Which fabric", names, key="cat-pick-f")
+    fabric = next(f for f in vocab.fabrics if f.name == chosen)
+    in_use = counts.get(chosen, 0)
+    with st.form(f"f-{chosen}"):
+        families = list(vocab.families())
+        fabric.family = st.selectbox(
+            "Family", families,
+            index=families.index(fabric.family) if fabric.family in families else 0,
+            key=f"ff-{chosen}",
+            help="What a sourcing route matches on, so one line can cover flannel, "
+                 "worsted and hopsack at once.")
+        b1, b2 = st.columns(2)
+        if b1.form_submit_button("Save"):
+            vocab.save()
+            st.rerun()
+        if b2.form_submit_button("Remove from the catalogue"):
+            if in_use:
+                st.warning(f"{in_use} piece(s) are made of {chosen}.")
+            else:
+                reset_mod.before(f"before removing the fabric {chosen}", "vocabulary")
+                vocab.remove_fabric(chosen)
+                vocab.save()
+                st.rerun()
+
+    ui.eyebrow("Add one")
+    with st.form("add-fabric", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        name = c1.text_input("Name")
+        family = c2.selectbox("Family", [*vocab.families(), "New family…"],
+                              key="af-family")
+        fresh = st.text_input("New family name", key="af-new")
+        if st.form_submit_button("Add fabric"):
+            picked = fresh.strip() if family == "New family…" else family
+            if not name.strip():
+                st.warning("Give it a name.")
+            elif not picked:
+                st.warning("Give it a family, or a route can never match it.")
+            else:
+                vocab.add_fabric(vocabulary.Fabric(name=name.strip(), family=picked))
+                vocab.save()
+                st.rerun()
+
+
+def words_section(vocab, inventory: Inventory) -> None:
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.markdown('<div class="dict-h">Grade</div>', unsafe_allow_html=True)
+        ui.blurb(
+            "What separates two garments of the same type that come from different "
+            "shops. A heavyweight tee and a plain tee are both T-shirts; the grade "
+            "is what sends one to Asos and the other to Uniqlo."
+        )
+        word_list_panel(vocab, "grades", inventory, "grade")
+    with right:
+        st.markdown('<div class="dict-h">Fit</div>', unsafe_allow_html=True)
+        ui.blurb(
+            "How the garment is cut, as the maker describes it. Recorded on the "
+            "piece and available to the sourcing plan in the same way as grade."
+        )
+        word_list_panel(vocab, "fits", inventory, "fit")
 
 
 def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) -> None:
