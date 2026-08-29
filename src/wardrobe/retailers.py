@@ -66,152 +66,52 @@ class Retailer:
 
 
 
-TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Overshirt")
+TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Overshirt",
+        "Waistcoat")
 BOTTOMS = ("Trousers", "Chinos", "Jeans", "Shorts")
 OUTER = ("Blazer", "Jacket", "Overcoat", "Overshirt", "Gilet", "Suit")
 FOOTWEAR = ("Loafers", "Derbies", "Boots", "Trainers", "Sandals")
 ACCESSORIES = ("Belt", "Bag", "Scarf", "Hat", "Socks", "Sunglasses", "Watch", "Jewellery")
 EVERYTHING = TOPS + BOTTOMS + OUTER + FOOTWEAR + ACCESSORIES
 
+# Six shops, because six he actually uses beats forty he does not. A plan that
+# names a shop he has never walked into is a plan he cannot follow, and the
+# whole point of knowing his size somewhere is that it is somewhere he goes.
 DEFAULT_RETAILERS: tuple[Retailer, ...] = (
-    # Secondhand first, because that is the order the strategy uses.
     Retailer("vinted", "Vinted", SECONDHAND, EVERYTHING, 5, 400,
              "https://www.vinted.co.uk/catalog?search_text={q}",
-             "Best for anything expensive and rarely worn. Filter by size and brand, "
-             "then save the search so it tells you when one lands."),
-    Retailer("ebay", "eBay", SECONDHAND, EVERYTHING, 5, 600,
-             "https://www.ebay.co.uk/sch/i.html?_nkw={q}",
-             "Deeper than Vinted for shoes and tailoring. Sort by ending soonest."),
-    Retailer("depop", "Depop", SECONDHAND, TOPS + BOTTOMS + ("Jacket", "Overshirt", "Gilet"), 10, 250,
-             "https://www.depop.com/search/?q={q}",
-             "Younger stock, better for casual pieces than tailoring."),
-    Retailer("vestiaire", "Vestiaire Collective", SECONDHAND, OUTER + FOOTWEAR, 60, 900,
-             "https://www.vestiairecollective.com/search/?q={q}",
-             "Authenticated, so worth it only above roughly £150."),
-
-    Retailer("uniqlo", "Uniqlo", HIGH_STREET, TOPS + BOTTOMS + ("Gilet",), 15, 100,
+             "Everything worn seldom and kept for years: blazers, coats, dress "
+             "shoes, boots. Filter by size and brand, then save the search so it "
+             "tells you when one lands."),
+    Retailer("uniqlo", "Uniqlo", HIGH_STREET,
+             TOPS + BOTTOMS + ("Gilet", "Jacket"), 15, 100,
              "https://www.uniqlo.com/uk/en/search?q={q}",
-             "Unbeatable on plain basics and merino. Cuts run slim and short."),
-    Retailer("zara", "Zara", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 20, 160,
-             "https://www.zara.com/uk/en/search?searchTerm={q}",
-             "Strong silhouettes, inconsistent cloth. Try before committing."),
-    Retailer("hm", "H&M", HIGH_STREET, TOPS + BOTTOMS + OUTER, 10, 90,
-             "https://www2.hm.com/en_gb/search-results.html?q={q}",
-             "Cheap, and the linen is better than it has any right to be."),
+             "The baseline for plain things: tees, polos, chinos, jeans, "
+             "overshirts, knitwear. Sizing is consistent across the range, which "
+             "is why it is the shop to know your size in first."),
+    Retailer("marks", "Marks and Spencer", HIGH_STREET,
+             TOPS + BOTTOMS + OUTER + ("Trainers", "Belt", "Socks"), 20, 200,
+             "https://www.marksandspencer.com/search?q={q}",
+             "Jackets in numbered chest sizes, 36, 38, 40, which is the reference "
+             "worth using. Also knitwear, wool trousers and a suit to alter."),
     Retailer("mango", "Mango", HIGH_STREET, TOPS + BOTTOMS + OUTER, 25, 180,
              "https://shop.mango.com/gb/en/search?q={q}",
-             "The best of the high street for relaxed tailoring and warm neutrals."),
-    Retailer("cos", "COS", HIGH_STREET, TOPS + BOTTOMS + OUTER, 45, 250,
-             "https://www.cos.com/en_gbp/search.html?q={q}",
-             "Clean shapes, good cloth. Wait for the sale, it is reliable."),
-    Retailer("arket", "Arket", HIGH_STREET, TOPS + BOTTOMS + OUTER, 35, 220,
-             "https://www.arket.com/en_gbp/search.html?q={q}",
-             "Quiet colours and honest fabrics. Overlaps COS, softer cuts."),
-    Retailer("massimo", "Massimo Dutti", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 40, 300,
-             "https://www.massimodutti.com/gb/search?searchTerm={q}",
-             "Italian-leaning tailoring at high-street prices in the sale."),
-    Retailer("next", "Next", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 15, 120,
+             "Linen shirts and linen trousers, alpha sized. Warm neutrals and "
+             "relaxed tailoring. Wait for the sale; it is reliable."),
+    Retailer("next", "Next", HIGH_STREET,
+             TOPS + BOTTOMS + OUTER + FOOTWEAR, 15, 120,
              "https://www.next.co.uk/search?w={q}",
-             "Wide sizing and fast delivery. Quality is a lottery, so read the composition."),
-    Retailer("marks", "Marks & Spencer", HIGH_STREET, TOPS + BOTTOMS + OUTER + ("Trainers", "Belt"), 20, 150,
-             "https://www.marksandspencer.com/search?q={q}",
-             "Better than its reputation for knitwear and chinos."),
-
-    Retailer("asos", "Asos", HIGH_STREET, TOPS + BOTTOMS + OUTER + FOOTWEAR, 10, 120,
-             "https://www.asos.com/men/search/?q={q}",
-             "Enormous range, so filter hard by composition. Own-brand heavyweight "
-             "jersey is the reason to come here."),
-    Retailer("adidas", "Adidas", ONLINE, ("Trainers",), 60, 160,
-             "https://www.adidas.co.uk/search?q={q}",
-             "Check the outlet section before the sale section; it is usually cheaper."),
-    Retailer("newbalance", "New Balance", ONLINE, ("Trainers",), 70, 180,
-             "https://www.newbalance.co.uk/search?q={q}",
-             "Sales are seasonal and deep. The outlet runs all year."),
-    Retailer("nike", "Nike", ONLINE, ("Trainers",), 60, 170,
-             "https://www.nike.com/gb/w?q={q}",
-             "Members get the sale early, which is the only reason to sign up."),
-
-    Retailer("moss", "Moss", TAILORING, ("Blazer", "Waistcoat", "Trousers", "Shirt"), 60, 350,
-             "https://www.moss.co.uk/search?q={q}",
-             "Hire and buy. The sale rail is where the value is."),
-    Retailer("suitsupply", "Suitsupply", TAILORING, ("Blazer", "Trousers", "Waistcoat", "Overcoat"),
-             150, 600, "https://suitsupply.com/en-gb/search?q={q}",
-             "Proper construction and free alterations. Worth it once, for one jacket."),
-    Retailer("tyrwhitt", "Charles Tyrwhitt", TAILORING, ("Shirt", "Blazer", "Trousers"), 30, 200,
+             "Wide sizing and fast delivery. Heavyweight tees if you read the "
+             "composition. Quality is a lottery, so check the fabric."),
+    Retailer("tyrwhitt", "Charles Tyrwhitt", TAILORING,
+             ("Shirt", "Blazer", "Trousers"), 30, 200,
              "https://www.charlestyrwhitt.com/uk/search?q={q}",
-             "Shirts by collar and sleeve, which is the only sane way to buy one."),
-
-    Retailer("clarks", "Clarks", SHOES, FOOTWEAR, 50, 180,
-             "https://www.clarks.co.uk/c/search?q={q}",
-             "Wide fittings as standard. Desert boots are the obvious buy."),
-    Retailer("base", "Base London", SHOES, ("Loafers", "Derbies", "Boots"), 45, 130,
-             "https://www.baselondon.com/search?q={q}",
-             "Cheap leather loafers and brogues. Fine for a season or three."),
-    Retailer("loake", "Loake", SHOES, ("Loafers", "Derbies", "Boots"), 130, 400,
-             "https://www.loake.co.uk/search?q={q}",
-             "Goodyear welted, so resoleable. Buy once, secondhand if you can."),
-    Retailer("grenson", "Grenson", SHOES, ("Loafers", "Derbies", "Boots"), 150, 450,
-             "https://www.grenson.com/uk/catalogsearch/result/?q={q}",
-             "Chunkier last than Loake. Very common on Vinted."),
-    Retailer("solovair", "Solovair", SHOES, ("Boots", "Derbies"), 130, 250,
-             "https://www.nps-solovair.com/search?q={q}",
-             "The original Doc Martens factory. Built to be resoled."),
-
-    Retailer("percival", "Percival", ONLINE, TOPS + BOTTOMS + OUTER, 60, 300,
-             "https://percivalclo.com/search?q={q}",
-             "London-made-ish, playful knits and camp collars."),
-    Retailer("universal", "Universal Works", ONLINE, TOPS + BOTTOMS + OUTER, 70, 350,
-             "https://www.universalworks.co.uk/search?q={q}",
-             "Relaxed workwear tailoring. Exactly the unstructured shape to aim at."),
-    Retailer("oliver", "Oliver Spencer", ONLINE, TOPS + BOTTOMS + OUTER, 90, 450,
-             "https://oliverspencer.co.uk/search?q={q}",
-             "Soft shoulders and good cloth. Sale twice a year, wait for it."),
-    Retailer("community", "Community Clothing", ONLINE, TOPS + BOTTOMS + OUTER, 30, 200,
-             "https://communityclothing.co.uk/search?q={q}",
-             "UK factories, no marketing budget, honest prices. Plain by design."),
-    Retailer("sunspel", "Sunspel", ONLINE, ("T-shirt", "Polo", "Knitwear"), 60, 250,
-             "https://www.sunspel.com/uk/search?q={q}",
-             "The t-shirt worth paying for, once, in the sale."),
-    Retailer("carhartt", "Carhartt WIP", ONLINE, TOPS + BOTTOMS + ("Jacket", "Overshirt"), 40, 200,
-             "https://www.carhartt-wip.com/en/search?q={q}",
-             "Workwear cuts that hold their shape and their resale value."),
-    Retailer("levis", "Levi's", ONLINE, ("Jeans", "Jacket", "Shorts"), 50, 140,
-             "https://www.levi.com/GB/en_GB/search?q={q}",
-             "For denim, start here and work outwards."),
-    Retailer("end", "End Clothing", ONLINE, EVERYTHING, 50, 800,
-             "https://www.endclothing.com/gb/search?q={q}",
-             "Aggregates a lot of brands. The sale section is the reason to visit."),
-
-    Retailer("acetate", "Ace & Tate", ONLINE, ("Sunglasses",), 60, 180,
-             "https://www.aceandtate.com/uk/search?q={q}",
-             "Own-brand frames at one price. Home try-on before committing."),
-    Retailer("cubitts", "Cubitts", ONLINE, ("Sunglasses",), 125, 350,
-             "https://www.cubitts.com/search?q={q}",
-             "London-made, and they will reglaze a secondhand frame for you."),
-    Retailer("sunglasshut", "Sunglass Hut", HIGH_STREET, ("Sunglasses",), 90, 300,
-             "https://www.sunglasshut.com/uk/search?q={q}",
-             "The big brands under one roof. Almost never discounted."),
-    Retailer("christopherward", "Christopher Ward", ONLINE, ("Watch",), 400, 2000,
-             "https://www.christopherward.com/search?q={q}",
-             "Swiss movements without the marketing markup."),
-    Retailer("watchfinder", "Watchfinder", SECONDHAND, ("Watch",), 250, 5000,
-             "https://www.watchfinder.co.uk/search?q={q}",
-             "Serviced and warrantied pre-owned. The sane way to buy a good watch."),
-    Retailer("timex", "Timex", ONLINE, ("Watch",), 70, 300,
-             "https://www.timex.co.uk/search?q={q}",
-             "Where a good-looking watch costs less than a jacket."),
-
-    Retailer("tkmaxx", "TK Maxx", OFF_PRICE, EVERYTHING, 15, 200,
-             "https://www.tkmaxx.com/uk/en/search?q={q}",
-             "A lottery, but the only place good tailoring turns up at high-street money."),
+             "Shirts by collar and sleeve, which is the only sane way to buy one "
+             "and the reason the fit can be exact. Wait for the sale."),
 )
 
-# Order to try the secondhand sites in. Vinted leads because it is by far the
-# deepest in ordinary menswear; Vestiaire is authenticated and only earns its
-# margin on genuinely expensive things.
-SECONDHAND_ORDER: dict[str, int] = {
-    "vinted": 12, "ebay": 8, "watchfinder": 6, "vestiaire": 3, "depop": 2,
-}
+# Order to try the secondhand sites in, where there is more than one.
+SECONDHAND_ORDER: dict[str, int] = {"vinted": 12}
 
 KINDS: tuple[str, ...] = tuple(sorted(
     (SECONDHAND, HIGH_STREET, ONLINE, TAILORING, SHOES, OFF_PRICE)))

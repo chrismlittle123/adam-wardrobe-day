@@ -1058,8 +1058,8 @@ def check_secondhand_rule() -> str:
                 fabric="Wool melton")
     top = suggest(coat, limit=3)
     assert top[0].retailer.name == "Vinted", f"Vinted did not lead: {top[0].retailer.name}"
-    assert all(s.retailer.kind == SECONDHAND for s in top), \
-        "an overcoat should put secondhand in every top slot"
+    assert top[0].retailer.kind == SECONDHAND, \
+        "an overcoat should lead with a resale site"
     assert "worn seldom" in top[0].reason, "the rarely-worn reason was not given"
 
     for garment in ("Blazer", "Derbies", "Boots", "Suit", "Loafers"):
@@ -1073,8 +1073,8 @@ def check_secondhand_rule() -> str:
     every = suggest(Item(name="x", garment="T-shirt"), limit=99)
     resale = [s for s in every if s.retailer.kind == SECONDHAND]
     assert resale, "no resale site sells a t-shirt at all"
-    assert all(s.retailer.kind != SECONDHAND for s in every[:5]), \
-        "a resale site reached the top five for a consumable"
+    assert every[0].retailer.kind != SECONDHAND, \
+        "a resale site led for something that wears out"
     assert "little life left" in resale[0].reason, "the worn-out reason was never given"
     assert "T-shirt" in WORN_OUT and "Jeans" in WORN_OUT, "the consumables set shrank"
     return (f"{len(RARELY_WORN)} garments go secondhand first, "
@@ -1137,9 +1137,14 @@ def check_retailer_catalogue() -> str:
         assert r.strengths, f"{r.name} sells nothing"
         assert r.url("linen blazer").startswith("https://"), f"{r.name} built a bad url"
         assert " " not in r.url("linen blazer"), f"{r.name} did not escape the query"
-    for named in ("Vinted", "H&M", "Uniqlo", "Zara", "Next", "Moss", "Clarks",
-                  "Mango", "Base London"):
+    # Six he uses, not forty he does not. A shop in the list he has never walked
+    # into makes the plan unfollowable.
+    assert len(RETAILERS) <= 8, f"the catalogue has grown back to {len(RETAILERS)}"
+    for named in ("Vinted", "Uniqlo", "Marks and Spencer", "Mango", "Next",
+                  "Charles Tyrwhitt"):
         assert any(r.name == named for r in RETAILERS), f"{named} is missing"
+    assert any(r.kind == "Secondhand" for r in RETAILERS), \
+        "nothing secondhand, so the rarely-worn rule has nowhere to send him"
 
     coverable = {g for r in RETAILERS for g in r.strengths}
     unsold = [g for g in garments() if g not in coverable]
@@ -1199,7 +1204,7 @@ def check_sourcing_routes() -> str:
                                fabric=fabric, fit=fit))
         return found.where if found else None
 
-    assert where("T-shirt", grade="Heavyweight") == "Asos or Next", "heavyweight tee misrouted"
+    assert where("T-shirt", grade="Heavyweight") == "Next", "heavyweight tee misrouted"
     assert where("T-shirt") == "Uniqlo", "the plain tee default did not apply"
     assert where("Shirt", grade="Dress", fabric="Oxford cotton") == "Charles Tyrwhitt", \
         "dress shirt misrouted"
@@ -1211,8 +1216,9 @@ def check_sourcing_routes() -> str:
     assert where("Trousers", fabric="Linen") == "Mango", "the wool route swallowed the linen one"
     assert where("Polo", grade="Knitted") == "Mango", "knitted polo misrouted"
     assert where("Polo") == "Uniqlo", "the plain polo default did not apply"
-    assert where("Trainers", grade="Smart") == "Vinted", "smart trainers misrouted"
-    assert where("Trainers", grade="Branded") != "Vinted", "branded trainer sent to Vinted"
+    # Trainers stopped carrying a grade, so one route covers them and the
+    # condition does the work a second route used to.
+    assert where("Trainers") == "Vinted", "trainers misrouted"
 
     # Nothing is inferred from spelling any more: a garment named "heavyweight"
     # but graded plain must follow its grade, not its name.
@@ -1265,7 +1271,7 @@ def check_plan_is_editable() -> str:
     tee.stores = ["marks"]
     again.save()
     assert route_for(Item(name="x", garment="T-shirt"), Plan.load()).where == \
-        "Marks & Spencer", "editing a route had no effect"
+        "Marks and Spencer", "editing a route had no effect"
 
     edited = Plan.load()
     edited.remove(added.id)
@@ -1550,8 +1556,10 @@ def check_app_renders_empty() -> str:
         f"the dictionary is not second: {numbered[1]}"
     assert "Wardrobe Inventory" in numbered[2], "inventory does not follow the dictionary"
     assert "Colour" in numbered[4], f"Colour is not the fifth tab: {numbered[4]}"
-    assert "Body Measurements" in numbered[7], "body measurements did not get its own tab"
-    assert "Where to Buy" in numbered[8], "Where to Buy is not before the shop"
+    # Where to Buy comes before Body Measurements: the shops decide the size
+    # vocabulary, and the measurements only say which word to pick.
+    assert "Where to Buy" in numbered[7], "the shops do not come before the sizes"
+    assert "Body Measurements" in numbered[8], "body measurements did not get its own tab"
     assert "Shopping" in numbered[9], "shopping guide is not last"
     assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
     return f"{len(labels)} tabs: " + " · ".join(labels)
@@ -1966,7 +1974,7 @@ def check_shop_catalogue_opens() -> str:
     assert not app.exception, f"the shop catalogue raised: {app.exception[0].value}"
     assert not app.tabs, "the catalogue drew the whole app instead"
     page = "\n".join(m.value for m in app.markdown)
-    for name in ("Vinted", "Uniqlo", "Clarks", "Mango"):
+    for name in ("Vinted", "Uniqlo", "Mango", "Charles Tyrwhitt"):
         assert name in page, f"{name} is missing from the catalogue"
     assert "route(s)" in page, "the catalogue does not say which shops the plan uses"
     buttons = [b.label for b in app.button]

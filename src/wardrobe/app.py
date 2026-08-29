@@ -19,6 +19,7 @@ import streamlit as st
 from wardrobe import (
     palette as pal_mod,
     revisions,
+    fittings as fit_mod,
     retailers,
     vocabulary,
     shop as shop_mod,
@@ -124,7 +125,7 @@ def render() -> None:
     tabs = st.tabs([
         "1 · Style Guide", "2 · Garment Catalogue", "3 · Wardrobe Inventory",
         "4 · Principles", "5 · Colour", "6 · Outfit Generator", "7 · Outfit Gallery",
-        "8 · Body Measurements", "9 · Where to Buy", "10 · Shopping Guide",
+        "8 · Where to Buy", "9 · Body Measurements", "10 · Shopping Guide",
         "⚙ Diagnostics",
     ])
     with tabs[0]:
@@ -142,9 +143,9 @@ def render() -> None:
     with tabs[6]:
         gallery_tab(inventory, outfits)
     with tabs[7]:
-        body_tab(profile)
-    with tabs[8]:
         where_to_buy_tab(inventory)
+    with tabs[8]:
+        body_tab(profile)
     with tabs[9]:
         shop_tab(profile, inventory, outfits, principles)
     with tabs[10]:
@@ -2018,6 +2019,98 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
 
 # --- shared panels --------------------------------------------------------
 
+def known_sizes_panel(profile: Profile) -> None:
+    """His size in each shop, for each garment, and how much it is trusted.
+
+    Organised by the shops his own sourcing plan already names, because a size is
+    only worth knowing where he actually shops.
+    """
+    ui.eyebrow("What size he is, where he shops")
+    book = fit_mod.Fittings.load()
+    plan, catalogue = sourcing.Plan.load(), retailers.Catalogue.load()
+    shops = catalogue.lookup()
+
+    ui.blurb(
+        "Filled in the way it is actually learned: by trying something on, or by "
+        "reading a shop's own garment measurements against his. A size confirmed in "
+        "a changing room outranks anything worked out from a table, and says so."
+    )
+
+    if book.fittings:
+        ui.table([{
+            "Shop": shops[f.retailer].name if f.retailer in shops else f.retailer,
+            "Garment": f.garment + (f" · {f.line}" if f.line else ""),
+            "Size": f.size_line or "—",
+            "Fit": f.fit or "—",
+            "How we know": f.confidence,
+            "Verdict": f.verdict or "—",
+        } for f in sorted(book.fittings,
+                          key=lambda f: (f.garment, -fit_mod.CONFIDENCE.index(f.confidence)))])
+    else:
+        ui.empty("Nothing recorded yet. Start with the shop you buy most from.")
+
+    if not st.toggle("Record a size", key="fit-edit"):
+        return
+
+    with st.form("add-fitting", clear_on_submit=True):
+        c1, c2 = st.columns(2)
+        garment = c1.selectbox("Garment", garments(), key="fit-garment")
+        suggested = fit_mod.reference_shops(plan, catalogue, garment)
+        options = suggested + [i for i in catalogue.ids() if i not in suggested]
+        retailer = c2.selectbox(
+            "Shop", options, format_func=lambda i: shops[i].name, key="fit-shop",
+            help="The shops your sourcing plan already sends you to for this "
+                 "garment come first.")
+        line = st.text_input("Which range, if the shop has more than one",
+                             key="fit-line")
+
+        st.markdown('<div class="look-cap">The size on the label, in whatever this '
+                    'garment is sized as</div>', unsafe_allow_html=True)
+        scheme = schemes_for(garment)[0]
+        boxes = size_scheme(garment, scheme)
+        values: dict[str, str] = {}
+        if boxes:
+            columns = st.columns(min(len(boxes), 4))
+            for n, field in enumerate(boxes):
+                column = columns[n % len(columns)]
+                values[field.key] = (
+                    column.selectbox(field.label, field.options, key=f"fit-{field.key}")
+                    if field.options else
+                    column.text_input(field.label, key=f"fit-{field.key}"))
+
+        c3, c4, c5 = st.columns(3)
+        cut = c3.selectbox("Fit", fits(), key="fit-cut") if takes_fit(garment) else ""
+        confidence = c4.selectbox("How we know", fit_mod.CONFIDENCE,
+                                  index=len(fit_mod.CONFIDENCE) - 1, key="fit-conf")
+        verdict = c5.selectbox("Verdict", ["", *fit_mod.VERDICTS], key="fit-verdict")
+        note = st.text_input("Note", key="fit-note")
+
+        if st.form_submit_button("Record it"):
+            existing = book.find(retailer, garment)
+            if existing:
+                book.remove(existing.id)
+            book.add(fit_mod.Fitting(
+                retailer=retailer, garment=garment, line=line.strip(),
+                size={k: v for k, v in values.items() if v and v != "—"},
+                fit=cut, confidence=confidence, verdict=verdict, note=note.strip()))
+            book.save()
+            st.rerun()
+
+    if book.fittings:
+        ui.eyebrow("Forget one")
+        c1, c2 = st.columns([3, 1], vertical_alignment="center")
+        chosen = c1.selectbox(
+            "Which", [f.id for f in book.fittings],
+            format_func=lambda i: f"{book.by_id(i).garment} at "
+                                  f"{shops.get(book.by_id(i).retailer, book.by_id(i)).name if book.by_id(i).retailer in shops else book.by_id(i).retailer}",
+            key="fit-drop")
+        if c2.button("Forget", type="secondary"):
+            reset_mod.before("before forgetting a recorded size", "fittings")
+            book.remove(chosen)
+            book.save()
+            st.rerun()
+
+
 def measurements_panel(profile: Profile) -> None:
     ui.eyebrow("Body measurements")
     body = profile.measurements
@@ -2298,21 +2391,19 @@ def snapshots_panel() -> None:
 
 def body_tab(profile: Profile) -> None:
     ui.blurb(
-        "Two different kinds of number, and confusing them is most of why clothes do "
-        "not fit. A **UK size** is what a shop prints on a label: a jacket marked 38, "
-        "a shirt with a 15.5 inch collar, a shoe marked 9. It is a name, not a length, "
-        "and it means something different in every shop. A **measurement** is what a "
-        "tape reads, and in here every one of them is in centimetres, on this tab and "
-        "on every product page.\n\nSo: sizes stay in whatever the label says, "
-        "measurements are always cm, and the tables below turn the second into the "
-        "first. A blazer measuring 106 cm round the chest means the same thing "
-        "everywhere; a jacket labelled 38 does not."
+        "A size is not a fact about a man, it is a fact about a man and a shop. He is "
+        "a Uniqlo M, an M&S 38 and a Tyrwhitt 15.5 with a 33 sleeve, and none of those "
+        "converts into the others. So this tab comes after Where to Buy: the shops "
+        "decide the vocabulary, and the measurements only say which word to pick.\n\n"
+        "Everything measured here is centimetres. Everything a shop prints is a size. "
+        "Confusing the two is most of why clothes do not fit."
     )
+    known_sizes_panel(profile)
     measurements_panel(profile)
     size_targets_panel(profile)
 
 
-# --- 9. where to buy ----------------------------------------------------------
+# --- 8. where to buy ----------------------------------------------------------
 
 def where_to_buy_tab(inventory: Inventory) -> None:
     plan = sourcing.Plan.load()
@@ -2336,6 +2427,15 @@ def where_to_buy_tab(inventory: Inventory) -> None:
         '<div class="look-cap"><a href="?shops=all" target="_blank">'
         'Open the retailer catalogue &#8599;</a> to add a shop, change what it '
         'sells, or drop one you never use.</div>', unsafe_allow_html=True)
+
+    stranded = [r for r in plan.routes if r.stores and not r.shops(shops)]
+    if stranded:
+        st.error(
+            "These routes name shops that are no longer in the catalogue, so they "
+            "point nowhere: "
+            + "; ".join(f"**{r.label}**" for r in stranded)
+            + ". Give each one a shop that exists, or delete it."
+        )
 
     impossible = [
         r for r in plan.routes

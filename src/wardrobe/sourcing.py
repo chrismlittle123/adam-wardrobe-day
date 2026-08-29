@@ -109,7 +109,7 @@ class Route:
 # The plan he started from. Editable in the app; this is what a fresh install
 # gets and what the file is seeded with the first time it is saved.
 DEFAULT_ROUTES: tuple[Route, ...] = (
-    Route("Heavyweight t-shirt", "T-shirt", ("asos", "next"), grade="Heavyweight",
+    Route("Heavyweight t-shirt", "T-shirt", ["next"], grade="Heavyweight",
           spec="100% cotton, 200 gsm or heavier",
           note="The weight is the whole point. Anything thinner drapes like a vest."),
     Route("Plain t-shirt", "T-shirt", ["uniqlo"],
@@ -138,11 +138,12 @@ DEFAULT_ROUTES: tuple[Route, ...] = (
     Route("Overshirt", "Overshirt", ("uniqlo",)),
     Route("Jumper", "Knitwear", ("marks", "uniqlo")),
 
-    Route("Smart trainers", "Trainers", ["vinted"], grade="Smart", condition=VINTED_NWT,
-          note="New with tags only. A worn sole has already taken someone else's gait."),
-    Route("Branded trainers", "Trainers", ("adidas", "newbalance", "nike"),
-          grade="Branded", timing=ON_SALE,
-          note="Check the outlet section before the sale section."),
+    # Trainers no longer carry a grade, so smart and branded cannot be told
+    # apart by the plan. One route, and the condition does the work.
+    Route("Trainers", "Trainers", ["vinted"], condition=VINTED_NWT,
+          note="New with tags only. A worn sole has already taken someone else's "
+               "gait. For a specific pair from a brand's own sale, put the link on "
+               "the piece rather than a route."),
 
     Route("Suit", "Suit", ["marks"], timing="then have it altered",
           note="Off the peg for the cloth, a tailor for the fit. The alteration is "

@@ -124,11 +124,15 @@ times a year spends most of its life in a wardrobe whether it was bought new or
 not, and Vinted is full of them barely worn. Below that line the sum flips, and a
 £20 t-shirt is bought new from whoever cuts it well.
 
-36 UK retailers are ranked per garment and price: Vinted, eBay, Vestiaire and
-Watchfinder for secondhand; Uniqlo, Zara, H&M, Mango, COS, Arket, Massimo Dutti,
-Next and M&S on the high street; Moss, Suitsupply and Charles Tyrwhitt for
-tailoring; Clarks, Base London, Loake, Grenson and Solovair for shoes. Each comes
-with its reason and a working search link.
+Six shops, because six he uses beats forty he does not: **Vinted** for anything
+worn seldom, **Uniqlo** as the baseline for plain things, **Marks and Spencer**
+for jackets in numbered chest sizes and a suit to alter, **Mango** for linen,
+**Next** for heavyweight jersey, and **Charles Tyrwhitt** for shirts by collar
+and sleeve. Each comes with its reason and a working search link.
+
+Knowing your size somewhere is only worth anything if it is somewhere you go,
+which is why the list is short and why Where to Buy comes before the
+measurements.
 
 A wanted piece can also carry **one specific thing online**, a link he found and
 kept, and a **buy-it-reduced** rule of its own that overrides whatever the route

@@ -61,6 +61,10 @@ def vocabulary() -> Path:
     return home() / "garments.toml"
 
 
+def fittings() -> Path:
+    return home() / "fittings.toml"
+
+
 def guide_versions() -> Path:
     return home() / ".guide-versions"
 
@@ -92,6 +96,7 @@ DATA: dict[str, str] = {
     "sourcing": "Where to buy",
     "retailers": "Retailer catalogue",
     "vocabulary": "Garment catalogue",
+    "fittings": "Known sizes",
     "inventory": "Wardrobe inventory",
     "outfits": "Outfits",
     "photos": "Item photos",
