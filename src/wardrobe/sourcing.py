@@ -78,6 +78,10 @@ ROUTES: tuple[Route, ...] = (
           note="Sized by collar and sleeve, which is the only sane way to buy one."),
     Route("Linen shirt", "Shirt", ("mango",), match=("linen",), timing=ON_SALE),
     Route("Linen trousers", "Trousers", ("mango",), match=("linen",), timing=ON_SALE),
+    Route("Wool trousers", "Trousers", ("marks", "next"),
+          match=("wool", "flannel", "worsted", "tweed", "hopsack", "merino"),
+          note="The nine months of the year linen cannot do. Check the composition: "
+               "a wool blend below about 60% drapes like a school trouser."),
     Route("Knitted polo", "Polo", ("mango",),
           match=("knit", "knitted", "merino", "wool"), timing=ON_SALE),
 

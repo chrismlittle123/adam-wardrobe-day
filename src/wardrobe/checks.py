@@ -892,11 +892,16 @@ def check_sourcing_routes() -> str:
     heavy = route_for(Item(name="Heavy tee", garment="T-shirt"))
     assert "200 gsm" in heavy.spec, "the gsm specification was lost"
 
-    # A garment with only a keyword route and no default must return nothing
-    # rather than being quietly forced down the wrong one.
-    assert route_for(Item(name="Grey flannel trousers", garment="Trousers",
-                          fabric="Wool flannel")) is None, \
-        "a wool trouser was pushed down the linen route"
+    assert where("Grey flannel trousers", "Trousers", "Wool flannel") == \
+        "Marks & Spencer or Next", "wool trousers misrouted"
+    assert where("Stone trousers", "Trousers", "Linen") == "Mango", \
+        "the wool route swallowed the linen one"
+
+    # A garment whose type has only keyword routes and no default must return
+    # nothing rather than being quietly forced down the nearest one.
+    assert route_for(Item(name="Cotton twill trousers", garment="Trousers",
+                          fabric="Cotton twill")) is None, \
+        "an unmatched trouser was pushed down a route it does not belong to"
     assert "Loafers" in uncovered(GARMENTS), "a known gap stopped being reported"
     return (f"{len(ROUTES)} routes over {len(BY_GARMENT)} garment types; "
             f"tee, shirt, polo and trainer splits all land")
