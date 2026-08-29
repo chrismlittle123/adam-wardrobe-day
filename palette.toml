@@ -1,4 +1,223 @@
 [[colours]]
+id = "navy"
+name = "Navy"
+hex = "#26303F"
+role = "Ground"
+categories = [
+    "Bottom",
+    "Outerwear",
+    "Shoes",
+]
+seasons = []
+note = "flannel only"
+
+[[colours]]
+id = "cream"
+name = "Cream"
+hex = "#F2E9D8"
+role = "Field"
+categories = [
+    "Top",
+    "Outerwear",
+]
+seasons = [
+    "Spring",
+    "Summer",
+]
+note = ""
+
+[[colours]]
+id = "ecru"
+name = "Ecru"
+hex = "#E8DFC8"
+role = "Field"
+categories = [
+    "Top",
+]
+seasons = [
+    "Spring",
+    "Summer",
+]
+note = ""
+
+[[colours]]
+id = "white"
+name = "White"
+hex = "#F6F4EF"
+role = "Field"
+categories = [
+    "Top",
+]
+seasons = []
+note = ""
+
+[[colours]]
+id = "pale-blue"
+name = "Pale blue"
+hex = "#BFD3E6"
+role = "Field"
+categories = [
+    "Top",
+]
+seasons = [
+    "Spring",
+    "Summer",
+]
+note = ""
+
+[[colours]]
+id = "oatmeal"
+name = "Oatmeal"
+hex = "#DDD3C0"
+role = "Field"
+categories = [
+    "Top",
+    "Outerwear",
+]
+seasons = [
+    "Autumn",
+    "Winter",
+]
+note = ""
+
+[[colours]]
+id = "charcoal"
+name = "Charcoal"
+hex = "#3C3B3A"
+role = "Ground"
+categories = [
+    "Bottom",
+    "Outerwear",
+]
+seasons = [
+    "Autumn",
+    "Winter",
+]
+note = ""
+
+[[colours]]
+id = "mid-grey"
+name = "Mid grey"
+hex = "#7A7A78"
+role = "Ground"
+categories = [
+    "Bottom",
+]
+seasons = []
+note = ""
+
+[[colours]]
+id = "olive"
+name = "Olive"
+hex = "#5F6146"
+role = "Ground"
+categories = [
+    "Bottom",
+    "Outerwear",
+]
+seasons = [
+    "Autumn",
+    "Winter",
+]
+note = ""
+
+[[colours]]
+id = "camel"
+name = "Camel"
+hex = "#C19A6B"
+role = "Ground"
+categories = [
+    "Outerwear",
+    "Top",
+]
+seasons = [
+    "Autumn",
+    "Winter",
+]
+note = ""
+
+[[colours]]
+id = "stone"
+name = "Stone"
+hex = "#C9BCA4"
+role = "Ground"
+categories = [
+    "Bottom",
+]
+seasons = [
+    "Spring",
+    "Summer",
+]
+note = ""
+
+[[colours]]
+id = "chocolate"
+name = "Chocolate"
+hex = "#6B4426"
+role = "Ground"
+categories = [
+    "Shoes",
+    "Accessory",
+]
+seasons = []
+note = ""
+
+[[colours]]
+id = "chestnut"
+name = "Chestnut"
+hex = "#8B5A2B"
+role = "Ground"
+categories = [
+    "Shoes",
+    "Accessory",
+]
+seasons = []
+note = ""
+
+[[colours]]
+id = "rust"
+name = "Rust"
+hex = "#8E3B2E"
+role = "Accent"
+categories = [
+    "Accessory",
+    "Top",
+]
+seasons = [
+    "Autumn",
+]
+note = ""
+
+[[colours]]
+id = "burgundy"
+name = "Burgundy"
+hex = "#6E2C33"
+role = "Accent"
+categories = [
+    "Accessory",
+]
+seasons = [
+    "Autumn",
+    "Winter",
+]
+note = ""
+
+[[colours]]
+id = "terracotta"
+name = "Terracotta"
+hex = "#B5613F"
+role = "Accent"
+categories = [
+    "Accessory",
+    "Top",
+]
+seasons = [
+    "Spring",
+    "Summer",
+]
+note = ""
+
+[[colours]]
 id = "sand"
 name = "Sand"
 hex = "#D9C9A8"
