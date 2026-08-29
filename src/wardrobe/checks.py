@@ -787,14 +787,10 @@ def check_roles() -> str:
 
 def check_colour_arithmetic() -> str:
     """Hue, lightness and the round trip through hex."""
-    from .palette import contrast, from_hsl, hsl, hue_distance, hue_name, lightness, to_hex, to_rgb
+    from .palette import from_hsl, hsl, hue_name, lightness, to_hex, to_rgb
     assert to_hex(to_rgb("#A0583C")).upper() == "#A0583C", "hex round trip lost precision"
     assert hsl("#FFFFFF")[2] == 1.0 and hsl("#000000")[2] == 0.0, "lightness poles wrong"
     assert lightness("#F2E9D8") > lightness("#26303F"), "cream is not lighter than navy"
-    assert _near(contrast("#FFFFFF", "#000000"), 1.0), "maximum contrast is not 1"
-    assert _near(contrast("#26303F", "#26303F"), 0.0), "a colour contrasts with itself"
-    assert hue_distance("#FF0000", "#00FF00") == 120, "hue distance wrong"
-    assert hue_distance("#FF0000", "#FF0000") == 0, "a hue differs from itself"
     assert hue_name("#7A7A78") == "grey", "flat grey not named grey"
     assert hue_name("#6B4426") == "brown", "chocolate should be brown, not a wheel sector"
     assert hue_name("#C19A6B") != "brown", "camel is too light to be brown"
@@ -803,67 +799,66 @@ def check_colour_arithmetic() -> str:
     assert hue_name("#8E3B2E") == "red" and hue_name("#8B5A2B") == "brown", \
         "rust and chestnut are not being told apart"
     assert from_hsl(0, 1, 0.5).upper() == "#FF0000", "hsl to hex wrong"
-    return "hex round trips, contrast poles at 0 and 1, grey and brown named"
+    return "hex round trips, lightness poles at 0 and 1, grey and brown named"
 
 
-def check_warmth_against_skin() -> str:
-    """The verdicts have to match what is actually true of warm skin."""
-    from .palette import warmth
-    from .palette import DEFAULT_SKIN
-    skin = DEFAULT_SKIN
-    assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should sit in his family"
-    assert warmth("#6B4426", skin)[0] == "harmonious", "chocolate should sit in his family"
-    assert warmth("#26303F", skin)[0] == "flattering", "navy should flatter by contrast"
-    # A warm off-white is harmonious rather than flattering; only a truly neutral
-    # one goes through the desaturated branch.
-    assert warmth("#F8F4EC", skin)[0] == "harmonious", "warm off-white should sit in his family"
-    assert warmth("#FAFAFA", skin)[0] == "flattering", "neutral off-white should lift warm skin"
-    assert warmth("#7A7A78", skin)[0] == "careful", "flat grey should be flagged"
-    assert all(warmth(h, skin)[1] for h in ("#C19A6B", "#26303F", "#7A7A78")), \
-        "a verdict came back with no reason"
+def check_the_one_rule() -> str:
+    """A colour worn on top must sit far enough from his skin. That is the whole
+    engine now.
 
-    # Hue and lightness are separate questions. At his depth a mid-brown can be
-    # perfectly harmonious in family and still vanish against him, and the
-    # engine has to be able to say both things at once.
-    from .palette import (CLEARLY_APART, TOO_CLOSE, reads_against_skin,
-                          separation_reason, skin_distance, to_lab)
+    There used to be a warmth verdict here as well, grading colours harmonious or
+    flattering or careful by how many degrees round the hue wheel they sat from
+    him. Nobody asked for it and it was never observed, only invented. It is gone,
+    and so is the middle band it sat next to: the rule is a yes or a no.
+    """
+    from .palette import (Colour, DEFAULT_SKIN, NEAR_THE_FACE, Palette, TOO_CLOSE,
+                          blurs_at_the_collar, breaks_the_rule, clears_the_face,
+                          face_rule, skin_distance, to_lab)
     from .profile import Profile
+    skin = DEFAULT_SKIN
     assert Profile.load().subject.skin_tone_hex == skin, \
         "the profile and the engine disagree about his skin"
-    assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should still be in family"
 
-    # Distance is measured in CIELAB, where a step of a given size looks the
-    # same size wherever it is taken. A colour compared with itself is zero.
+    # Distance is measured in CIELAB, where a step of a given size looks the same
+    # size wherever it is taken. A colour compared with itself is zero.
     assert skin_distance(skin, skin) < 0.001, "a colour differs from itself"
     assert to_lab("#000000")[0] < 1 and to_lab("#FFFFFF")[0] > 99, "the L axis is wrong"
     assert skin_distance("#FFFFFF", skin) > skin_distance("#C19A6B", skin), \
         "white should be further from him than camel"
 
-    # Three bands, because a binary was the wrong shape. Hue and lightness taken
-    # separately banned burgundy, which is a good combination on brown skin; it
-    # differs moderately on both axes at once and the max of two threw that away.
-    bands = {n: reads_against_skin(h, skin) for n, h in (
-        ("terracotta", "#B5613F"), ("rust", "#8E3B2E"), ("tobacco", "#7E5835"),
-        ("chocolate", "#6B4426"), ("burgundy", "#6E2C33"), ("camel", "#C19A6B"),
-        ("cream", "#F2E9D8"), ("navy", "#26303F"), ("cobalt", "#0F4C9E"),
-        ("emerald", "#0F7B5F"))}
-    for name in ("terracotta", "rust", "tobacco", "chocolate"):
-        assert bands[name] == "too close", f"{name} should read as more of him"
-    for name in ("burgundy", "camel"):
-        assert bands[name] == "tonal", f"{name} should be close-toned, not banned"
-    for name in ("cream", "navy", "cobalt", "emerald"):
-        assert bands[name] == "clear", f"{name} should plainly frame him"
+    too_close = ("#B5613F", "#8E3B2E", "#7E5835", "#6B4426")   # terracotta rust tobacco chocolate
+    clear = ("#6E2C33", "#C19A6B", "#F2E9D8", "#26303F", "#0F4C9E", "#0F7B5F")
+    for hex_code in too_close:
+        assert blurs_at_the_collar(hex_code, skin), f"{hex_code} should read as more of him"
+        assert not face_rule(hex_code, skin)[0], f"{hex_code} passed the rule it breaks"
+        assert "more of him" in face_rule(hex_code, skin)[1], "the failure does not explain itself"
+    for hex_code in clear:
+        assert clears_the_face(hex_code, skin), f"{hex_code} should clear his face"
+        assert face_rule(hex_code, skin)[0], f"{hex_code} failed the rule it passes"
 
-    assert TOO_CLOSE < CLEARLY_APART, "the bands are the wrong way round"
+    # Burgundy is the one that matters. Hue and lightness taken separately banned
+    # it, and it is a good colour on brown skin, so it is the regression case.
+    assert clears_the_face("#6E2C33", skin), "burgundy must not be banned"
     assert skin_distance("#6E2C33", skin) > skin_distance("#6B4426", skin), \
         "burgundy should sit further off him than chocolate"
-    assert "deliberate look" in separation_reason("#6E2C33", skin), \
-        "the tonal band does not explain itself"
-    assert "more of him" in separation_reason("#B5613F", skin), \
-        "the too-close band does not explain itself"
-    return (f"CIELAB distance in three bands: terracotta {skin_distance('#B5613F', skin):.0f} "
-            f"too close, burgundy {skin_distance('#6E2C33', skin):.0f} tonal, "
-            f"cobalt {skin_distance('#0F4C9E', skin):.0f} clear")
+
+    # The rule only bites where it applies. The same colour is fine on a shoe.
+    palette = Palette(colours=[
+        Colour(id="terracotta", name="Terracotta", hex="#B5613F", categories=["Top"]),
+        Colour(id="chocolate", name="Chocolate", hex="#6B4426", categories=["Shoes"]),
+        Colour(id="navy", name="Navy", hex="#26303F", categories=["Top"]),
+    ])
+    named = [c.name for c in breaks_the_rule(palette, skin)]
+    assert named == ["Terracotta"], f"the rule bit the wrong colours: {named}"
+    assert NEAR_THE_FACE == ("Top",), "the rule has quietly changed scope"
+
+    # No verdict machinery survives.
+    import wardrobe.palette as module
+    for gone in ("warmth", "reads_against_skin", "separation_reason", "hue_distance",
+                 "CLEARLY_APART", "HUE_GAP", "VALUE_GAP"):
+        assert not hasattr(module, gone), f"{gone} came back"
+    return (f"one rule at {TOO_CLOSE:.0f}: terracotta {skin_distance('#B5613F', skin):.0f} "
+            f"breaks it, burgundy {skin_distance('#6E2C33', skin):.0f} clears it")
 
 
 def check_palette_round_trip() -> str:
@@ -2269,7 +2264,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Three roles, shoes exempt by slot", check_roles),
     (COLOUR, "Four seasonal palettes out of one", check_seasons),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
-    (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
+    (COLOUR, "Top colour must clear his skin", check_the_one_rule),
     (COLOUR, "Palette round trips", check_palette_round_trip),
     (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),

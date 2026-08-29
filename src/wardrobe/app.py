@@ -834,23 +834,54 @@ def handwrite_panel(principles: Principles) -> None:
 
 # --- 5. colour ----------------------------------------------------------------
 
-VERDICT_BADGE = {"harmonious": "ok", "flattering": "ok", "careful": "no"}
-AGAINST_BADGE = {"clear": "ok", "tonal": "want", "too close": "no"}
 
 
 def colour_tab(profile: Profile, palette: Palette) -> None:
     skin = profile.subject.skin_tone_hex
     ui.blurb(
-        "A palette is not a list of colours, it is a set of roles. Navy is a "
-        "different garment as the ground under everything than as the field next to "
-        "the face, so every colour carries a role and the garments it is allowed on. "
-        "Coordination then stops being taste and becomes two things that can be "
-        "measured: how far apart two colours sit in lightness, and where a hue sits "
-        f"relative to his skin at {skin}."
+        "One rule, and it is the only one that cannot be broken: <b>a colour worn "
+        "on top must sit far enough from his skin</b>. Under "
+        f"{pal_mod.TOO_CLOSE:.0f} units from {skin} in CIELAB it stops reading as a "
+        "garment and starts reading as more of him. Everything below that line is "
+        "bookkeeping: which colour goes on which garment, and which season it is "
+        "worn in. There are no other verdicts here and nothing else is forbidden."
     )
+    face_rule_panel(palette, skin)
     palette_panel(palette, skin)
     season_panel(palette)
     rules_panel(palette)
+
+
+def face_rule_panel(palette: Palette, skin: str) -> None:
+    ui.eyebrow("The one rule")
+    breaks = pal_mod.breaks_the_rule(palette, skin)
+    near = [c for c in palette.colours if c.near_the_face]
+    if not near:
+        ui.empty("No colour is allowed on Top yet, so there is nothing to check.")
+        return
+    if not breaks:
+        st.markdown(
+            f'<div class="look-cap"><span class="badge ok">all clear</span> '
+            f'every one of the {len(near)} colours allowed on Top sits at least '
+            f'{pal_mod.TOO_CLOSE:.0f} from his skin.</div>', unsafe_allow_html=True)
+        return
+    st.markdown(
+        f'<div class="look-cap" style="color:var(--bad)">'
+        f'{len(breaks)} of {len(near)} colours allowed on Top break the rule. '
+        f'Take Top off them, or drop them.</div>', unsafe_allow_html=True)
+    for colour in breaks:
+        elsewhere = ", ".join(c for c in colour.allowed if c != "Top")
+        st.markdown(
+            f'<div class="step" style="border-left-color:{colour.hex}">'
+            f'<div class="hd"><div class="pieces">'
+            f'<span class="chip" style="background:{colour.hex}"></span>'
+            f'{colour.name}</div><div class="cost">'
+            f'{pal_mod.skin_distance(colour.hex, skin):.0f}</div></div>'
+            f'<div class="why">Needs {pal_mod.TOO_CLOSE:.0f} from his skin and has '
+            f'{pal_mod.skin_distance(colour.hex, skin):.0f}, so at the collar it '
+            f'reads as more of him than as a garment. '
+            f'Fine on {elsewhere or "nothing else"}.</div></div>',
+            unsafe_allow_html=True)
 
 
 def palette_panel(palette: Palette, skin: str) -> None:
@@ -885,11 +916,16 @@ def palette_panel(palette: Palette, skin: str) -> None:
                                  help="Leave empty for all year round.")
         note = st.text_input("Note", 
                              key="pal-note")
-        verdict, why = pal_mod.warmth(hex_code, skin)
+        passes, why = pal_mod.face_rule(hex_code, skin)
+        on_top = "Top" in allowed or (not allowed and
+                                      "Top" in pal_mod.ROLE_CATEGORIES.get(role, ()))
+        badge = "ok" if passes else ("no" if on_top else "want")
+        label = ("clears the face" if passes
+                 else "breaks the rule on Top" if on_top else "too close for Top")
         st.markdown(
-            f'<div class="look-cap"><span class="badge {VERDICT_BADGE[verdict]}">'
-            f'{verdict}</span> {why} &middot; reads as {pal_mod.hue_name(hex_code)}, '
-            f'lightness {pal_mod.lightness(hex_code):.2f}</div>', unsafe_allow_html=True)
+            f'<div class="look-cap"><span class="badge {badge}">{label}</span> {why}'
+            f' &middot; reads as {pal_mod.hue_name(hex_code)}</div>',
+            unsafe_allow_html=True)
         if st.form_submit_button("Add to palette"):
             chosen = name.strip() or (picked if not custom else
                                       pal_mod.hue_name(hex_code).title())
@@ -909,18 +945,24 @@ def palette_panel(palette: Palette, skin: str) -> None:
         st.markdown(ui.swatch_strip(colours), unsafe_allow_html=True)
         for colour in colours:
             c1, c2 = st.columns([9, 1], vertical_alignment="center")
-            verdict, why = colour.verdict(skin)
-            against = pal_mod.reads_against_skin(colour.hex, skin)
             note_line = f"<br>{colour.note}" if colour.note else ""
+            distance = pal_mod.skin_distance(colour.hex, skin)
+            if not colour.near_the_face:
+                rule_line = (f'<span class="badge">not worn on top</span> {distance:.0f}'
+                             f' from his skin, which does not matter off the face')
+            elif pal_mod.clears_the_face(colour.hex, skin):
+                rule_line = (f'<span class="badge ok">clears the face</span> '
+                             f'{distance:.0f} from his skin')
+            else:
+                rule_line = (f'<span class="badge no">breaks the rule</span> '
+                             f'{pal_mod.face_rule(colour.hex, skin)[1]}')
             c1.markdown(
                 f'<div class="step" style="border-left-color:{colour.hex}">'
                 f'<div class="hd"><div class="pieces">'
                 f'<span class="chip" style="background:{colour.hex}"></span>'
                 f'{colour.name}</div><div class="cost">{colour.hex}</div></div>'
-                f'<div class="why"><span class="badge {VERDICT_BADGE[verdict]}">{verdict}</span> '
-                f'{why}<br><span class="badge {AGAINST_BADGE[against]}">{against}</span> '
-                f'{pal_mod.separation_reason(colour.hex, skin)}<br>'
-                f'{colour.family}, lightness {colour.light:.2f} &middot; '
+                f'<div class="why">{rule_line}<br>'
+                f'{colour.family} &middot; '
                 f'{", ".join(colour.allowed)} &middot; {colour.season_line}'
                 f'{note_line}</div></div>',
                 unsafe_allow_html=True)

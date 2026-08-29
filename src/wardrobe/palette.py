@@ -1,29 +1,28 @@
-"""Colour: the palette, and the rules for combining it.
+"""Colour: the palette, and the one rule.
 
-A palette is not a list of colours, it is a set of roles. Navy is a different
-garment depending on whether it is the ground under everything or the field next
-to the face, and a colour that works as one is often wrong as the other. So each
-colour carries a role and the garment categories it is allowed on, and every
-rule below is expressed in those terms.
+There is exactly one rule here, and it is the only one that cannot be broken:
 
-Coordination then stops being taste and becomes two measurable things:
+    A colour worn on top must sit far enough from his skin.
 
-  value contrast   how far apart two colours are in lightness. Top and bottom
-                   within a hair of each other reads as a tracksuit, whatever
-                   the hues are.
-  temperature      where a hue sits relative to his skin. Warm medium-brown skin
-                   at hue 22 carries warm colour easily; cold greys next to the
-                   face drain it. Blue is the interesting exception: at roughly
-                   the opposite side of the wheel it flatters by contrast, which
-                   is why navy is the one cold colour everybody looks well in.
+That is it. Everything else is preference, and preference belongs to him, not to
+this file. There used to be a warmth verdict calling colours harmonious, or
+flattering, or careful, on the strength of how many degrees round the hue wheel
+they sat from his skin. It was invented rather than observed, it dressed taste up
+as arithmetic, and it is gone.
 
-Everything here is plain arithmetic on HSL. No model calls, nothing to wait for.
+The one rule is measured, not guessed: straight distance in CIELAB, where a step
+of a given size looks like the same size wherever it is taken. Under TOO_CLOSE a
+colour at the collar reads as more of him than as a garment. Anything else
+passes, including close-toned choices like burgundy, which are a deliberate look
+and not a mistake.
+
+A colour still carries a role and the garments it is allowed on, because a
+trouser colour is not a shirt colour. That is bookkeeping, not a verdict.
 """
 
 from __future__ import annotations
 
 import colorsys
-import itertools
 import math
 import re
 import tomllib
@@ -36,27 +35,19 @@ from . import paths
 
 # --- roles --------------------------------------------------------------------
 
-# His skin, measured rather than guessed. Every warmth verdict is relative to
-# it, so it lives in one place; the app passes the profile's value in, and this
-# is only the fallback for calling the maths directly.
+# His skin, measured rather than guessed. The rule is relative to it, so it lives
+# in one place; the app passes the profile's value in, and this is only the
+# fallback for calling the maths directly.
 DEFAULT_SKIN = "#A0583C"
 
-# How far a colour sits from his skin, measured properly. Hue and lightness
-# separately was the wrong shape: taking the larger of two axes threw away the
-# fact that burgundy differs from him moderately on both at once, and moderate
-# plus moderate is a real difference. Distance in CIELAB counts both, and counts
-# them the way an eye does.
-#
-# Two thresholds, because a binary was also the wrong shape. Below the first a
-# colour reads as more of him. Between them it reads as tonal: a deliberate,
-# close-toned look rather than a mistake, which is what burgundy on brown skin
-# actually is. Above the second it plainly frames him.
+# The only threshold in this file. Under it, a colour at the collar reads as more
+# of him than as a garment. Over it, it passes: there is no second band and no
+# grade of approval, because the rule is a rule and not an opinion.
 TOO_CLOSE = 20.0
-CLEARLY_APART = 32.0
 
-# Kept for the warmth verdict, which is a separate question about family.
-HUE_GAP = 60.0
-VALUE_GAP = 0.20
+# Where the rule applies. A jumper and a shirt sit at the face; trousers, shoes
+# and a belt do not, and a colour too near his skin is perfectly good on those.
+NEAR_THE_FACE: tuple[str, ...] = ("Top",)
 
 GROUND, FIELD, ACCENT = "Ground", "Field", "Accent"
 
@@ -79,12 +70,6 @@ ROLE_CATEGORIES: dict[str, tuple[str, ...]] = {
 SEASONS: tuple[str, ...] = ("Spring", "Summer", "Autumn", "Winter")
 
 CATEGORIES: tuple[str, ...] = ("Top", "Bottom", "Outerwear", "Shoes", "Accessory")
-
-# Twelve equal sectors, used only as labels around the wheel.
-HUE_NAMES: tuple[str, ...] = (
-    "red", "orange", "amber", "yellow", "lime", "green",
-    "teal", "azure", "blue", "indigo", "violet", "magenta",
-)
 
 # Naming a colour is a different job from drawing the wheel. Equal sectors put
 # navy in "cyan" and olive in "amber", which no tailor would say, so the names
@@ -175,12 +160,6 @@ def hue_name(hex_code: str) -> str:
     return next((name for edge, name in HUE_BANDS if hue < edge), "red")
 
 
-def contrast(a: str, b: str) -> float:
-    """Difference in lightness, 0 to 1. The only number that decides whether a
-    top and a bottom read as two garments or as one."""
-    return abs(lightness(a) - lightness(b))
-
-
 def to_lab(hex_code: str) -> tuple[float, float, float]:
     """sRGB to CIELAB, D65.
 
@@ -204,87 +183,41 @@ def to_lab(hex_code: str) -> tuple[float, float, float]:
     return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
 
 
+# --- the one rule -------------------------------------------------------------
+
 def skin_distance(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
     """How far this colour sits from his skin, perceptually.
 
     Straight Euclidean distance in CIELAB. Roughly: under 20 the two are more
     alike than not, over 50 nobody would group them.
     """
-    a, b = to_lab(hex_code), to_lab(skin_hex)
-    return math.dist(a, b)
+    return math.dist(to_lab(hex_code), to_lab(skin_hex))
 
 
-def value_gap(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
-    """How far a colour sits from his own lightness.
-
-    A separate question from hue, and the one that decides whether something
-    next to the face reads as contrast or as a tonal blur. At 0.43 he is
-    mid-deep, so a mid-brown can be perfectly harmonious in family and still
-    disappear against him.
-    """
-    return abs(lightness(hex_code) - lightness(skin_hex))
-
-
-def separation(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
-    """Perceptual distance from his skin. See skin_distance."""
-    return skin_distance(hex_code, skin_hex)
-
-
-def reads_against_skin(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
-    """One of: too close, tonal, clear."""
-    distance = skin_distance(hex_code, skin_hex)
-    if distance < TOO_CLOSE:
-        return "too close"
-    return "tonal" if distance < CLEARLY_APART else "clear"
-
-
-def separates_from_skin(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
-    """Anything that is not actively disappearing into him."""
-    return reads_against_skin(hex_code, skin_hex) != "too close"
+def clears_the_face(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
+    """The rule, as a yes or a no. Nothing in between."""
+    return skin_distance(hex_code, skin_hex) >= TOO_CLOSE
 
 
 def blurs_at_the_collar(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
-    return reads_against_skin(hex_code, skin_hex) == "too close"
+    return not clears_the_face(hex_code, skin_hex)
 
 
-def separation_reason(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
+def face_rule(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[bool, str]:
+    """(passes, why). The only judgement this module makes about a colour."""
     distance = skin_distance(hex_code, skin_hex)
-    verdict = reads_against_skin(hex_code, skin_hex)
-    if verdict == "too close":
-        return (f"sits {distance:.0f} from his own colouring, near enough to read "
-                "as more of him than as a garment")
-    if verdict == "tonal":
-        return (f"sits {distance:.0f} from his own colouring: close-toned, which is "
-                "a deliberate look rather than a contrast one")
-    return f"sits {distance:.0f} from his own colouring, plainly a garment"
+    if distance < TOO_CLOSE:
+        return False, (f"{distance:.0f} from his skin, under the {TOO_CLOSE:.0f} "
+                       "minimum: at the collar this reads as more of him than as "
+                       "a garment")
+    return True, f"{distance:.0f} from his skin, clear of the {TOO_CLOSE:.0f} minimum"
 
 
-def hue_distance(a: str, b: str) -> float:
-    """Shortest way round the wheel, in degrees."""
-    difference = abs(hsl(a)[0] - hsl(b)[0]) % 360
-    return min(difference, 360 - difference)
-
-
-def warmth(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[str, str]:
-    """How a colour sits against his skin. Returns (verdict, why).
-
-    Near his skin hue is harmonious, the far side is flattering by contrast, and
-    the awkward zone is the near-miss: close enough to relate, far enough to
-    argue. That is where sallow greens and cold mauves live.
-    """
-    saturation, light = hsl(hex_code)[1], hsl(hex_code)[2]
-    if saturation < 0.10:
-        if light > 0.82:
-            return "flattering", "off-white lifts warm skin without competing"
-        if light < 0.22:
-            return "careful", "near-black drains warm skin; keep it below the waist"
-        return "careful", "flat grey next to warm skin reads cold"
-    distance = hue_distance(hex_code, skin_hex)
-    if distance <= 45:
-        return "harmonious", f"{round(distance)}° from his skin hue, the same warm family"
-    if distance >= 140:
-        return "flattering", f"{round(distance)}° away, flatters by contrast, as navy does"
-    return "careful", f"{round(distance)}° away: close enough to relate, far enough to argue"
+def breaks_the_rule(palette: "Palette", skin_hex: str = DEFAULT_SKIN) -> list["Colour"]:
+    """Every colour in the palette allowed near the face that sits too close."""
+    return [c for c in palette.colours
+            if any(c.allows(category) for category in NEAR_THE_FACE)
+            and blurs_at_the_collar(c.hex, skin_hex)]
 
 
 # --- the palette --------------------------------------------------------------
@@ -326,8 +259,10 @@ class Colour:
     def family(self) -> str:
         return hue_name(self.hex)
 
-    def verdict(self, skin_hex: str = DEFAULT_SKIN) -> tuple[str, str]:
-        return warmth(self.hex, skin_hex)
+    @property
+    def near_the_face(self) -> bool:
+        """Whether the rule applies to this colour at all."""
+        return any(self.allows(category) for category in NEAR_THE_FACE)
 
 
 @dataclass
