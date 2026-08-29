@@ -133,6 +133,7 @@ def render() -> None:
     st.markdown(f'<div class="page-head"><span class="page-no">{page_number(here)}</span>'
                 f'<h2>{PAGE_TITLES[here]}</h2></div>', unsafe_allow_html=True)
     draw[here]()
+    remember_page()
 
 
 # The ten pages in the order the work is actually done, plus the workshop.
@@ -178,27 +179,47 @@ def page_number(slug: str) -> str:
 
 
 def current_page() -> str:
-    """Which page we are on, taken from the URL rather than from widget state.
+    """Which page we are on.
 
-    Streamlit tabs reset to the first one on every rerun, so saving anything sent
-    you back to the Style Guide. The page now lives in the query string: a rerun
-    keeps it, a refresh keeps it, and a page can be linked to.
+    Seeded from the URL on the first run of a session and owned by the radio
+    afterwards. Writing the URL in response to a click, which is how this worked
+    for a while, restarted the session: every widget further down the page lost
+    its state, so the wardrobe search could not hold a word once you had reached
+    it by clicking rather than by typing the address.
     """
-    wanted = st.query_params.get("page", "")
-    return wanted if wanted in PAGE_TITLES else PAGES[0][0]
+    if "nav-page" not in st.session_state:
+        asked = st.query_params.get("page", "")
+        st.session_state["nav-page"] = asked if asked in PAGE_TITLES else PAGES[0][0]
+    return st.session_state["nav-page"]
 
 
 def navigation() -> None:
+    """The page list. No index and no callback: the key is the whole of it."""
     slugs = [slug for slug, _ in PAGES]
-    here = current_page()
-    picked = st.radio(
-        "Section", slugs, index=slugs.index(here),
+    current_page()                       # seed the state before drawing
+    st.radio(
+        "Section", slugs, key="nav-page",
         format_func=lambda slug: f"{page_number(slug).replace('&#9881;', chr(9881))}  "
                                  f"{PAGE_TITLES[slug]}",
-        label_visibility="collapsed", key="nav-page")
-    if picked != here:
-        st.query_params["page"] = picked
-        st.rerun()
+        label_visibility="collapsed")
+    # The address bar is synced by remember_page() at the very end of the run.
+    # Writing it here reruns the script from inside the sidebar, before the page
+    # body has drawn, and every widget below loses its state on the way.
+
+
+def remember_page() -> None:
+    """Put the current page in the address bar, once the page itself has drawn.
+
+    A refresh has to land back where you were, which means the URL has to follow
+    the navigation. Writing it while the sidebar is drawing reruns the script
+    before the page body exists, and Streamlit discards the state of every widget
+    that did not get rendered: the wardrobe search would then arrive empty every
+    time and filter nothing. Doing it last means everything has already been
+    drawn and registered before the address changes.
+    """
+    here = st.session_state.get("nav-page", "")
+    if here and st.query_params.get("page") != here:
+        st.query_params["page"] = here
 
 
 def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:

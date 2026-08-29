@@ -2140,6 +2140,13 @@ def check_no_widget_fights_its_own_key() -> str:
     # value fourth, so reading args[1] there flags every bounded number on the
     # page, and a number with a constant default is usually what was meant.
     WIDGETS = {"text_input", "text_area"}
+    # A keyed selection widget must not also be told which option to select.
+    # The navigation carried both and Streamlit settled the argument with an
+    # extra rerun that aborted the script partway, so a search box further down
+    # the page lost what had been typed into it. Reaching the wardrobe by
+    # clicking the navigation left its search unable to hold a word; reaching it
+    # by URL was fine, which is why it looked intermittent.
+    SELECTORS = {"radio", "selectbox", "multiselect", "select_slider"}
     offences: list[str] = []
     for source in sorted(Path(__file__).parent.glob("*.py")):
         tree = _ast.parse(source.read_text())
@@ -2156,6 +2163,36 @@ def check_no_widget_fights_its_own_key() -> str:
                 (k.value for k in node.keywords if k.arg == "value"), None)
             if isinstance(given, _ast.Constant) and given.value in ("", None, 0):
                 offences.append(f"{source.name}:{node.lineno}")
+
+    # The navigation only. A form field given both a key and the item's current
+    # value is fine: a form does not rerun per widget, so the two never argue.
+    # It is the navigation that reruns on every click, and it carried both.
+    import wardrobe.app as _app
+    source = _ast.parse(Path(_app.__file__).read_text())
+    nav = next(n for n in _ast.walk(source)
+               if isinstance(n, _ast.FunctionDef) and n.name == "navigation")
+    for node in _ast.walk(nav):
+        if isinstance(node, _ast.Call) and getattr(node.func, "attr", "") == "radio":
+            named = {k.arg for k in node.keywords}
+            assert "key" in named, "the navigation radio lost its key"
+            assert "index" not in named, (
+                "the navigation radio carries both a key and an index; Streamlit "
+                "settles that with an extra rerun that aborts the script partway, "
+                "and a search box further down the page loses what was typed")
+            assert "on_change" not in named, (
+                "the navigation writes the URL from a callback again; that reruns "
+                "the script before the page body is drawn")
+            break
+    else:
+        raise AssertionError("the navigation no longer draws a radio")
+
+    # The address bar is synced after the page body has drawn, not while the
+    # sidebar is drawing. Writing it early reruns the script before the widgets
+    # below exist and Streamlit discards their state.
+    body = Path(_app.__file__).read_text()
+    assert "remember_page()" in body, "the URL is no longer kept in step with the page"
+    assert body.index("draw[here]()") < body.index("    remember_page()\n"), \
+        "the URL is written before the page is drawn"
     assert not offences, (
         "keyed widgets handed a constant default, which wipes what is typed: "
         + ", ".join(offences))
