@@ -589,7 +589,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
 
     ui.eyebrow("The wardrobe")
     f1, f2, f3 = st.columns([2, 1, 1])
-    query = f1.text_input("Search", "", key="inv-q", )
+    query = f1.text_input("Search", "", key="inv-q")
     category = f2.selectbox("Category", ["All", *categories()], key="inv-cat")
     status = f3.selectbox("Status", ["All", *STATUSES], key="inv-status")
 
@@ -788,8 +788,8 @@ def kept_panel(principles: Principles) -> None:
 def handwrite_panel(principles: Principles) -> None:
     with st.expander("Write one by hand"):
         with st.form("add-principle", clear_on_submit=True):
-            text = st.text_input("Instruction", )
-            reason = st.text_input("Reason", )
+            text = st.text_input("Instruction")
+            reason = st.text_input("Reason")
             group = st.selectbox("Group", GROUPS)
             if st.form_submit_button("Add principle") and text.strip():
                 principles.add(Principle(text=text.strip(), reason=reason.strip(), group=group))
@@ -1249,7 +1249,7 @@ def garment_catalogue_panel() -> None:
     with st.expander("Add a garment"):
         with st.form("add-garment", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            name = c1.text_input("Name", )
+            name = c1.text_input("Name")
             category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
             picked = c3.multiselect("Size schemes", list(vocabulary.SCHEMES),
                                     default=["Alpha"], key="ag-scheme",
@@ -1310,7 +1310,7 @@ def garment_catalogue_panel() -> None:
     with st.expander("Add a fabric"):
         with st.form("add-fabric", clear_on_submit=True):
             c1, c2 = st.columns(2)
-            name = c1.text_input("Name", )
+            name = c1.text_input("Name")
             family = c2.selectbox("Family", [*vocab.families(), "New family…"],
                                   key="af-family")
             fresh = st.text_input("New family name", key="af-new",
@@ -1392,7 +1392,7 @@ def retailer_catalogue_view() -> None:
     with st.expander("Add a shop"):
         with st.form("add-shop", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
-            name = c1.text_input("Name", )
+            name = c1.text_input("Name")
             kind = c2.selectbox("Kind", retailers.KINDS, key="as-kind")
             search = st.text_input(
                 "Search link", 
@@ -1663,7 +1663,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     with st.expander("Invent a piece you do not own"):
         with st.form("quick-aspirational", clear_on_submit=True):
             c1, c2, c3 = st.columns([3, 2, 1])
-            name = c1.text_input("Name", )
+            name = c1.text_input("Name")
             garment = c2.selectbox("Garment", garments(), key="asp-garment")
             grade = c3.selectbox("Grade", grades(), key="asp-grade")
             c4, c5, c6 = st.columns([2, 1, 2])
@@ -1719,9 +1719,9 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     background = c2.selectbox("Background", list(BACKGROUNDS), key="gen-bg")
     count = c3.number_input("Variations", 1, 4, 1, key="gen-count")
     c4, c5 = st.columns([2, 2])
-    name = c4.text_input("Outfit name", )
+    name = c4.text_input("Outfit name")
     tag_choice = c5.multiselect("Tags", outfits.all_tags(), key="gen-tags")
-    extra = st.text_input("Extra direction", )
+    extra = st.text_input("Extra direction")
     use_principles = st.toggle("Apply the principles", value=bool(principles.principles),
                                key="gen-prin")
 
@@ -2302,7 +2302,7 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
     with st.expander("Add a route"):
         with st.form("add-route", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
-            label = c1.text_input("Name it", )
+            label = c1.text_input("Name it")
             garment = c2.selectbox("Garment", garments(), key="ar-garment")
             book = catalogue.lookup()
             stores = st.multiselect(
@@ -2316,9 +2316,9 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
                                   key="ar-family")
             fit = m4.selectbox("Fit", fits(), key="ar-fit")
             t1, t2 = st.columns(2)
-            condition = t1.text_input("Condition", )
-            timing = t2.text_input("Timing", )
-            spec = st.text_input("Insist on", )
+            condition = t1.text_input("Condition")
+            timing = t2.text_input("Timing")
+            spec = st.text_input("Insist on")
             note = st.text_area("Note", height=68, key="ar-note")
             if st.form_submit_button("Add route"):
                 if not stores:
