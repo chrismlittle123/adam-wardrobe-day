@@ -106,12 +106,10 @@ fits = [
 ]
 grades = [
     "",
-    "Branded",
     "Dress",
     "Everyday",
     "Heavyweight",
     "Knitted",
-    "Smart",
 ]
 
 [[garments]]

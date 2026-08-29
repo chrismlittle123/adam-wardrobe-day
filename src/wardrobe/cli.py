@@ -12,6 +12,8 @@ def check(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="wardrobe-check", description="Run the check suite.")
     parser.add_argument("--live", action="store_true",
                         help="also call Vertex AI for real (slow, costs money)")
+    parser.add_argument("--browser", action="store_true",
+                        help="also open every page in Chromium and look at it (slow)")
     parser.add_argument("--group", action="append", choices=list(checks.GROUPS),
                         help="only this group; repeatable")
     args = parser.parse_args(argv)
@@ -20,7 +22,12 @@ def check(argv: list[str] | None = None) -> int:
         mark = "\033[32m✓\033[0m" if c.passed else "\033[31m✗\033[0m"
         print(f" {mark} {c.group:15} {c.name:46} {c.seconds:5.2f}s  {c.detail[:70]}")
 
-    result = checks.run(args.group, live=args.live, on_result=line)
+    groups = list(args.group or [])
+    if args.browser and not groups:
+        groups = [g for g in checks.GROUPS if g != checks.LIVE]
+    elif args.browser:
+        groups.append(checks.BROWSER)
+    result = checks.run(groups or None, live=args.live, on_result=line)
     print(f"\n{result.passed}/{len(result.checks)} passed in {result.seconds}s")
     for failure in result.failed:
         print(f"\n--- {failure.name} ---\n{failure.trace or failure.detail}")

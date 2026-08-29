@@ -50,7 +50,7 @@ CSS = """
 }
 
 .stApp { background: var(--ground); }
-html, body, [class*="css"], .stMarkdown, p, li, label, [data-testid="stWidgetLabel"] {
+html, body, [class*="css"], .stMarkdown, p, li, label, td, th, [data-testid="stWidgetLabel"] {
   font-family: var(--prose); color: var(--cream);
 }
 [data-testid="stHeader"] { background: transparent; }
@@ -177,7 +177,11 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 }
 [data-testid="stTab"][aria-selected="true"], 
 [data-testid="stTab"][aria-selected="true"] p { color: var(--brass) !important; }
-[data-testid="stTabs"] [role="tablist"] + div { background: var(--brass); }
+/* The underline goes on the selected tab itself. It was briefly written as
+   [role="tablist"] + div, meaning "the highlight bar after the tabs", which is
+   in fact the tab panel: it painted the entire contents of the page brass. */
+[data-testid="stTab"][aria-selected="true"] { box-shadow: inset 0 -2px 0 var(--brass); }
+[data-testid="stTabPanel"] { background: transparent !important; }
 
 /* Navigation: a running order, not a row of tabs -------------------------- */
 /* Ten pages will not fit across the top without wrapping into an ugly second

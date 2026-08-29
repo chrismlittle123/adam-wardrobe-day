@@ -22,12 +22,12 @@ from . import paths
 
 APP_FILE = Path(__file__).with_name("app.py")
 
-DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, SHOP, PROMPTS, APP, LIVE = (
+DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, SHOP, PROMPTS, APP, LIVE, BROWSER = (
     "Data", "Fit engine", "Inventory", "Questionnaire", "Colour",
-    "Shopping maths", "Shop", "Prompts", "App", "Live Gemini",
+    "Shopping maths", "Shop", "Prompts", "App", "Live Gemini", "Browser",
 )
 GROUPS: tuple[str, ...] = (DATA, FIT, INVENTORY, QUESTIONS, COLOUR, MATHS, SHOP,
-                           PROMPTS, APP, LIVE)
+                           PROMPTS, APP, LIVE, BROWSER)
 
 
 @dataclass
@@ -1672,6 +1672,29 @@ def check_no_shrugging_plurals() -> str:
     return "no string shrugs at a plural; 1 piece, 2 pieces, 3 feet"
 
 
+def check_nothing_looks_wrong() -> str:
+    """Open every page in a real browser and look at it.
+
+    The two style regressions that shipped were not broken selectors. Both
+    matched something; they matched the wrong thing. Streamlit dropped
+    data-baseweb, so four blocks silently stopped applying. And
+    `[role="tablist"] + div`, written meaning "the highlight bar under the
+    tabs", is the tab panel: it painted the whole garment catalogue brass.
+
+    Reading the stylesheet cannot catch either. This drives Chromium instead,
+    and fails on a page that raises, on text left in the framework's own font,
+    on a page that scrolls sideways, and on any panel larger than a quarter of
+    the screen painted one of the accent colours.
+    """
+    from . import browser
+    with browser.server() as url:
+        faults = browser.sweep(url)
+    if faults:
+        lines = [f"{view}: {'; '.join(bad)}" for view, bad in faults.items()]
+        raise AssertionError("the app looks wrong on " + " | ".join(lines))
+    return f"{len(browser.VIEWS)} views: no flooded panels, no unstyled text, no sideways scroll"
+
+
 def check_no_dead_style_hooks() -> str:
     """Every selector in the stylesheet must hook onto something Streamlit emits.
 
@@ -2524,6 +2547,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
     (APP, "No text box prefills a suggestion", check_no_prefilled_hints),
     (APP, "No dead style hooks", check_no_dead_style_hooks),
+    (BROWSER, "Every page looks right in a browser", check_nothing_looks_wrong),
     (APP, "The meter never overflows", check_meter_never_overflows),
     (APP, "Nothing shrugs at a plural", check_no_shrugging_plurals),
     (APP, "Typography is one system, not three", check_typography),
