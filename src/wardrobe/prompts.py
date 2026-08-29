@@ -32,8 +32,16 @@ SHOTS: dict[str, str] = {
 BACKGROUNDS: dict[str, str] = {
     "Interior": "Warm domestic interior behind him, softly out of focus",
     "Street": "Blurred European city street behind him, shallow depth of field, background well out of focus",
-    "Warm grey studio": "Plain seamless warm mid-grey studio background",
-    "White studio": "Plain seamless pure white studio background",
+    "Warm grey studio": (
+        "Plain seamless warm mid-grey studio background, no visible floor and no "
+        "line where a floor meets a wall"),
+    # Asking for white is not enough on a full-length shot: the model puts him
+    # in a room and lets him cast a shadow across the floor, which is then a
+    # floor. The sweep has to be asked for by name.
+    "White studio": (
+        "Plain seamless pure white studio background, an infinity cove with no "
+        "visible floor, no horizon and no line where a floor meets a wall. A soft "
+        "contact shadow directly beneath his feet only. Nothing else in the frame"),
 }
 
 CIRCUMFERENCE_FREE = {"shoe_eu"}
@@ -94,8 +102,12 @@ def build_prompt(
         lines.append(prose)
     lines += [
         "",
-        "Keep his face, head shape, hair, skin tone and facial hair exactly as the "
-        "reference image. This must read as the same person. Do not restyle his face.",
+        # "The reference image" was fine when there was one. There are now up to
+        # seven, and a model told to take the face from an unspecified one of
+        # them will sometimes take it from a photograph of a coat.
+        "THE FIRST reference image is the man himself. Take his face, head shape, "
+        "hair, skin tone and facial hair from THAT image exactly. This must read as "
+        "the same person, not a similar one. Do not restyle his face.",
         f"Keep his body exactly as described: he is {s.height_metric} and "
         f"{s.build.lower() or 'lean'}, so the clothes hang on a lean frame. Do not "
         "elongate him into a fashion-model silhouette and do not broaden him."

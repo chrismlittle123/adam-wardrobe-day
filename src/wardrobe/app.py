@@ -731,7 +731,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
 
     ui.eyebrow("The wardrobe")
     f1, f2, f3 = st.columns([2, 1, 1])
-    query = f1.text_input("Search", "", key="inv-q")
+    query = f1.text_input("Search", key="inv-q")
     category = f2.selectbox("Category", ["All", *categories()], key="inv-cat")
     status = f3.selectbox("Status", ["All", *STATUSES], key="inv-status")
 
@@ -2015,17 +2015,37 @@ def checked_look(prompt: str, *, out_prefix, portrait, photos, items,
 
 
 def report_rejections(rejected, kept_count: int) -> None:
-    """Say what was thrown away and why, rather than quietly keeping the best."""
+    """Say what was thrown away and why, and let a near miss be kept anyway.
+
+    Discarding every attempt threw away work the user had paid for and left them
+    with nothing to look at. Nothing rejected is ever saved automatically, which
+    was the point, but a picture that failed on one count out of three is often
+    still worth having, and it is his eye that decides that, not the judge's.
+    """
     if not rejected:
         return
-    lines = "<br>".join(
-        f"attempt {n + 1}: {a.report.summary()}" for n, a in enumerate(rejected))
     st.warning(f"{ui.plural(len(rejected), 'attempt')} rejected and redrawn.")
-    st.markdown(f'<div class="look-cap">{lines}</div>', unsafe_allow_html=True)
-    if not kept_count:
-        st.error("Nothing passed the check, so nothing was saved. The model kept "
-                 "returning a picture that is not him, not on white, or not in "
-                 "those clothes.")
+    for n, attempt in enumerate(rejected, 1):
+        held = 3 - len(attempt.report.failures)
+        st.markdown(
+            f'<div class="look-cap">attempt {n} &middot; {held} of 3 held '
+            f'&middot; {attempt.report.summary()}</div>', unsafe_allow_html=True)
+    if kept_count:
+        return
+
+    st.error("Nothing passed the check, so nothing was saved automatically. The "
+             "model kept returning a picture that is not him, not on white, or "
+             "not in those clothes.")
+    best = min(rejected, key=lambda a: len(a.report.failures))
+    st.markdown('<div class="look-cap">The closest attempt, which failed on '
+                f'{ui.plural(len(best.report.failures), "count")}:</div>',
+                unsafe_allow_html=True)
+    ui.plate(best.path, "rejected", width=420)
+    st.markdown(
+        '<div class="look-cap">Every attempt is on disk under the looks folder, '
+        'so nothing is lost. Judge it yourself: the check is strict on purpose '
+        'and a shadow it disliked may be one you do not mind.</div>',
+        unsafe_allow_html=True)
 
 
 def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
@@ -2180,7 +2200,7 @@ def gallery_tab(inventory: Inventory, outfits: Outfits) -> None:
     )
 
     f1, f2, f3, f4 = st.columns([2, 2, 1, 1])
-    query = f1.text_input("Search", "", key="gal-q")
+    query = f1.text_input("Search", key="gal-q")
     tags = f2.multiselect("Tags", outfits.all_tags(), key="gal-tags")
     match_all = f3.toggle("Match all tags", key="gal-all")
     loved_only = f4.toggle("Loved only", key="gal-loved")

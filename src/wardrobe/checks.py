@@ -1927,8 +1927,17 @@ def check_a_look_is_checked_before_it_is_kept() -> str:
     fix = mixed.correction("plain seamless pure white, empty")
     assert "face is wrong" in fix.lower() and "background is wrong" in fix.lower()
     assert "garments are wrong" not in fix.lower(), "it was told to change what was right"
-    assert "no furniture" in fix and "no shadow gradient" in fix, \
+    assert "no furniture" in fix and "no visible floor" in fix, \
         "the correction does not say what an empty background means"
+    # A contact shadow under the feet is what a studio photograph looks like.
+    # Forbidding it made the check unpassable on a standing full-length shot.
+    assert "contact shadow directly under his feet is fine" in fix, \
+        "the correction still forbids the shadow every studio photograph has"
+    # The positions must be stated, and stated correctly: the picture being
+    # corrected goes first, so the man is the second image.
+    assert "SECOND image is the man" in fix, "the correction does not say where the man is"
+    assert "reference image 1 is the man" not in fix.lower(), \
+        "the correction points at the failed picture for the face"
 
     only_clothes = verify._read('{"face":{"ok":true,"why":""},'
                                 '"background":{"ok":true,"why":""},'
@@ -2110,6 +2119,76 @@ def check_changing_garment_changes_the_form() -> str:
     assert scheme.value == trouser.schemes[0], \
         f"a trouser opened as {scheme.value!r}, not {trouser.schemes[0]!r}"
     return "garment drives the scheme and the size boxes, across five garments"
+
+
+def check_no_widget_fights_its_own_key() -> str:
+    """A keyed text box must not also be handed a constant default.
+
+    `st.text_input("Search", "", key="inv-q")` re-applies that empty string on
+    every rerun, so what you typed was thrown away before the filter ever saw
+    it: the wardrobe search accepted a word, reran, and still said 25 of 25.
+    It was invisible to the suite because AppTest sets a widget's value directly
+    and never goes through the default at all.
+
+    A default that is computed is fine, and sometimes necessary: the palette form
+    fills the name from whichever colour was picked. It is the constant that
+    fights the key, because it can never be anything but what it was.
+    """
+    import ast as _ast
+
+    # Only the text widgets. st.number_input takes the minimum second and the
+    # value fourth, so reading args[1] there flags every bounded number on the
+    # page, and a number with a constant default is usually what was meant.
+    WIDGETS = {"text_input", "text_area"}
+    offences: list[str] = []
+    for source in sorted(Path(__file__).parent.glob("*.py")):
+        tree = _ast.parse(source.read_text())
+        for node in _ast.walk(tree):
+            if not isinstance(node, _ast.Call):
+                continue
+            name = getattr(node.func, "attr", getattr(node.func, "id", ""))
+            if name not in WIDGETS:
+                continue
+            keyed = any(k.arg == "key" for k in node.keywords)
+            if not keyed:
+                continue
+            given = node.args[1] if len(node.args) > 1 else next(
+                (k.value for k in node.keywords if k.arg == "value"), None)
+            if isinstance(given, _ast.Constant) and given.value in ("", None, 0):
+                offences.append(f"{source.name}:{node.lineno}")
+    assert not offences, (
+        "keyed widgets handed a constant default, which wipes what is typed: "
+        + ", ".join(offences))
+
+    # And the thing it broke, end to end, on the page it broke on.
+    from streamlit.testing.v1 import AppTest
+    inventory, _ = _seeded()
+    target = inventory.items[0]
+    word = (target.name or target.garment).split()[0]
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["page"] = "inventory"
+    app = app.run()
+    assert not app.exception, f"the inventory raised: {app.exception[0].value}"
+    box = next((w for w in app.text_input if w.key == "inv-q"), None)
+    assert box is not None, "the wardrobe search box has gone"
+    searched = box.set_value(word).run()
+    assert not searched.exception, f"searching raised: {searched.exception[0].value}"
+    assert next(w for w in searched.text_input if w.key == "inv-q").value == word, \
+        "the search box did not keep what was typed"
+
+    # What the box holds after typing is the whole of it. If a constant default
+    # is re-applied on the rerun this is empty, the filter sees nothing, and the
+    # page reports every garment as a match. Counting rendered cards was tried
+    # and measures nothing: the seeded scratch home draws no grid at all.
+    kept = next(w for w in searched.text_input if w.key == "inv-q").value
+    assert kept == word, f"the search box held {kept!r} after typing {word!r}"
+
+    filtered = inventory.filter(query=word)
+    assert 0 < len(filtered) < len(inventory.items), \
+        f"the fixture word {word!r} does not narrow anything, so this proves little"
+    return (f"no keyed widget carries a constant default, and the box keeps "
+            f"{word!r}, which narrows {len(inventory.items)} to {len(filtered)}")
 
 
 def check_no_page_is_a_dead_end() -> str:
@@ -3194,6 +3273,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Every garment is shown to the model", check_every_garment_is_shown_to_the_model),
     (PROMPTS, "A look is checked before it is kept", check_a_look_is_checked_before_it_is_kept),
     (APP, "Choosing a garment reshapes the form", check_changing_garment_changes_the_form),
+    (APP, "No widget fights its own key", check_no_widget_fights_its_own_key),
     (APP, "No page is a dead end", check_no_page_is_a_dead_end),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),

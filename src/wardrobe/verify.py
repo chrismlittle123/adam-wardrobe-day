@@ -33,9 +33,10 @@ from .gemini_image import (GeminiImageError, Settings, _part_from_image,
 
 DEFAULT_JUDGE_MODEL = "gemini-2.5-pro"
 
-# Three attempts: the first draw, and two chances to be corrected. Past that the
-# model is not converging and another go is spending money to no purpose.
-MAX_ATTEMPTS = 3
+# The first draw and three chances to be corrected. Three attempts in total was
+# not enough while the corrections were pointing at the wrong reference; it is
+# probably generous now, but a rejected look costs a call either way.
+MAX_ATTEMPTS = 4
 
 SYSTEM = """You are checking a generated fashion photograph against the references it was built from.
 
@@ -73,27 +74,43 @@ class Report:
             return "his face, a white background, and the garments as photographed"
         return "; ".join(f"{name}: {self.notes.get(name, 'wrong')}" for name in self.failures)
 
-    def correction(self, background: str = "plain seamless pure white, empty") -> str:
-        """What to tell the model, naming only what was wrong."""
+    def correction(self, background: str = "plain seamless pure white") -> str:
+        """What to tell the model, naming only what was wrong.
+
+        The positions matter and were wrong here for a while. The picture being
+        corrected goes in first, because that is what an image model edits, so
+        the man is the *second* image. Saying "reference image 1 is the man"
+        while handing it the failed picture first told it to copy the face from
+        the very thing whose face was wrong, and it never converged.
+        """
         asks: list[str] = []
         if not self.face:
             asks.append(
-                "The face is wrong. Reference image 1 is the man. Reproduce his face, "
-                "head shape, hair, facial hair and skin tone exactly from it. This must "
-                "be recognisably the same person and not merely a similar one.")
+                "THE FACE IS WRONG. The SECOND image is the man. Take his face, head "
+                "shape, hair, facial hair and skin tone from the SECOND image, not "
+                "from the first. The first image has the wrong face and it is the "
+                "thing you are correcting. The result must be recognisably the same "
+                "person as the second image, not merely a similar one.")
         if not self.background:
             asks.append(
-                f"The background is wrong. It must be {background}: no wall, no floor "
-                "line, no horizon, no furniture, no props, no shadow gradient and no "
-                "texture. Nothing behind him at all.")
+                f"THE BACKGROUND IS WRONG. It must be {background} and empty: no wall, "
+                "no visible floor, no horizon line where a floor meets a wall, no "
+                "furniture, no props and no texture. A soft contact shadow directly "
+                "under his feet is fine and expected; a shadow cast across a floor is "
+                "not. He should look as though he is standing in front of a seamless "
+                "backdrop with nothing behind or beneath him.")
         if not self.garments:
             asks.append(
-                "The garments are wrong. The reference images after the first are the "
-                "actual garments. Reproduce each one exactly: its colour, its cloth, "
-                "its cut and its length. Do not substitute a similar piece.")
+                "THE GARMENTS ARE WRONG. The images after the second are the actual "
+                "garments. Reproduce each exactly: its colour, its cloth and its "
+                "texture, its cut and its length, and whether it is a shoe or a boot. "
+                "Do not substitute a similar piece.")
         told = " ".join(asks)
-        return (f"Correct this photograph. Keep everything that is already right and "
-                f"change only what is named. {told}\n\nReturn the corrected photograph.")
+        return (
+            "Correct the FIRST image. The SECOND image is the man. Every image after "
+            "that is one of the garments he is wearing.\n\n"
+            f"Keep everything already right and change only what is named here. {told}"
+            "\n\nReturn the corrected photograph and nothing else.")
 
 
 def _questions(garments: list[str], background: str) -> str:
@@ -104,7 +121,9 @@ Every image after that is a reference photograph of one garment he should be wea
 
 FACE. Compare the man in the first image with the portrait. Same person, or not? Judge the bone structure, the hair, the facial hair and the skin tone. A different man who looks similar is a failure.
 
-BACKGROUND. The background should be: {background}. It must be completely empty. A wall, a floor, a horizon line, furniture, a prop, a shadow falling on a surface behind him, or any texture at all is a failure. Only the man and his clothes should be in the frame.
+BACKGROUND. The background should be: {background}. Nothing may be in it: no wall, no visible floor, no horizon line, no furniture, no prop, no texture. Only the man and his clothes.
+
+A soft contact shadow directly beneath his feet is normal in a studio photograph and is NOT a failure. A shadow cast across a visible floor, or any line where a floor meets a wall, IS a failure.
 
 GARMENTS. He should be wearing exactly these, and nothing else:
 {listed}
@@ -204,6 +223,9 @@ def ensure(prompt: str, *, out_prefix: Path, portrait: Path,
         # Correct the picture itself rather than redrawing from nothing: the
         # face is usually the part that survived, and redrawing risks losing it.
         current_prompt = report.correction(background)
+        # The picture first because that is what gets edited, the man second
+        # because the correction says so. These two must agree or the face is
+        # taken from the failure.
         current_refs = [picture, portrait, *garment_photos]
 
     return None, history
