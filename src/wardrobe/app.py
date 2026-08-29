@@ -23,8 +23,8 @@ from wardrobe import (
     vocabulary,
     shop as shop_mod,
     sourcing,
-    checks as check_mod, fitspec, inventory as inv_mod, paths,
-    principles as prin_mod, reset as reset_mod, seed as seed_mod, shopping, ui,
+    fitspec, inventory as inv_mod, paths,
+    principles as prin_mod, reset as reset_mod, shopping, ui,
 )
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
@@ -2048,9 +2048,11 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
 
 def diagnostics_tab() -> None:
     ui.blurb(
-        "Prove it works, fill it with something realistic to play with, then put it "
-        "back exactly as it was. Every check runs in a throwaway directory of its own, "
-        "so running them cannot touch this wardrobe even if a check is wrong."
+        "Where the data lives, what is in it, and how to get it back. Clearing "
+        "anything takes a snapshot first, and every snapshot can be put back whole "
+        "or in part. The checks are not here: they belong at a terminal, where they "
+        "can run against a throwaway copy rather than against this wardrobe. "
+        "`uv run wardrobe-check`, or `uv run pytest`."
     )
     where = paths.home().resolve()
     st.markdown(
@@ -2058,70 +2060,8 @@ def diagnostics_tab() -> None:
         f'{" · scratch directory" if paths.is_scratch() else ""}</div>',
         unsafe_allow_html=True)
 
-    checks_panel()
-    sample_panel()
     reset_panel()
     snapshots_panel()
-
-
-def checks_panel() -> None:
-    ui.eyebrow("Checks")
-    offline = [g for g in check_mod.GROUPS if g != check_mod.LIVE]
-    c1, c2 = st.columns([3, 1])
-    groups = c1.multiselect("Groups", offline, default=offline, key="chk-groups")
-    live = c2.toggle("Include live Gemini", key="chk-live",
-                     help="Two real calls to Vertex AI: one for text, one for an image. "
-                          "Slow, and it costs money.")
-    if st.button("Run checks", type="primary"):
-        wanted = list(groups) + ([check_mod.LIVE] if live else [])
-        with st.spinner("Running…"):
-            st.session_state["check_result"] = check_mod.run(wanted, live=live)
-
-    result = st.session_state.get("check_result")
-    if not result:
-        return
-
-    ui.stats([
-        ("Passed", f"{result.passed}/{len(result.checks)}"),
-        ("Failed", str(len(result.failed))),
-        ("Seconds", f"{result.seconds:g}"),
-    ], brass_first=result.ok)
-    if result.ok:
-        st.success(f"All {len(result.checks)} checks passed.")
-    else:
-        st.error(f"{len(result.failed)} check(s) failed.")
-
-    for group, group_checks in result.by_group().items():
-        rows = [{
-            "": '<span class="badge ok">pass</span>' if c.passed
-                else '<span class="badge no">fail</span>',
-            "Check": c.name,
-            "Result": c.detail,
-            "Time": f"{c.seconds:.2f}s",
-        } for c in group_checks]
-        st.markdown(f'<div class="look-cap">{group}</div>', unsafe_allow_html=True)
-        ui.table(rows, numeric=("Time",))
-
-    for failure in result.failed:
-        with st.expander(f"Traceback · {failure.name}"):
-            st.code(failure.trace or failure.detail, language=None)
-
-
-def sample_panel() -> None:
-    ui.eyebrow("Sample data")
-    counts = (f"{len(seed_mod.ITEMS)} items, {len(seed_mod.LOOKS)} outfits, "
-              f"{len(seed_mod.ANSWERS)} answers, {len(seed_mod.PRINCIPLES)} principles")
-    ui.blurb(
-        f"Fills the wardrobe with {counts}, arranged so the shopping maths has "
-        "something real to chew on: three outfits blocked by the same two garments, "
-        "one blocked by a single expensive coat. A snapshot is taken first."
-    )
-    if st.button("Fill with sample data"):
-        reset_mod.snapshot()
-        added = seed_mod.seed_all()
-        st.success("Added " + ", ".join(f"{v} {k}" for k, v in added.items())
-                   + ". A snapshot was taken first.")
-        st.rerun()
 
 
 def reset_panel() -> None:

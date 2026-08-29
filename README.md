@@ -192,8 +192,10 @@ uv run wardrobe-reset --yes        # clear the data, snapshot taken first
 uv run wardrobe-reset --yes --seed # clear, then refill with sample data
 ```
 
-Or the **Diagnostics** tab in the app: run the checks, fill the wardrobe with
-realistic sample data, then clear it and put everything back.
+The **Diagnostics** tab in the app holds the data side only: where it lives,
+clearing it, and the snapshot store. The checks are deliberately not there. A
+button that runs the suite against the live wardrobe is a foot-gun, and at a
+terminal they run against a throwaway copy instead.
 
 Every check runs inside a throwaway `WARDROBE_HOME`, so running the suite cannot
 touch the real wardrobe even if a check is wrong. `WARDROBE_HOME` is what makes

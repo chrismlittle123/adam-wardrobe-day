@@ -1428,7 +1428,12 @@ def check_app_renders_seeded() -> str:
 
 
 def check_diagnostics_renders() -> str:
-    """The panel that clears data must itself render, or the escape hatch is gone."""
+    """The panel that clears data must itself render, or the escape hatch is gone.
+
+    The checks and the sample seeder used to live on this tab and have gone: a
+    button that runs the suite against the live wardrobe is a foot-gun, and they
+    belong at a terminal where they run against a throwaway copy.
+    """
     from . import reset
     _seeded()
     reset.snapshot()
@@ -1439,9 +1444,12 @@ def check_diagnostics_renders() -> str:
     assert any("I am sure" in l for l in labels), "the confirmation checkbox is missing"
     assert any("Wardrobe inventory" in l for l in labels), "reset checkboxes missing"
     buttons = [b.label for b in app.button]
-    for wanted in ("Run checks", "Fill with sample data", "Clear selected", "Restore"):
+    for wanted in ("Clear selected", "Restore"):
         assert wanted in buttons, f"the {wanted!r} button is missing"
-    return f"{len(labels)} reset checkboxes, confirmation and restore present"
+    for gone in ("Run checks", "Fill with sample data"):
+        assert gone not in buttons, f"{gone!r} is back on the front end"
+    assert "wardrobe-check" in page, "the tab does not say where the checks went"
+    return f"{len(labels)} reset checkboxes, confirmation and restore; no test buttons"
 
 
 def check_every_deletion_is_snapshotted() -> str:
