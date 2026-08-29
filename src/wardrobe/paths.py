@@ -57,6 +57,10 @@ def retailers() -> Path:
     return home() / "retailers.toml"
 
 
+def vocabulary() -> Path:
+    return home() / "garments.toml"
+
+
 def guide_versions() -> Path:
     return home() / ".guide-versions"
 
@@ -87,6 +91,7 @@ DATA: dict[str, str] = {
     "palette": "Colour palette",
     "sourcing": "Where to buy",
     "retailers": "Retailer catalogue",
+    "vocabulary": "Garment catalogue",
     "inventory": "Wardrobe inventory",
     "outfits": "Outfits",
     "photos": "Item photos",

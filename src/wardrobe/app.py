@@ -20,6 +20,7 @@ from wardrobe import (
     palette as pal_mod,
     revisions,
     retailers,
+    vocabulary,
     shop as shop_mod,
     sourcing,
     checks as check_mod, fitspec, inventory as inv_mod, paths,
@@ -28,8 +29,8 @@ from wardrobe import (
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
-    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, FABRICS, FITS, GARMENTS, GRADES,
-    NONE, OWNED, RETIRED, STATUSES, Inventory, Item, size_scheme,
+    ASPIRATIONAL, NONE, OWNED, RETIRED, STATUSES, Inventory, Item,
+    categories, fabric_options, fits, garments, grades, size_scheme,
 )
 from wardrobe.outfits import (
     Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
@@ -88,6 +89,10 @@ def render() -> None:
 
     if st.query_params.get("shops") is not None:
         retailer_catalogue_view()
+        return
+
+    if st.query_params.get("garments") is not None:
+        garment_catalogue_view()
         return
 
     looking = st.query_params.get("outfit")
@@ -450,8 +455,8 @@ def shape_row(item: Item, key: str) -> tuple[str, str]:
     """
     c1, c2 = st.columns(2)
     garment = c1.selectbox(
-        "Garment", GARMENTS,
-        index=GARMENTS.index(item.garment) if item.garment in GARMENTS else 0,
+        "Garment", garments(),
+        index=garments().index(item.garment) if item.garment in garments() else 0,
         key=f"{key}-garment")
     status = c2.selectbox(
         "Status", STATUSES, index=STATUSES.index(item.status), key=f"{key}-status",
@@ -484,8 +489,8 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
         f'border:1px solid var(--line)"></div>'
         f'<div class="look-cap">{item.colour_hex}</div>', unsafe_allow_html=True)
     item.fabric = c3.selectbox(
-        "Fabric", FABRIC_OPTIONS,
-        index=FABRIC_OPTIONS.index(item.fabric) if item.fabric in FABRIC_OPTIONS else 0,
+        "Fabric", fabric_options(),
+        index=fabric_options().index(item.fabric) if item.fabric in fabric_options() else 0,
         key=f"{key}-fabric",
         help="Fixed list on purpose: free text gave three spellings of cotton and "
              "the image model three different shirts.")
@@ -496,12 +501,12 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     # heavyweight tee and a plain one are the same garment to the plan.
     g1, g2 = st.columns(2)
     item.grade = g1.selectbox(
-        "Grade", GRADES, index=GRADES.index(item.grade) if item.grade in GRADES else 0,
+        "Grade", grades(), index=grades().index(item.grade) if item.grade in grades() else 0,
         key=f"{key}-grade",
         help="What kind of thing it is within its type. This is what separates a "
              "heavyweight tee from a plain one when both are T-shirts.")
     item.fit = g2.selectbox(
-        "Fit", FITS, index=FITS.index(item.fit) if item.fit in FITS else 0,
+        "Fit", fits(), index=fits().index(item.fit) if item.fit in fits() else 0,
         key=f"{key}-fit", help="How it is cut.")
     scheme = size_scheme(garment)
     if scheme:
@@ -539,6 +544,11 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
         "cannot pin down: \"green jacket\" gives the model a different jacket every "
         "time, the photograph gives it that one."
     )
+    st.markdown(
+        '<div class="look-cap"><a href="?garments=all" target="_blank">'
+        'Open the garment catalogue &#8599;</a> to add a garment, a fabric, a fit or '
+        'a grade. Every dropdown on this page is built from it.</div>',
+        unsafe_allow_html=True)
 
     with st.expander("Add an item", expanded=not inventory.items):
         garment, status = shape_row(Item(), "new")
@@ -566,7 +576,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
     ui.eyebrow("The wardrobe")
     f1, f2, f3 = st.columns([2, 1, 1])
     query = f1.text_input("Search", "", key="inv-q", placeholder="brown, linen, Uniqlo…")
-    category = f2.selectbox("Category", ["All", *CATEGORIES], key="inv-cat")
+    category = f2.selectbox("Category", ["All", *categories()], key="inv-cat")
     status = f3.selectbox("Status", ["All", *STATUSES], key="inv-status")
 
     found = inventory.filter(
@@ -817,8 +827,8 @@ def palette_panel(palette: Palette, skin: str) -> None:
         c3, c4 = st.columns([1, 2])
         role = c3.selectbox("Role", list(ROLES), key="pal-role",
                             help=" · ".join(f"{k}: {v}" for k, v in ROLES.items()))
-        categories = c4.multiselect("Allowed on", COLOUR_CATEGORIES, key="pal-cats",
-                                    help="Leave empty to use the role's defaults.")
+        allowed = c4.multiselect("Allowed on", COLOUR_CATEGORIES, key="pal-cats",
+                                 help="Leave empty to use the role's defaults.")
         seasons = st.multiselect("Seasons", SEASONS, key="pal-seasons",
                                  help="Leave empty for all year round.")
         note = st.text_input("Note", placeholder="Only in flannel, never in cotton",
@@ -832,7 +842,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
             chosen = name.strip() or (picked if not custom else
                                       pal_mod.hue_name(hex_code).title())
             palette.add(Colour(name=chosen, hex=hex_code, role=role,
-                               categories=list(categories), seasons=list(seasons),
+                               categories=list(allowed), seasons=list(seasons),
                                note=note.strip()))
             palette.save()
             st.rerun()
@@ -1172,6 +1182,147 @@ def compare_view(pair: str) -> None:
                 '</div>', unsafe_allow_html=True)
 
 
+def garment_catalogue_view() -> None:
+    """The vocabularies the rest of the app is built from, editable."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    vocab = vocabulary.Vocabulary.load()
+    inventory = Inventory.load()
+    used_garments = {i.garment for i in inventory.items}
+    used_fabrics = {i.fabric for i in inventory.items if i.fabric}
+
+    st.markdown(
+        '<div class="masthead"><h1>Garment <em>catalogue</em></h1>'
+        f'<div class="sub">{len(vocab.garments)} garments &middot; '
+        f'{len(vocab.fabrics)} fabrics &middot; {len(vocab.fits) - 1} fits &middot; '
+        f'{len(vocab.grades) - 1} grades</div></div>', unsafe_allow_html=True)
+    ui.blurb(
+        "Every list the rest of the app is built from. Add a garment nobody thought "
+        "of, retire a fabric you will never own, rename a grade so it means what you "
+        "mean. Anything already in use says so, because deleting it leaves the pieces "
+        "that used it pointing at a word the app no longer knows."
+    )
+
+    ui.eyebrow("Garments")
+    ui.blurb("Each one belongs to a category, which decides the outfit slot it fills, "
+             "and uses a size scheme, which decides the boxes on its form.")
+    with st.expander("Add a garment"):
+        with st.form("add-garment", clear_on_submit=True):
+            c1, c2, c3 = st.columns([2, 1, 1])
+            name = c1.text_input("Name", placeholder="Cardigan")
+            category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
+            scheme = c3.selectbox("Size scheme", list(vocabulary.SCHEMES), key="ag-scheme")
+            if st.form_submit_button("Add garment"):
+                if not name.strip():
+                    st.warning("Give it a name.")
+                elif vocab.garment(name.strip()):
+                    st.warning(f"{name.strip()} is already in the catalogue.")
+                else:
+                    vocab.add_garment(vocabulary.Garment(
+                        name=name.strip(), category=category, scheme=scheme))
+                    vocab.save()
+                    st.rerun()
+
+    for category, names in vocab.categories().items():
+        st.markdown(f'<div class="look-cap">{category} &middot; {len(names)}</div>',
+                    unsafe_allow_html=True)
+        for name in names:
+            garment = vocab.garment(name)
+            in_use = name in used_garments
+            fields = [f.label for f in vocab.scheme_for(name)] or ["no size fields"]
+            with st.expander(f"{name}  ·  {garment.scheme}  ·  {', '.join(fields)}"
+                             + ("  ·  in use" if in_use else "")):
+                with st.form(f"g-{name}"):
+                    e1, e2 = st.columns(2)
+                    garment.category = e1.selectbox(
+                        "Category", vocab.category_names(),
+                        index=vocab.category_names().index(garment.category)
+                        if garment.category in vocab.category_names() else 0,
+                        key=f"gc-{name}")
+                    schemes = list(vocabulary.SCHEMES)
+                    garment.scheme = e2.selectbox(
+                        "Size scheme", schemes,
+                        index=schemes.index(garment.scheme)
+                        if garment.scheme in schemes else 0, key=f"gs-{name}")
+                    b1, b2 = st.columns(2)
+                    if b1.form_submit_button("Save"):
+                        vocab.save()
+                        st.rerun()
+                    if b2.form_submit_button("Remove"):
+                        if in_use:
+                            st.warning(f"{name} is used by pieces in the wardrobe. "
+                                       "Re-classify them first.")
+                        else:
+                            vocab.remove_garment(name)
+                            vocab.save()
+                            st.rerun()
+
+    ui.eyebrow("Fabrics")
+    ui.blurb("The family matters as much as the cloth: a sourcing route can name a "
+             "whole family, so one line covers flannel, worsted and hopsack at once.")
+    with st.expander("Add a fabric"):
+        with st.form("add-fabric", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            name = c1.text_input("Name", placeholder="Cotton lyocell")
+            family = c2.selectbox("Family", [*vocab.families(), "New family…"],
+                                  key="af-family")
+            fresh = st.text_input("New family name", key="af-new",
+                                  placeholder="Only if you picked New family")
+            if st.form_submit_button("Add fabric"):
+                chosen = fresh.strip() if family == "New family…" else family
+                if not name.strip():
+                    st.warning("Give it a name.")
+                elif not chosen:
+                    st.warning("Give it a family, or a route can never match it.")
+                else:
+                    vocab.add_fabric(vocabulary.Fabric(name=name.strip(), family=chosen))
+                    vocab.save()
+                    st.rerun()
+
+    for family, fabrics in vocab.by_family().items():
+        st.markdown(f'<div class="look-cap">{family} &middot; {len(fabrics)}</div>',
+                    unsafe_allow_html=True)
+        for fabric in fabrics:
+            c1, c2 = st.columns([9, 1])
+            mark = " &middot; in use" if fabric.name in used_fabrics else ""
+            c1.markdown(f'<div class="look-cap">{fabric.name}{mark}</div>',
+                        unsafe_allow_html=True)
+            if c2.button("Drop", key=f"fab-{fabric.name}", type="secondary"):
+                if fabric.name in used_fabrics:
+                    st.warning(f"{fabric.name} is on pieces in the wardrobe.")
+                else:
+                    vocab.remove_fabric(fabric.name)
+                    vocab.save()
+                    st.rerun()
+
+    ui.eyebrow("Fits and grades")
+    ui.blurb("Grade says what kind of thing it is within its type, which is what "
+             "separates a heavyweight tee from a plain one when both are T-shirts. "
+             "Fit says how it is cut. One per line; the blank first line is the "
+             "“not set” option and is kept for you.")
+    with st.form("fits-grades"):
+        c1, c2 = st.columns(2)
+        fits_text = c1.text_area("Fits", "\n".join(f for f in vocab.fits if f),
+                                 height=180, key="v-fits")
+        grades_text = c2.text_area("Grades", "\n".join(g for g in vocab.grades if g),
+                                   height=180, key="v-grades")
+        if st.form_submit_button("Save fits and grades"):
+            vocab.fits = ["", *[line.strip() for line in fits_text.splitlines() if line.strip()]]
+            vocab.grades = ["", *[line.strip() for line in grades_text.splitlines() if line.strip()]]
+            vocab.save()
+            st.rerun()
+
+    with st.expander("Start again"):
+        ui.blurb("Throws away every change and reloads the vocabulary the app ships "
+                 "with. Pieces naming a garment or fabric you added will be left "
+                 "pointing at a word the catalogue no longer knows.")
+        if st.button("Restore the default catalogue", type="secondary"):
+            vocab.restore_defaults()
+            st.rerun()
+
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
+
+
 def retailer_catalogue_view() -> None:
     """Every shop the plan can point at, on its own page, editable."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
@@ -1197,7 +1348,7 @@ def retailer_catalogue_view() -> None:
             search = st.text_input(
                 "Search link", placeholder="https://example.com/search?q={q}",
                 help="Put {q} where the search term goes. The app escapes it for you.")
-            strengths = st.multiselect("Sells", GARMENTS, key="as-sells")
+            strengths = st.multiselect("Sells", garments(), key="as-sells")
             c3, c4 = st.columns(2)
             low = c3.number_input("Typical from £", 0, 5000, 30, step=5, key="as-low")
             high = c4.number_input("Typical to £", 0, 10000, 200, step=10, key="as-high")
@@ -1244,8 +1395,8 @@ def retailer_catalogue_view() -> None:
                     shop.search = st.text_input("Search link", shop.search,
                                                 key=f"ss-{shop.id}")
                     shop.strengths = st.multiselect(
-                        "Sells", GARMENTS,
-                        default=[g for g in shop.strengths if g in GARMENTS],
+                        "Sells", garments(),
+                        default=[g for g in shop.strengths if g in garments()],
                         key=f"sg-{shop.id}")
                     e3, e4 = st.columns(2)
                     shop.price_low = e3.number_input("Typical from £", 0, 5000,
@@ -1460,16 +1611,16 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         with st.form("quick-aspirational", clear_on_submit=True):
             c1, c2, c3 = st.columns([3, 2, 1])
             name = c1.text_input("Name", placeholder="Camel wool overcoat")
-            garment = c2.selectbox("Garment", GARMENTS, key="asp-garment")
-            grade = c3.selectbox("Grade", GRADES, key="asp-grade")
+            garment = c2.selectbox("Garment", garments(), key="asp-garment")
+            grade = c3.selectbox("Grade", grades(), key="asp-grade")
             c4, c5, c6 = st.columns([2, 1, 2])
             colour = c4.selectbox("Colour", ["", *COLOUR_NAMES], key="asp-colour")
             colour_hex = hex_for(colour) if colour else "#CCCCCC"
             c5.markdown(f'<div class="look-cap">Swatch</div><div style="height:2.1rem;'
                         f'background:{colour_hex};border:1px solid var(--line)"></div>',
                         unsafe_allow_html=True)
-            fabric = c6.selectbox("Fabric", FABRIC_OPTIONS, key="asp-fabric")
-            fit = st.selectbox("Fit", FITS, key="asp-fit")
+            fabric = c6.selectbox("Fabric", fabric_options(), key="asp-fabric")
+            fit = st.selectbox("Fit", fits(), key="asp-fit")
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
@@ -2007,10 +2158,10 @@ def where_to_buy_tab(inventory: Inventory) -> None:
         "nothing is simply the default for its type."
     )
 
-    garments = list(GARMENTS)
+    every = list(garments())
     ui.stats([
         ("Routes", str(len(plan.routes))),
-        ("Types covered", f"{len(plan.covered())} of {len(garments)}"),
+        ("Types covered", f"{len(plan.covered())} of {len(every)}"),
         ("Shops in use", str(len({s for r in plan.routes for s in r.stores}))),
         ("In the catalogue", str(len(shops.retailers))),
     ], brass_first=True)
@@ -2038,7 +2189,7 @@ def where_to_buy_tab(inventory: Inventory) -> None:
         for route in routes:
             route_editor(plan, route, shops)
 
-    empty_types = plan.uncovered(garments)
+    empty_types = plan.uncovered(every)
     if empty_types:
         with st.expander(f"No route at all · {len(empty_types)} garment types"):
             ui.blurb("Not all of these need one. A watch and a pair of sandals can "
@@ -2063,8 +2214,8 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route,
             c1, c2 = st.columns([2, 1])
             route.label = c1.text_input("Name it", route.label, key=f"rl-{route.id}")
             route.garment = c2.selectbox(
-                "Garment", GARMENTS,
-                index=GARMENTS.index(route.garment) if route.garment in GARMENTS else 0,
+                "Garment", garments(),
+                index=garments().index(route.garment) if route.garment in garments() else 0,
                 key=f"rg-{route.id}")
 
             book = catalogue.lookup()
@@ -2079,14 +2230,14 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route,
                         unsafe_allow_html=True)
             m1, m2, m3, m4 = st.columns(4)
             route.grade = m1.selectbox(
-                "Grade", GRADES, index=GRADES.index(route.grade) if route.grade in GRADES else 0,
+                "Grade", grades(), index=grades().index(route.grade) if route.grade in grades() else 0,
                 key=f"rgr-{route.id}")
-            fabrics = ["", *FABRIC_OPTIONS[1:]]
+            fabrics = ["", *fabric_options()[1:]]
             route.fabric = m2.selectbox(
                 "Exact fabric", fabrics,
                 index=fabrics.index(route.fabric) if route.fabric in fabrics else 0,
                 key=f"rf-{route.id}")
-            families = ["", *FABRICS]
+            families = ["", *vocabulary.current().families()]
             route.family = m3.selectbox(
                 "Fabric family", families,
                 index=families.index(route.family) if route.family in families else 0,
@@ -2094,7 +2245,7 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route,
                 help="One line covering a whole family, so Wool catches flannel, "
                      "worsted and hopsack at once.")
             route.fit = m4.selectbox(
-                "Fit", FITS, index=FITS.index(route.fit) if route.fit in FITS else 0,
+                "Fit", fits(), index=fits().index(route.fit) if route.fit in fits() else 0,
                 key=f"rfit-{route.id}")
 
             t1, t2 = st.columns(2)
@@ -2130,17 +2281,18 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
         with st.form("add-route", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
             label = c1.text_input("Name it", placeholder="Loafers")
-            garment = c2.selectbox("Garment", GARMENTS, key="ar-garment")
+            garment = c2.selectbox("Garment", garments(), key="ar-garment")
             book = catalogue.lookup()
             stores = st.multiselect(
                 "Shops, in the order you would try them", catalogue.ids(),
                 format_func=lambda i: f"{book[i].name} · {book[i].kind}",
                 key="ar-stores")
             m1, m2, m3, m4 = st.columns(4)
-            grade = m1.selectbox("Grade", GRADES, key="ar-grade")
-            fabric = m2.selectbox("Exact fabric", ["", *FABRIC_OPTIONS[1:]], key="ar-fabric")
-            family = m3.selectbox("Fabric family", ["", *FABRICS], key="ar-family")
-            fit = m4.selectbox("Fit", FITS, key="ar-fit")
+            grade = m1.selectbox("Grade", grades(), key="ar-grade")
+            fabric = m2.selectbox("Exact fabric", ["", *fabric_options()[1:]], key="ar-fabric")
+            family = m3.selectbox("Fabric family", ["", *vocabulary.current().families()],
+                                  key="ar-family")
+            fit = m4.selectbox("Fit", fits(), key="ar-fit")
             t1, t2 = st.columns(2)
             condition = t1.text_input("Condition", placeholder="Very Good condition or above")
             timing = t2.text_input("Timing", placeholder="wait for the sale")

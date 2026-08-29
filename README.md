@@ -50,7 +50,10 @@ Six tabs, in the order the work happens.
    shirt, chest and a length letter for a jacket, waist and leg for trousers,
    three disagreeing national systems for a shoe. Only wanted pieces carry a
    price, since what an owned garment cost is sunk. Photograph anything words
-   cannot pin down: "green jacket" gives a different jacket every time.
+   cannot pin down: "green jacket" gives a different jacket every time. The
+   **garment catalogue** opens in its own tab: garments and their categories and
+   size schemes, fabrics and their families, the fits and the grades. Every
+   dropdown in the app is built from it, and editing it takes effect at once.
 3. **Principles** — short checkable rules, about ten of them. The model offers
    five suggestions at a time and you keep the ones that ring true; each round
    is told what you already kept so it goes somewhere new. Hand-written ones
@@ -70,7 +73,7 @@ Six tabs, in the order the work happens.
    where it can be varied from the settings it was generated with and put
    side by side against a rival, with the difference between them named. Each outfit shows its cost split
    between what is already owned and what is still to buy.
-7. **Body Measurements** — ten measurements, all takeable on yourself with a tape
+7. **Body Measurements** — nine measurements, all takeable on yourself with a tape
    and a mirror, and the finished garment dimensions derived from them.
 8. **Where to Buy** — the sourcing plan, editable. Which shops each garment type
    comes from, what to match on, and on what terms. Add, edit and delete routes,

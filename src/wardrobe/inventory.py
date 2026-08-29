@@ -27,146 +27,50 @@ from . import paths
 OWNED, ASPIRATIONAL, RETIRED = "owned", "aspirational", "retired"
 STATUSES: tuple[str, ...] = (OWNED, ASPIRATIONAL, RETIRED)
 
-# Category drives the outfit slots. Only one item per slot, except accessories.
-# Both the categories and the garments inside them are alphabetical, because the
-# dropdown is scanned by eye and no other order is defensible.
-CATEGORIES: dict[str, tuple[str, ...]] = {
-    "Accessory": ("Bag", "Belt", "Hat", "Jewellery", "Scarf", "Socks", "Sunglasses", "Watch"),
-    "Bottom": ("Chinos", "Jeans", "Shorts", "Trousers"),
-    "Outerwear": ("Blazer", "Gilet", "Jacket", "Overcoat", "Overshirt", "Suit"),
-    "Shoes": ("Boots", "Derbies", "Loafers", "Sandals", "Trainers"),
-    "Top": ("Knitwear", "Polo", "Shirt", "Sweatshirt", "T-shirt", "Waistcoat"),
-}
-GARMENTS: tuple[str, ...] = tuple(sorted({g for group in CATEGORIES.values() for g in group}))
+# The vocabularies now live in the garment catalogue, which is editable. These
+# are lookups rather than constants: a dropdown asking for the list on every
+# rerun must get the list as it is now, not as it was when the module imported.
+from .vocabulary import (          # noqa: E402
+    NONE, SCHEMES, SizeField, Vocabulary, current,
+)
+
 SINGLE_SLOT: tuple[str, ...] = ("Top", "Bottom", "Outerwear", "Shoes")
 
 
-# --- sizing -------------------------------------------------------------------
-
-# A shirt is sized by the collar, a jacket by the chest and a length letter, a
-# trouser by waist and leg, a shoe by a number that means something different in
-# every country. One shared set of boxes would be wrong for all of them, so each
-# garment declares its own.
-#
-# Everything here is a UK SIZE: the number printed on the label, in whatever unit
-# the shop chose to print it. That is not a measurement, and the two get confused
-# constantly. A jacket labelled 38 is not 38 of anything you could put a tape
-# across; it is a size that happens to have started life as a chest in inches.
-# Every actual measurement in this app, body and garment alike, is centimetres,
-# and lives in the Body Measurements tab. EU sizes are kept alongside the UK ones
-# only because half of Vinted is listed in them.
-
-@dataclass(frozen=True)
-class SizeField:
-    key: str
-    label: str
-    options: tuple[str, ...] = ()   # empty means a free text box
-    help: str = ""
+def garments() -> tuple[str, ...]:
+    return current().names()
 
 
-def _range(start: float, stop: float, step: float, suffix: str = "") -> tuple[str, ...]:
-    out, value = [], start
-    while value <= stop + 1e-9:
-        out.append(f"{value:g}{suffix}")
-        value += step
-    return tuple(out)
+def categories() -> dict[str, tuple[str, ...]]:
+    return current().categories()
 
 
-NONE = "—"
-ALPHA = (NONE, "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL")
-
-# Grade says what kind of thing it is within its type: the axis that separates a
-# heavyweight tee from a plain one, or a dress shirt from a casual one. Together
-# with fabric and fit it is what makes a sourcing route precise instead of a
-# guess at keywords in a name.
-GRADES: tuple[str, ...] = (
-    "", "Everyday", "Heavyweight", "Knitted", "Smart", "Dress", "Branded",
-)
-
-# How it is cut. Kept on the item rather than in the size scheme, because it is
-# a property of the garment and not a number on a label.
-FITS: tuple[str, ...] = ("", "Slim", "Regular", "Relaxed", "Oversized")
-
-_alpha = SizeField("alpha", "Size", ALPHA)
-_collar = SizeField("collar", "Collar (UK)", (NONE, *_range(13.5, 18.5, 0.5, '"')),
-                    "UK shirts are labelled by collar in inches. 15\" is about 38 cm, "
-                    "15.5\" about 39 cm, 16\" about 41 cm.")
-_sleeve = SizeField("sleeve", "Sleeve (UK)", (NONE, *_range(31, 37, 1, '"')),
-                    "Dress shirts only, in inches on the label. Casual shirts rarely "
-                    "quote it.")
-_chest = SizeField("chest", "UK size", (NONE, *_range(34, 48, 2)),
-                   "The number on a UK jacket label. It is a size, not a chest "
-                   "measurement: the finished garment measures rather more.")
-_jkt_len = SizeField("length", "Length", (NONE, "Short", "Regular", "Long"),
-                     "38S, 38R and 38L share a chest and differ in body and sleeve length.")
-_eu_jkt = SizeField("eu", "EU size", (NONE, *_range(42, 62, 2)),
-                    "Half of Vinted is listed in these. Roughly the UK size plus 10.")
-_waist = SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"')),
-                   "Inches on the label. Rarely the same as your actual waist.")
-_leg = SizeField("leg", "Leg (UK)", (NONE, *_range(28, 38, 1, '"')),
-                 "Inside leg in inches, the half of trouser sizing shops most often "
-                 "ignore. 30\" is about 76 cm, 32\" about 81 cm.")
-_uk_shoe = SizeField("uk", "UK", (NONE, *_range(5, 14, 0.5)))
-_eu_shoe = SizeField("eu", "EU", (NONE, *_range(38, 49, 0.5)),
-                     "For listings from the continent. Roughly UK plus 33.")
-_width = SizeField("width", "Width", (NONE, "Narrow", "Standard", "Wide", "D", "E", "F", "G"))
-
-SHOE_SCHEME = (_uk_shoe, _eu_shoe, _width)
-JACKET_SCHEME = (_chest, _jkt_len, _eu_jkt)
-TROUSER_SCHEME = (_waist, _leg)
-TOP_SCHEME = (_alpha,)
-DEFAULT_SCHEME = (SizeField("size", "Size", (), "However this one happens to be sized."),)
-
-SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
-    "Bag": (), "Jewellery": (), "Scarf": (), "Sunglasses": (),
-    "Watch": (SizeField("case", "Case", (NONE, *_range(34, 46, 1, "mm"))),),
-    "Belt": (SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"'))), _alpha),
-    "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
-    "Socks": (SizeField("socks", "UK size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
-    "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME, "Suit": JACKET_SCHEME,
-    "Jacket": (_alpha, _chest), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
-    "Waistcoat": (_chest, _alpha),
-    "Chinos": TROUSER_SCHEME, "Jeans": TROUSER_SCHEME, "Trousers": TROUSER_SCHEME,
-    "Shorts": (_waist,),
-    "Boots": SHOE_SCHEME, "Derbies": SHOE_SCHEME, "Loafers": SHOE_SCHEME,
-    "Sandals": SHOE_SCHEME, "Trainers": SHOE_SCHEME,
-    "Knitwear": TOP_SCHEME, "Polo": TOP_SCHEME, "Sweatshirt": TOP_SCHEME, "T-shirt": TOP_SCHEME,
-    "Shirt": (_collar, _alpha, _sleeve),
-}
+def category_names() -> tuple[str, ...]:
+    return current().category_names()
 
 
-# Cloth, by family. Typing it free-hand produced "cotton", "Cotton" and "100%
-# cotton" as three different fabrics, which made the inventory unsearchable and
-# gave the image model three different answers for the same shirt.
-FABRICS: dict[str, tuple[str, ...]] = {
-    "Cotton": (
-        "Chambray", "Corduroy", "Cotton canvas", "Cotton jersey", "Cotton piqué",
-        "Cotton poplin", "Cotton twill", "Moleskin", "Oxford cotton", "Seersucker",
-        "Terry towelling",
-    ),
-    "Wool": (
-        "Boiled wool", "Cashmere", "Donegal tweed", "Fresco", "Harris tweed",
-        "Lambswool", "Merino wool", "Mohair", "Wool flannel", "Wool hopsack",
-        "Wool melton", "Worsted wool",
-    ),
-    "Linen and hemp": ("Hemp", "Irish linen", "Linen", "Linen-cotton", "Linen-wool"),
-    "Denim": ("Raw denim", "Selvedge denim", "Washed denim"),
-    "Leather": ("Calf leather", "Cordovan", "Nubuck", "Shearling", "Suede"),
-    "Silk and fine": ("Cotton-silk", "Silk", "Wool-silk-linen"),
-    "Technical": ("Fleece", "Nylon", "Polyester", "Ripstop", "Technical shell", "Waxed cotton"),
-}
+def fits() -> tuple[str, ...]:
+    return tuple(current().fits)
 
-# Flat, alphabetical, with the placeholder first. The grouping above is for
-# reading; the dropdown is for finding.
-FABRIC_OPTIONS: tuple[str, ...] = (NONE, *sorted({f for g in FABRICS.values() for f in g}))
+
+def grades() -> tuple[str, ...]:
+    return tuple(current().grades)
+
+
+def fabric_options() -> tuple[str, ...]:
+    return current().fabric_options()
 
 
 def fabric_family(fabric: str) -> str:
-    return next((name for name, group in FABRICS.items() if fabric in group), "")
+    return current().fabric_family(fabric)
 
 
 def size_scheme(garment: str) -> tuple[SizeField, ...]:
-    return SIZE_SCHEMES.get(garment, DEFAULT_SCHEME)
+    return current().scheme_for(garment)
+
+
+def category_for(garment: str) -> str:
+    return current().category_for(garment)
 
 
 @dataclass
@@ -402,5 +306,4 @@ def drop_photo(item: Item) -> None:
     item.photo = ""
 
 
-def category_for(garment: str) -> str:
-    return next((c for c, group in CATEGORIES.items() if garment in group), "Accessory")
+

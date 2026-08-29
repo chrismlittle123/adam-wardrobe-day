@@ -167,7 +167,7 @@ def check_principles_round_trip() -> str:
 def check_body_measurement_set() -> str:
     """Exactly the ten a man can take on himself, plus the three derived for him."""
     from .fitspec import CRITICAL, HOW_TO_MEASURE, Body, LABELS
-    wanted = {"chest", "waist", "shoulder", "bicep", "wrist", "sleeve",
+    wanted = {"chest", "waist", "shoulder", "bicep", "sleeve",
               "inseam", "outseam", "hip", "neck"}
     fields = set(Body().__dataclass_fields__)
     assert fields == wanted, f"body fields drifted: {fields ^ wanted}"
@@ -180,6 +180,7 @@ def check_body_measurement_set() -> str:
     for derived in ("thigh", "knee", "ankle"):
         assert derived in values and derived in estimated, f"{derived} not derived"
     assert "chest" not in estimated, "a measured value was marked estimated"
+    assert "wrist" not in wanted and "wrist" not in fields, "wrist came back"
     return f"{len(wanted)} measured, {len(values) - len(wanted)} derived, hip not seat"
 
 
@@ -274,14 +275,14 @@ def check_uk_sizing() -> str:
     a shop prints is a UK size, and the labels have to say which is which.
     """
     from .fitspec import Body, HOW_TO_MEASURE, LABELS, spec_table, target_spec
-    from .inventory import GARMENTS, size_scheme
+    from .inventory import garments, size_scheme
 
-    for garment in GARMENTS:
-        for field in size_scheme(garment):
-            assert field.key != "us", f"{garment} still offers a US size"
-            assert "cm" not in field.label.lower(), \
-                f"{garment}'s {field.label} mixes a measurement into a size label"
-    labelled = {f.label for g in GARMENTS for f in size_scheme(g)}
+    for garment in garments():
+        for spec in size_scheme(garment):
+            assert spec.key != "us", f"{garment} still offers a US size"
+            assert "cm" not in spec.label.lower(), \
+                f"{garment}'s {spec.label} mixes a measurement into a size label"
+    labelled = {f.label for g in garments() for f in size_scheme(g)}
     assert any("UK" in l for l in labelled), "no size is marked as a UK size"
 
     # Every measurement the engine produces is centimetres, with no inches in sight.
@@ -306,32 +307,34 @@ def check_uk_sizing() -> str:
 
 def check_fabric_list() -> str:
     """Fabric is a fixed list, and the sample data uses names from it."""
-    from .inventory import FABRICS, FABRIC_OPTIONS, NONE, fabric_family
+    from .inventory import NONE, fabric_family, fabric_options
+    from .vocabulary import current as vocabulary
     from .seed import ITEMS
-    flat = [f for group in FABRICS.values() for f in group]
+    flat = list(vocabulary().fabric_names())
     assert len(flat) == len(set(flat)), "a fabric appears in two families"
-    assert FABRIC_OPTIONS[0] == NONE, "no blank option"
-    assert list(FABRIC_OPTIONS[1:]) == sorted(FABRIC_OPTIONS[1:]), "fabrics not alphabetical"
-    assert len(FABRIC_OPTIONS) > 30, "the list is too thin to cover a wardrobe"
+    assert fabric_options()[0] == NONE, "no blank option"
+    assert list(fabric_options()[1:]) == sorted(fabric_options()[1:]), "fabrics not alphabetical"
+    assert len(fabric_options()) > 30, "the list is too thin to cover a wardrobe"
     assert fabric_family("Wool flannel") == "Wool", "family lookup broken"
-    unknown = [row[4] for row in ITEMS if row[4] and row[4] not in FABRIC_OPTIONS]
+    unknown = [row[4] for row in ITEMS if row[4] and row[4] not in fabric_options()]
     assert not unknown, f"sample data uses fabrics not on the list: {unknown}"
-    return f"{len(flat)} fabrics across {len(FABRICS)} families, sample data conforms"
+    return f"{len(flat)} fabrics across {len(vocabulary().families())} families, sample data conforms"
 
 
 def check_alphabetical() -> str:
-    from .inventory import CATEGORIES, GARMENTS
-    assert list(GARMENTS) == sorted(GARMENTS), "garments not alphabetical"
-    assert list(CATEGORIES) == sorted(CATEGORIES), "categories not alphabetical"
-    for name, group in CATEGORIES.items():
+    from .inventory import categories, garments
+    assert list(garments()) == sorted(garments()), "garments not alphabetical"
+    groups = categories()
+    assert list(groups) == sorted(groups), "categories not alphabetical"
+    for name, group in groups.items():
         assert list(group) == sorted(group), f"{name} not alphabetical"
-    return f"{len(GARMENTS)} garments, {len(CATEGORIES)} categories, all sorted"
+    return f"{len(garments())} garments, {len(groups)} categories, all sorted"
 
 
 def check_size_schemes() -> str:
-    from .inventory import GARMENTS, size_scheme
+    from .inventory import garments, size_scheme
     keyed = {}
-    for garment in GARMENTS:
+    for garment in garments():
         scheme = size_scheme(garment)
         keys = [f.key for f in scheme]
         assert len(keys) == len(set(keys)), f"{garment} has duplicate size keys"
@@ -876,11 +879,11 @@ def check_subject_in_prompt() -> str:
 def check_outfit_prompt() -> str:
     from .profile import Profile
     from .prompts import build_outfit_prompt
-    garments = ["cream cotton shirt", "grey flannel trousers", "brown suede loafers"]
-    with_photos = build_outfit_prompt(Profile.load(), garments, photo_count=2,
+    pieces = ["cream cotton shirt", "grey flannel trousers", "brown suede loafers"]
+    with_photos = build_outfit_prompt(Profile.load(), pieces, photo_count=2,
                                       principles="- Keep volume in one place.")
-    without = build_outfit_prompt(Profile.load(), garments, photo_count=0)
-    for g in garments:
+    without = build_outfit_prompt(Profile.load(), pieces, photo_count=0)
+    for g in pieces:
         assert g in with_photos, f"{g} missing from the prompt"
     assert "Reference image 1 is the man" in with_photos, "photo roles not explained"
     assert "Reference image 1" not in without, "photo note appears with no photos"
@@ -983,7 +986,7 @@ def check_catalogue_is_editable() -> str:
 
 def check_retailer_catalogue() -> str:
     """Every retailer is reachable, sane and buildable into a search link."""
-    from .inventory import GARMENTS, Item
+    from .inventory import garments, Item
     from .retailers import Catalogue, KINDS, query_for
 
     RETAILERS = Catalogue.load().retailers
@@ -1001,7 +1004,7 @@ def check_retailer_catalogue() -> str:
         assert any(r.name == named for r in RETAILERS), f"{named} is missing"
 
     coverable = {g for r in RETAILERS for g in r.strengths}
-    unsold = [g for g in GARMENTS if g not in coverable]
+    unsold = [g for g in garments() if g not in coverable]
     assert not unsold, f"no retailer sells: {unsold}"
     assert query_for(Item(garment="Blazer", colour="navy", fabric="Linen")) == "navy Linen Blazer"
     return f"{len(RETAILERS)} retailers across {len(KINDS)} kinds, every garment covered"
@@ -1034,7 +1037,7 @@ def check_sourcing_routes() -> str:
     Grade, fabric and fit are what make a route precise. If the matching breaks,
     every shirt goes to the same shop and the plan is decoration.
     """
-    from .inventory import GARMENTS, GRADES, FITS, Item
+    from .inventory import fits, garments, grades, Item
     from .retailers import Catalogue
     from .sourcing import Plan, route_for, uncovered, why
 
@@ -1047,9 +1050,9 @@ def check_sourcing_routes() -> str:
         assert route.stores, f"{route.label} names no shop"
         assert all(i in known for i in route.stores), \
             f"{route.label} points at a retailer that does not exist"
-        assert route.garment in GARMENTS, f"{route.label} is for an unknown garment"
-        assert not route.grade or route.grade in GRADES, f"{route.label} has an unknown grade"
-        assert not route.fit or route.fit in FITS, f"{route.label} has an unknown fit"
+        assert route.garment in garments(), f"{route.label} is for an unknown garment"
+        assert not route.grade or route.grade in grades(), f"{route.label} has an unknown grade"
+        assert not route.fit or route.fit in fits(), f"{route.label} has an unknown fit"
         assert not (route.fabric and route.family), \
             f"{route.label} constrains both an exact fabric and a family"
 
@@ -1088,14 +1091,14 @@ def check_sourcing_routes() -> str:
     # hold, rather than being pushed down the nearest one.
     assert route_for(Item(name="x", garment="Trousers", fabric="Cotton twill")) is None, \
         "an unmatched trouser was pushed down a route it does not belong to"
-    assert "Loafers" in uncovered(GARMENTS), "a known gap stopped being reported"
+    assert "Loafers" in uncovered(garments()), "a known gap stopped being reported"
     return (f"{len(ROUTES)} routes over {len(plan.covered())} types, selected on grade, "
             f"fabric and fit; name no longer decides anything")
 
 
 def check_plan_is_editable() -> str:
     """The plan is data, not a constant: it round trips and it can be changed."""
-    from .inventory import GARMENTS, Item
+    from .inventory import garments, Item
     from .sourcing import DEFAULT_ROUTES, Plan, Route, route_for
 
     fresh = Plan.load()
@@ -1136,7 +1139,7 @@ def check_plan_is_editable() -> str:
     assert len(restored.routes) == len(DEFAULT_ROUTES), "restoring defaults did not"
     assert route_for(Item(name="x", garment="T-shirt"), restored).where == "Uniqlo", \
         "restoring did not undo the edit"
-    assert "Loafers" in restored.uncovered(GARMENTS), "coverage is not recomputed"
+    assert "Loafers" in restored.uncovered(garments()), "coverage is not recomputed"
     return f"{len(DEFAULT_ROUTES)} defaults; add, edit, delete and restore all persist"
 
 
@@ -1502,6 +1505,61 @@ def check_unreadable_image_does_not_crash() -> str:
     return "corrupt image degraded to a placeholder, page still rendered"
 
 
+def check_garment_catalogue() -> str:
+    """The vocabularies are data, and the app reads them as they are now.
+
+    They used to be module constants, so an edit would not show up until the
+    process restarted. Everything downstream asks for the list on each rerun.
+    """
+    from streamlit.testing.v1 import AppTest
+
+    from . import vocabulary
+    from .inventory import categories, fabric_options, fits, garments, grades, size_scheme
+
+    vocab = vocabulary.Vocabulary.load()
+    assert not vocab.path.is_file(), "loading wrote a file it should not have"
+    before = len(garments())
+    assert before == len(vocab.garments), "the lookup disagrees with the file"
+    assert "Blazer" in garments() and "Wool flannel" in fabric_options()
+
+    vocab.add_garment(vocabulary.Garment(name="Cardigan", category="Top", scheme="Top"))
+    vocab.add_fabric(vocabulary.Fabric(name="Cotton lyocell", family="Cotton"))
+    vocab.fits = ["", "Slim", "Regular", "Relaxed", "Oversized", "Cropped"]
+    vocab.grades = ["", "Everyday", "Dress", "Souvenir"]
+    vocab.save()
+
+    # The cache keys on the file's timestamp, so an edit must be visible at once.
+    assert "Cardigan" in garments(), "an added garment is not visible to the app"
+    assert len(garments()) == before + 1, "the count did not move"
+    assert "Cotton lyocell" in fabric_options(), "an added fabric is not visible"
+    assert "Cropped" in fits() and "Souvenir" in grades(), "fits and grades did not move"
+    assert "Cardigan" in categories()["Top"], "the new garment landed in no category"
+    assert [f.label for f in size_scheme("Cardigan")] == ["Size"], \
+        f"the new garment got the wrong scheme: {[f.label for f in size_scheme('Cardigan')]}"
+
+    vocabulary.Vocabulary.load().restore_defaults()
+    assert "Cardigan" not in garments(), "restoring defaults did not undo the edit"
+    assert len(garments()) == before, "the count did not come back"
+
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["garments"] = "all"
+    page = page.run()
+    assert not page.exception, f"the garment catalogue raised: {page.exception[0].value}"
+    assert not page.tabs, "the catalogue drew the whole app"
+    # Garment names sit in expander labels, not markdown, so both are read.
+    body = "\n".join(
+        [m.value for m in page.markdown]
+        + [getattr(e, "label", "") for e in page.get("expander") or []]
+        + [w.label for w in page.text_area]
+    )
+    for word in ("Blazer", "Wool flannel", "Fits and grades", "Garments", "Fabrics"):
+        assert word in body, f"{word} is missing from the catalogue"
+    buttons = [b.label for b in page.button]
+    assert "Add garment" in buttons and "Add fabric" in buttons, "no way to add"
+    assert "Save fits and grades" in buttons, "no way to edit fits or grades"
+    return f"{before} garments, {len(vocab.fabrics)} fabrics; edits visible at once"
+
+
 def check_shop_catalogue_opens() -> str:
     """The retailer catalogue is a page of its own, and it can be edited there."""
     from streamlit.testing.v1 import AppTest
@@ -1794,6 +1852,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Guide edits keep what they replace", check_guide_edit_and_versions),
     (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
     (APP, "The retailer catalogue opens and edits", check_shop_catalogue_opens),
+    (INVENTORY, "The garment catalogue is editable data", check_garment_catalogue),
     (APP, "An outfit opens, varies and compares", check_outfit_page_and_comparison),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),

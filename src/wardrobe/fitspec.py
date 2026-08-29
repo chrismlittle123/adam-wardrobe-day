@@ -30,7 +30,6 @@ HEIGHT_RATIOS: dict[str, float] = {
     "hip": 0.540,
     "shoulder": 0.255,
     "bicep": 0.175,
-    "wrist": 0.095,
     "sleeve": 0.345,
     "neck": 0.215,
     "inseam": 0.455,
@@ -62,7 +61,6 @@ HOW_TO_MEASURE: dict[str, str] = {
     "waist": "Round the natural waist, the narrowest point, roughly at the navel.",
     "hip": "Round the fullest part of the hips and seat, feet together.",
     "bicep": "Round the fullest part of the upper arm, arm relaxed at the side.",
-    "wrist": "Round the wrist bone, where a cuff closes.",
     "sleeve": "From the shoulder point, over a slightly bent elbow, to the wrist bone.",
     "inseam": "From the crotch seam down the inside of the leg to the ankle bone.",
     "outseam": "From the waistband down the outside of the leg to the ankle bone.",
@@ -76,9 +74,10 @@ CRITICAL: tuple[str, ...] = tuple(HOW_TO_MEASURE)
 class Body:
     """The ten measurements worth taking, in centimetres. Zero means not measured.
 
-    Deliberately only what a man can get on himself with a tape and a mirror.
-    Thigh, knee and ankle are not asked for; they are derived from height so the
-    trouser spec keeps its leg opening without demanding a second pair of hands.
+    Deliberately only what a man can get on himself with a tape and a mirror,
+    and only what something downstream actually uses. Thigh, knee and ankle are
+    not asked for; they are derived from height so the trouser spec keeps its leg
+    opening without demanding a second pair of hands.
     """
 
     chest: float = 0
@@ -86,7 +85,6 @@ class Body:
     hip: float = 0
     shoulder: float = 0
     bicep: float = 0
-    wrist: float = 0
     sleeve: float = 0
     neck: float = 0
     inseam: float = 0
@@ -207,7 +205,7 @@ BREAKS: dict[str, float] = {"No break": -2.0, "Quarter break": 0.0, "Half break"
 
 # Dimensions that read as a circumference, so a shop's flat measurement is half.
 CIRCUMFERENCE: frozenset[str] = frozenset(
-    {"chest", "waist", "hip", "neck", "bicep", "thigh", "knee", "ankle", "wrist"}
+    {"chest", "waist", "hip", "neck", "bicep", "thigh", "knee", "ankle"}
 )
 
 LABELS: dict[str, str] = {
