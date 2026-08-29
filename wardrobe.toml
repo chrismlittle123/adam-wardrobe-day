@@ -248,3 +248,130 @@ product_copy = ""
 
 [items.sizes]
 alpha = "M"
+
+[[items]]
+id = "wool-hoodie"
+name = "Wool Hoodie"
+category = "Top"
+garment = "Hoodie"
+colours = [
+    "White",
+    "Mid blue",
+]
+colour_hex = "#F6F4EF"
+fabric = "Wool melton"
+grade = "Everyday"
+fit = "Oversized"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/wool-hoodie.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/wool-hoodie.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "waffle-green-oversize-jacket"
+name = "Waffle Green Oversize Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Green",
+]
+colour_hex = "#3F7A4F"
+fabric = "Cotton twill"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/waffle-green-oversize-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/waffle-green-oversize-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "tobacco-brown-wool-overcoat"
+name = "Tobacco Brown Wool Overcoat"
+category = "Outerwear"
+garment = "Overcoat"
+colours = [
+    "Tobacco",
+]
+colour_hex = "#7E5835"
+fabric = "Wool melton"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/tobacco-brown-wool-overcoat.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/tobacco-brown-wool-overcoat.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "wool-american-football-jacket"
+name = "Wool American Football Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "White",
+    "Navy",
+]
+colour_hex = "#F6F4EF"
+fabric = "Wool melton"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/wool-american-football-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/wool-american-football-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "distressed-denim-jacket"
+name = "Distressed Denim Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Denim",
+]
+colour_hex = "#3E5C79"
+fabric = "Washed denim"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/distressed-denim-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/distressed-denim-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"

@@ -180,6 +180,9 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
     "Blues": (
         ("Powder blue", "#D3E0EC"), ("Pale blue", "#BFD3E6"), ("Sky blue", "#8FB3D0"),
         ("Air force", "#5C7B95"), ("Mid blue", "#4A6E96"), ("Denim", "#3E5C79"),
+        # Deeper and more violet than anything else here. Navy is a grey blue;
+        # indigo is the dye, and it is the one a raw jean is actually dyed with.
+        ("Indigo", "#39417A"),
         ("Petrol", "#2E5561"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
         ("Midnight", "#171E2B"),
     ),
