@@ -115,45 +115,86 @@ def render() -> None:
 
     sidebar(profile, inventory, outfits)
 
-    st.markdown(
-        '<div class="masthead"><h1>Wardrobe <em>Studio</em></h1>'
-        '<div class="sub">Work out the style &middot; know the wardrobe &middot; '
-        'buy only what unlocks the most</div></div>',
-        unsafe_allow_html=True,
-    )
+    here = current_page()
+    draw = {
+        "style-guide": lambda: style_guide_tab(profile, answers),
+        "garments": garment_catalogue_panel,
+        "inventory": lambda: inventory_tab(profile, inventory, outfits),
+        "principles": lambda: principles_tab(profile, answers, principles),
+        "colour": lambda: colour_tab(profile, Palette.load()),
+        "generator": lambda: generator_tab(profile, inventory, outfits, principles),
+        "gallery": lambda: gallery_tab(inventory, outfits),
+        "where-to-buy": lambda: where_to_buy_tab(inventory),
+        "measurements": lambda: body_tab(profile),
+        "shop": lambda: shop_tab(profile, inventory, outfits, principles),
+        "diagnostics": diagnostics_tab,
+    }
+    st.markdown(f'<div class="page-head"><span class="page-no">{page_number(here)}</span>'
+                f'<h2>{PAGE_TITLES[here]}</h2></div>', unsafe_allow_html=True)
+    draw[here]()
 
-    tabs = st.tabs([
-        "1 · Style Guide", "2 · Garment Catalogue", "3 · Wardrobe Inventory",
-        "4 · Principles", "5 · Colour", "6 · Outfit Generator", "7 · Outfit Gallery",
-        "8 · Where to Buy", "9 · Body Measurements", "10 · Shopping Guide",
-        "⚙ Diagnostics",
-    ])
-    with tabs[0]:
-        style_guide_tab(profile, answers)
-    with tabs[1]:
-        garment_catalogue_panel()
-    with tabs[2]:
-        inventory_tab(profile, inventory, outfits)
-    with tabs[3]:
-        principles_tab(profile, answers, principles)
-    with tabs[4]:
-        colour_tab(profile, Palette.load())
-    with tabs[5]:
-        generator_tab(profile, inventory, outfits, principles)
-    with tabs[6]:
-        gallery_tab(inventory, outfits)
-    with tabs[7]:
-        where_to_buy_tab(inventory)
-    with tabs[8]:
-        body_tab(profile)
-    with tabs[9]:
-        shop_tab(profile, inventory, outfits, principles)
-    with tabs[10]:
-        diagnostics_tab()
+
+# The ten pages in the order the work is actually done, plus the workshop.
+# Order matters: it is the argument the app is making about how to dress well,
+# so the numbers are shown and the sequence is not alphabetical.
+PAGES: tuple[tuple[str, str], ...] = (
+    ("style-guide", "Style Guide"),
+    ("garments", "Garment Catalogue"),
+    ("inventory", "Wardrobe Inventory"),
+    ("principles", "Principles"),
+    ("colour", "Colour"),
+    ("generator", "Outfit Generator"),
+    ("gallery", "Outfit Gallery"),
+    ("where-to-buy", "Where to Buy"),
+    ("measurements", "Body Measurements"),
+    ("shop", "Shopping Guide"),
+    ("diagnostics", "Diagnostics"),
+)
+PAGE_TITLES: dict[str, str] = dict(PAGES)
+WORKSHOP = "diagnostics"
+
+
+def page_number(slug: str) -> str:
+    """Diagnostics is a workshop, not a step, so it carries a spanner."""
+    if slug == WORKSHOP:
+        return "&#9881;"
+    return str([s for s, _ in PAGES].index(slug) + 1)
+
+
+def current_page() -> str:
+    """Which page we are on, taken from the URL rather than from widget state.
+
+    Streamlit tabs reset to the first one on every rerun, so saving anything sent
+    you back to the Style Guide. The page now lives in the query string: a rerun
+    keeps it, a refresh keeps it, and a page can be linked to.
+    """
+    wanted = st.query_params.get("page", "")
+    return wanted if wanted in PAGE_TITLES else PAGES[0][0]
+
+
+def navigation() -> None:
+    slugs = [slug for slug, _ in PAGES]
+    here = current_page()
+    picked = st.radio(
+        "Section", slugs, index=slugs.index(here),
+        format_func=lambda slug: f"{page_number(slug).replace('&#9881;', chr(9881))}  "
+                                 f"{PAGE_TITLES[slug]}",
+        label_visibility="collapsed", key="nav-page")
+    if picked != here:
+        st.query_params["page"] = picked
+        st.rerun()
 
 
 def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
     with st.sidebar:
+        # The masthead lives here rather than over the page. Repeating it above
+        # every page pushed the actual content a third of the way down the
+        # screen and said the same thing as the page title underneath it.
+        st.markdown(
+            '<div class="brand"><h1>Wardrobe <em>Studio</em></h1>'
+            '<div class="sub">Work out the style &middot; know the wardrobe '
+            '&middot; buy only what unlocks</div></div>', unsafe_allow_html=True)
+        navigation()
         photo = profile.photo("neutral")
         if photo:
             ui.plate(photo, width=380)
@@ -700,7 +741,7 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
     with st.expander("Edit"):
         used = outfits.using(item.id)
         if used:
-            st.caption(f"Worn in {len(used)} outfit(s): "
+            st.caption(f"Worn in {ui.plural(len(used), 'outfit')}: "
                        f"{', '.join(o.name for o in used[:3])}"
                        f"{'…' if len(used) > 3 else ''}. Deleting takes it out of them.")
         garment, status, scheme = shape_row(item, f"e-{item.id}")
@@ -866,9 +907,9 @@ def face_rule_panel(palette: Palette, skin: str) -> None:
             f'{pal_mod.TOO_CLOSE:.0f} from his skin.</div>', unsafe_allow_html=True)
         return
     st.markdown(
-        f'<div class="look-cap" style="color:var(--bad)">'
-        f'{len(breaks)} of {len(near)} colours allowed on Top break the rule. '
-        f'Take Top off them, or drop them.</div>', unsafe_allow_html=True)
+        f'<div class="alarm">{len(breaks)} of {len(near)} colours allowed on Top '
+        f'break the rule &middot; take Top off them, or drop them</div>',
+        unsafe_allow_html=True)
     for colour in breaks:
         elsewhere = ", ".join(c for c in colour.allowed if c != "Top")
         st.markdown(
@@ -1264,7 +1305,7 @@ def compare_view(pair: str) -> None:
         rows += [{"Change": setting, "Detail": f"{was} → {now}"}
                  for setting, was, now in change.settings]
         ui.table(rows)
-        st.markdown(f'<div class="look-cap">{len(change.kept)} piece(s) unchanged</div>',
+        st.markdown(f'<div class="look-cap">{ui.plural(len(change.kept), "piece")} unchanged</div>',
                     unsafe_allow_html=True)
 
     ui.eyebrow("Keep one")
@@ -1402,7 +1443,7 @@ def garment_section(vocab, inventory: Inventory) -> None:
             st.rerun()
         if b2.form_submit_button("Remove from the catalogue"):
             if in_use:
-                st.warning(f"{in_use} piece(s) in the wardrobe are {chosen}. "
+                st.warning(f"{ui.plural(in_use, 'piece')} in the wardrobe are {chosen}. "
                            "Re-classify them first.")
             else:
                 reset_mod.before(f"before removing the garment {chosen}", "vocabulary")
@@ -1470,7 +1511,7 @@ def fabric_section(vocab, inventory: Inventory) -> None:
             st.rerun()
         if b2.form_submit_button("Remove from the catalogue"):
             if in_use:
-                st.warning(f"{in_use} piece(s) are made of {chosen}.")
+                st.warning(f"{ui.plural(in_use, 'piece')} are made of {chosen}.")
             else:
                 reset_mod.before(f"before removing the fabric {chosen}", "vocabulary")
                 vocab.remove_fabric(chosen)
@@ -1546,7 +1587,7 @@ def colour_section(vocab, inventory: Inventory) -> None:
             st.rerun()
         if b2.form_submit_button("Remove from the catalogue"):
             if in_use:
-                st.warning(f"{in_use} piece(s) are {chosen}.")
+                st.warning(f"{ui.plural(in_use, 'piece')} are {chosen}.")
             else:
                 reset_mod.before(f"before removing the colour {chosen}", "vocabulary")
                 vocab.remove_colour(chosen)
@@ -1616,11 +1657,11 @@ def word_list_panel(vocab, field: str, inventory: Inventory, item_field: str) ->
         c1, c2 = st.columns([3, 1], vertical_alignment="center")
         c1.markdown(
             f'<div class="dict-row">{word}'
-            f'<span class="meta">{f" · on {used} piece(s)" if used else " · unused"}'
+            f'<span class="meta">{f" · on {ui.plural(used, 'piece')}" if used else " · unused"}'
             f'</span></div>', unsafe_allow_html=True)
         if c2.button("Drop", key=f"{field}-drop-{word}", type="secondary"):
             if used:
-                st.warning(f"{used} piece(s) are marked {word}. Change them first, "
+                st.warning(f"{ui.plural(used, 'piece')} are marked {word}. Change them first, "
                            "or they will be left holding a word the catalogue has "
                            "forgotten.")
             else:
@@ -1699,7 +1740,7 @@ def retailer_catalogue_view() -> None:
         ui.eyebrow(f"{kind} · {len(shops)}")
         for shop in shops:
             used_by = [r.label or r.garment for r in plan.routes if shop.id in r.stores]
-            badge = (f'<span class="badge want">{len(used_by)} route(s)</span>'
+            badge = (f'<span class="badge want">{ui.plural(len(used_by), "route")}</span>'
                      if used_by else "")
             st.markdown(
                 f'<div class="step"><div class="hd"><div class="pieces">{shop.name}'
@@ -1741,7 +1782,7 @@ def retailer_catalogue_view() -> None:
                         catalogue.remove(shop.id)
                         catalogue.save()
                         if used_by:
-                            st.warning(f"{shop.name} was named by {len(used_by)} route(s); "
+                            st.warning(f"{shop.name} was named by {ui.plural(len(used_by), 'route')}; "
                                        "they have lost it.")
                         st.rerun()
 
@@ -1878,7 +1919,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
 
     wearable_items = [i for i in inventory.items if i.status != RETIRED]
     if not wearable_items:
-        ui.empty("Nothing to dress him in. Add pieces in the Wardrobe Inventory tab first.")
+        ui.empty("Nothing to dress him in. Add pieces on the Wardrobe Inventory page first.")
         return
 
     ui.eyebrow("The pieces")
@@ -1899,7 +1940,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
 
     photos = [Path(i.photo) for i in items if i.has_photo]
     missing_now = [i for i in items if not i.owned]
-    cost_note = (f"{len(missing_now)} piece(s) still to find"
+    cost_note = (f"{ui.plural(len(missing_now), 'piece')} still to find"
                  if missing_now else "every piece already owned")
     st.markdown(
         f'<div class="look-cap">{len(items)} pieces &middot; {len(photos)} with photos '
@@ -2252,7 +2293,7 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
     plan = shopping.purchase_plan(outfits, inventory, loved_only=loved_only)
     if plan.broken:
         st.warning(
-            f"{len(plan.broken)} outfit(s) left out of the plan because money cannot fix "
+            f"{ui.plural(len(plan.broken), 'outfit')} left out of the plan because money cannot fix "
             "them: " + "; ".join(f"**{o.name}** ({shopping.wearability(o, inventory).fault})"
                                  for o in plan.broken[:4]) + "."
         )
@@ -2274,10 +2315,10 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
         st.markdown(
             f'<div class="step"><div class="hd"><div><span class="n">{n}</span> '
             f'<span class="pieces">{pieces}</span></div>'
-            f'<div class="cost">{step.size} piece(s)</div></div>'
+            f'<div class="cost">{ui.plural(step.size, "piece")}</div></div>'
             f'<div class="why">Unlocks: {unlocked}<br>'
-            f'{step.cumulative_bought} garment(s) found so far, '
-            f'{step.cumulative_unlocked} outfit(s) unlocked</div></div>',
+            f'{ui.plural(step.cumulative_bought, "garment")} found so far, '
+            f'{ui.plural(step.cumulative_unlocked, "outfit")} unlocked</div></div>',
             unsafe_allow_html=True)
 
     if plan.still_blocked:
@@ -2317,7 +2358,7 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
         c1, c2 = st.columns([4, 1], vertical_alignment="center")
         c1.markdown(
             f'<div class="look-cap">{l.item.name or l.item.garment} &middot; '
-            f'in {l.appearances} blocked outfit(s)</div>', unsafe_allow_html=True)
+            f'in {ui.plural(l.appearances, "blocked outfit")}</div>', unsafe_allow_html=True)
         label = "★ Starred" if l.item.starred else "☆ Star"
         if c2.button(label, key=f"star-{l.item.id}",
                      type="primary" if l.item.starred else "secondary"):
@@ -2440,7 +2481,7 @@ def body_tab(profile: Profile) -> None:
     ui.blurb(
         "A size is not a fact about a man, it is a fact about a man and a shop. He is "
         "a Uniqlo M, an M&S 38 and a Tyrwhitt 15.5 with a 33 sleeve, and none of those "
-        "converts into the others. So this tab comes after Where to Buy: the shops "
+        "converts into the others. So this page comes after Where to Buy: the shops "
         "decide the vocabulary, and the measurements only say which word to pick.\n\n"
         "Everything measured here is centimetres. Everything a shop prints is a size. "
         "Confusing the two is most of why clothes do not fit."
@@ -2707,7 +2748,7 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     shown = [i for i in wanted if i.starred] if only_starred else wanted
     missing_art = [i for i in shown if not i.has_product_photo]
     c2.markdown(
-        f'<div class="look-cap">{len(shown)} piece(s)'
+        f'<div class="look-cap">{ui.plural(len(shown), "piece")}'
         f'{f" · {len(missing_art)} without a photograph yet" if missing_art else ""}</div>',
         unsafe_allow_html=True)
 

@@ -372,7 +372,9 @@ def check_garment_colour_comes_from_the_catalogue() -> str:
     from .palette import colour_names, hex_for
     from .inventory import Item
 
-    app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["page"] = "inventory"
+    app = app.run()
     assert not app.exception, f"the app raised: {app.exception[0].value}"
 
     boxes = [w for w in app.selectbox if w.label == "Colour"]
@@ -1518,12 +1520,124 @@ def check_guide_edit_and_versions() -> str:
 
 # --- App ----------------------------------------------------------------------
 
-def _render():
+def _render(page: str = ""):
+    """Render one page of the app. Empty means whichever the app opens on.
+
+    The app used to draw all ten tabs on every run, so any check could read any
+    tab's markdown by accident. It renders one page now, which is faster and
+    honest, but it means a check has to say which page it is talking about.
+    """
     from streamlit.testing.v1 import AppTest
-    app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    if page:
+        app.query_params["page"] = page
+    app = app.run()
     if app.exception:
-        raise AssertionError(str(app.exception[0].value))
+        raise AssertionError(f"{page or 'the opening page'} raised: {app.exception[0].value}")
     return app
+
+
+def _every_page():
+    """Every page rendered, as {slug: all its markdown}."""
+    import importlib
+    pages = importlib.import_module("wardrobe.app").PAGES
+    return {slug: "\n".join(m.value for m in _render(slug).markdown) for slug, _ in pages}
+
+
+def check_page_survives_a_rerun() -> str:
+    """Saving something must leave you where you were.
+
+    Streamlit tabs reset to the first one on every rerun, so every save, drop and
+    confirm bounced you back to the Style Guide from wherever you actually were.
+    The page lives in the query string now, so a rerun keeps it and so does a
+    browser refresh.
+    """
+    import importlib
+    from streamlit.testing.v1 import AppTest
+    app_mod = importlib.reload(importlib.import_module("wardrobe.app"))
+    from .principles import Principle, Principles
+
+    slugs = [slug for slug, _ in app_mod.PAGES]
+    assert app_mod.current_page.__module__ == "wardrobe.app"
+
+    book = Principles.load()
+    book.add(Principle(text="Buy the shoulder.", reason="It cannot be altered."))
+    book.offer([Principle(text="Wear more beige.", reason="No.")])
+    book.save()
+
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["page"] = "principles"
+    page = page.run()
+    assert not page.exception, f"the principles page raised: {page.exception[0].value}"
+
+    binned = next(b for b in page.button if b.key == "bin-wear-more-beige")
+    page = binned.click().run()
+    assert not page.exception, f"binning raised: {page.exception[0].value}"
+    landed = page.query_params["page"]
+    landed = landed[-1] if isinstance(landed, list) else landed
+    assert landed == "principles", f"a rerun moved us to {landed!r}"
+    assert any("Principles" in m.value for m in page.markdown), \
+        "the rerun drew a different page"
+
+    # A refresh is a fresh run carrying only the URL, which is exactly this.
+    again = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    again.query_params["page"] = "colour"
+    again = again.run()
+    assert any("Colour" in m.value for m in again.markdown), "a refresh lost the page"
+
+    # An unknown or missing page falls back rather than raising.
+    for junk in ("", "not-a-page", "1 · Style Guide"):
+        stray = AppTest.from_file(str(APP_FILE), default_timeout=180)
+        stray.query_params["page"] = junk
+        stray = stray.run()
+        assert not stray.exception, f"page={junk!r} raised: {stray.exception[0].value}"
+
+    # Only one page renders now, which is the other half of the fix.
+    everything = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    everything.query_params["page"] = "colour"
+    everything = everything.run()
+    body = "\n".join(m.value for m in everything.markdown)
+    assert "Wardrobe Inventory" not in body, "the colour page also drew the inventory"
+    return f"{len(slugs)} pages, the URL keeps the place through a rerun and a refresh"
+
+
+def check_no_dead_style_hooks() -> str:
+    """Every selector in the stylesheet must hook onto something Streamlit emits.
+
+    Streamlit moved its widgets off BaseWeb's data-baseweb attributes and onto
+    data-testid. Three whole blocks of this stylesheet quietly stopped matching
+    anything: the select and input boxes reverted to framework grey, and the
+    sub-tabs drifted back to sentence-case body text. Nothing failed, it just
+    slowly got uglier, which is the worst way for a bug to behave.
+
+    A browser is the only thing that can prove a selector matches, and this suite
+    does not run one. So this is the cheap half: no rule may lean on the attribute
+    Streamlit has abandoned. WARDROBE_BROWSER=1 runs the other half.
+    """
+    import re as _re
+    from . import ui
+    sheets = {"CSS": ui.CSS, "SHOP_CSS": ui.SHOP_CSS}
+    dead: list[str] = []
+    for name, sheet in sheets.items():
+        for line in sheet.splitlines():
+            rule = line.split("{")[0].strip()
+            if not rule or rule.startswith(("/*", "*", "@")):
+                continue
+            # data-baseweb survives only on tab-highlight, kept as a fallback
+            # beside a live data-testid rule in the same selector list.
+            if "data-baseweb" in rule and "data-testid" not in rule:
+                dead.append(f"{name}: {rule[:70]}")
+    assert not dead, "selectors leaning on the abandoned attribute: " + "; ".join(dead)
+
+    # The hooks the layout actually depends on, spelled once so a rename is loud.
+    for needed in ('[data-testid="stTab"]', '[data-testid="stSelectbox"]',
+                   '[data-testid="stTextInputRootElement"]', '[data-testid="stAlertContainer"]',
+                   '[data-testid="stRadioOption"]', '[data-testid="stSidebar"]',
+                   '[data-testid="stToolbar"]'):
+        assert needed in ui.CSS, f"the stylesheet no longer targets {needed}"
+
+    styled = len([l for l in ui.CSS.splitlines() if l.strip().endswith("{")])
+    return f"{styled} rules, none leaning on data-baseweb, every widget hook present"
 
 
 def check_no_prefilled_hints() -> str:
@@ -1610,23 +1724,25 @@ def check_typography() -> str:
 
 
 def check_app_renders_empty() -> str:
-    app = _render()
-    labels = [t.label for t in app.tabs]
-    numbered = [l for l in labels if l[0].isdigit()]
-    assert len(numbered) == 10, f"expected 10 numbered tabs, got {numbered}"
-    assert [l.split(" ")[0] for l in numbered] == [str(n) for n in range(1, 11)], \
-        f"tabs out of order: {numbered}"
-    assert "Garment Catalogue" in numbered[1], \
-        f"the dictionary is not second: {numbered[1]}"
-    assert "Wardrobe Inventory" in numbered[2], "inventory does not follow the dictionary"
-    assert "Colour" in numbered[4], f"Colour is not the fifth tab: {numbered[4]}"
+    """Every page draws on an empty wardrobe, and the running order is the one
+    the app is arguing for."""
+    import importlib
+    pages = importlib.import_module("wardrobe.app").PAGES
+    titles = [title for _, title in pages]
+    assert len(pages) == 11, f"expected ten pages and the workshop, got {len(pages)}"
+    assert titles[1] == "Garment Catalogue", f"the dictionary is not second: {titles[1]}"
+    assert titles[2] == "Wardrobe Inventory", "inventory does not follow the dictionary"
+    assert titles[4] == "Colour", f"Colour is not the fifth page: {titles[4]}"
     # Where to Buy comes before Body Measurements: the shops decide the size
     # vocabulary, and the measurements only say which word to pick.
-    assert "Where to Buy" in numbered[7], "the shops do not come before the sizes"
-    assert "Body Measurements" in numbered[8], "body measurements did not get its own tab"
-    assert "Shopping" in numbered[9], "shopping guide is not last"
-    assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
-    return f"{len(labels)} tabs: " + " · ".join(labels)
+    assert titles[7] == "Where to Buy", "the shops do not come before the sizes"
+    assert titles[8] == "Body Measurements", "body measurements did not get its own page"
+    assert titles[9] == "Shopping Guide", "shopping guide is not the tenth"
+    assert titles[10] == "Diagnostics", "the workshop is not last"
+    for slug, title in pages:
+        body = "\n".join(m.value for m in _render(slug).markdown)
+        assert title in body, f"the {title} page does not name itself"
+    return f"{len(pages)} pages all render empty: " + " · ".join(titles)
 
 
 def check_app_renders_seeded() -> str:
@@ -1634,17 +1750,19 @@ def check_app_renders_seeded() -> str:
     from .seed import seed_answers, seed_principles
     seed_answers()
     seed_principles()
-    app = _render()
-    page = "\n".join(m.value for m in app.markdown)
     from . import paths as _paths
     _paths.guide().write_text("# Style Guide\n\n## The thesis\n\nQuiet clothes.\n")
-    app = _render()
-    page = "\n".join(m.value for m in app.markdown)
-    for probe in ("Grey flannel trousers", "Saturday, Fulham Road", "Keep the volume",
-                  "Every missing piece"):
-        assert probe in page, f"{probe!r} never made it onto the page"
-    assert len(app.button) > 20, "the seeded page has suspiciously few controls"
-    return f"{len(app.button)} controls, inventory, outfits, principles and plan all rendered"
+    body = _every_page()
+    # Each probe has to appear on the page that owns it, not merely somewhere.
+    for slug, probe in (("inventory", "Grey flannel trousers"),
+                        ("gallery", "Saturday, Fulham Road"),
+                        ("principles", "Keep the volume"),
+                        ("shop", "Every missing piece"),
+                        ("style-guide", "The thesis")):
+        assert probe in body[slug], f"{probe!r} never made it onto the {slug} page"
+    controls = len(_render("inventory").button)
+    assert controls > 10, f"the seeded inventory has suspiciously few controls: {controls}"
+    return f"{len(body)} pages rendered seeded, each probe on the page that owns it"
 
 
 def check_diagnostics_renders() -> str:
@@ -1657,7 +1775,7 @@ def check_diagnostics_renders() -> str:
     from . import reset
     _seeded()
     reset.snapshot()
-    app = _render()
+    app = _render("diagnostics")
     page = "\n".join(m.value for m in app.markdown)
     assert "Data lives in" in page, "the diagnostics tab did not draw"
     labels = [c.label for c in app.checkbox]
@@ -1822,7 +1940,9 @@ def check_generate_button_runs() -> str:
     real = gemini_image.generate_images
     gemini_image.generate_images = stub
     try:
-        app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+        app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+        app.query_params["page"] = "generator"
+        app = app.run()
         if app.exception:
             raise AssertionError(f"render failed: {app.exception[0].value}")
 
@@ -1872,7 +1992,9 @@ def check_unreadable_image_does_not_crash() -> str:
     outfits.add(Outfit(name="Corrupt look", item_ids=[tee.id], images=[str(broken)]))
     outfits.save()
 
-    app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["page"] = "gallery"
+    app = app.run()
     assert not app.exception, f"one bad image killed the render: {app.exception[0].value}"
     page = "\n".join(m.value for m in app.markdown)
     assert "could not be read" in page, "no placeholder shown for the corrupt image"
@@ -1979,11 +2101,13 @@ def check_garment_catalogue() -> str:
     assert "Cardigan" not in garments(), "restoring defaults did not undo the edit"
     assert len(garments()) == before, "the count did not come back"
 
-    # It is a tab now, and also a page of its own for a second monitor.
-    inside = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    # It is a page of the app, and also a page of its own for a second monitor.
+    inside = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    inside.query_params["page"] = "garments"
+    inside = inside.run()
     assert not inside.exception, f"the app raised: {inside.exception[0].value}"
-    assert any("Garment Catalogue" in t.label for t in inside.tabs), \
-        "the dictionary is not a tab"
+    assert any("Garment Catalogue" in m.value for m in inside.markdown), \
+        "the dictionary is not a page of the app"
 
     page = AppTest.from_file(str(APP_FILE), default_timeout=180)
     page.query_params["garments"] = "all"
@@ -1991,8 +2115,8 @@ def check_garment_catalogue() -> str:
     assert not page.exception, f"the garment catalogue raised: {page.exception[0].value}"
     # "No tabs" used to stand in for "not the whole app". The catalogue has its
     # own sections now, so the test has to say what it actually means.
-    assert not [t for t in page.tabs if t.label[:1].isdigit()], \
-        "the standalone catalogue drew the numbered app tabs"
+    assert not [r for r in page.radio if r.label == "Section"], \
+        "the standalone catalogue drew the app navigation"
     # Garment names sit in expander labels, not markdown, so both are read.
     body = "\n".join(
         [m.value for m in page.markdown]
@@ -2040,7 +2164,10 @@ def check_shop_catalogue_opens() -> str:
     page = "\n".join(m.value for m in app.markdown)
     for name in ("Vinted", "Uniqlo", "Mango", "Charles Tyrwhitt"):
         assert name in page, f"{name} is missing from the catalogue"
-    assert "route(s)" in page, "the catalogue does not say which shops the plan uses"
+    import re as _re
+    assert _re.search(r"\b\d+ routes?\b", page), \
+        "the catalogue does not say how many routes name each shop"
+    assert "route(s)" not in page, "the (s) plural hack is back"
     buttons = [b.label for b in app.button]
     assert "Add to the catalogue" in buttons, "no way to add a shop"
     assert any("Remove from the catalogue" in b for b in buttons), "no way to remove one"
@@ -2172,7 +2299,8 @@ def check_answer_view_opens() -> str:
     assert index.count("?answer=") >= 20, "the index is not linking every answer"
 
     normal = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
-    assert normal.tabs, "the app stopped drawing tabs without a query param"
+    assert [r for r in normal.radio if r.label == "Section"], \
+        "the app stopped drawing its navigation without a query param"
     return "single answer, index, and the app itself all render"
 
 
@@ -2313,8 +2441,10 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Outfit prompt carries garments and photo roles", check_outfit_prompt),
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
     (APP, "No text box prefills a suggestion", check_no_prefilled_hints),
+    (APP, "No dead style hooks", check_no_dead_style_hooks),
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
+    (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
     (APP, "No function shadows an imported module", check_no_module_shadowing),

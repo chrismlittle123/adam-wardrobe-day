@@ -32,6 +32,18 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
 
+def plural(count: int, singular: str, many: str = "") -> str:
+    """One piece, two pieces. It used to print "1 piece(s)" everywhere, which
+    reads as a shrug."""
+    word = singular if abs(count) == 1 else (many or f"{singular}s")
+    return f"{count} {word}"
+
+
+def count_of(count: int, singular: str, many: str = "") -> str:
+    """The word alone, no number, for when the count is already on the page."""
+    return singular if abs(count) == 1 else (many or f"{singular}s")
+
+
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:opsz,wght@6..96,400;6..96,600&family=Jost:wght@300;400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@300;400;500&display=swap');
@@ -48,7 +60,7 @@ CSS = """
 }
 
 .stApp { background: var(--ground); }
-html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
+html, body, [class*="css"], .stMarkdown, p, li, label, [data-testid="stWidgetLabel"] {
   font-family: var(--prose); color: var(--cream);
 }
 [data-testid="stHeader"] { background: transparent; }
@@ -117,9 +129,20 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
   font-family: var(--prose);
 }
 .stTextArea textarea:focus, .stTextInput input:focus { border-color: var(--brass) !important; box-shadow: none !important; }
-div[data-baseweb="select"] > div, div[data-baseweb="input"] {
-  background: var(--panel) !important; border: 1px solid var(--line) !important; border-radius: 0 !important;
+/* Streamlit stopped exposing data-baseweb on these, so the old rule quietly
+   matched nothing and the boxes reverted to the framework's own grey. */
+[data-testid="stSelectbox"] > div > div,
+[data-testid="stMultiSelect"] > div > div,
+[data-testid="stTextInputRootElement"],
+[data-testid="stTextAreaRootElement"],
+[data-testid="stNumberInputContainer"] {
+  background: var(--panel) !important; border: 1px solid var(--line) !important;
+  border-radius: 0 !important;
 }
+[data-testid="stSelectbox"] > div > div:focus-within,
+[data-testid="stMultiSelect"] > div > div:focus-within,
+[data-testid="stTextInputRootElement"]:focus-within,
+[data-testid="stNumberInputContainer"]:focus-within { border-color: var(--brass) !important; }
 .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
   background: var(--brass); color: #17110E; border: none; border-radius: 0;
   font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .12em;
@@ -147,14 +170,111 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
   letter-spacing: .14em !important; text-transform: uppercase !important; }
 .stCode, pre, code { font-family: var(--data); font-size: 0.82rem !important; }
 
-/* Tabs -------------------------------------------------------------------- */
-.stTabs [data-baseweb="tab-list"] { gap: 1.6rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-.stTabs [data-baseweb="tab"] {
-  font-family: var(--chrome); font-size: 0.78rem; letter-spacing: .16em;
-  text-transform: uppercase; color: var(--muted); background: transparent; padding: .3rem 0 .8rem;
+/* Tabs, still used inside a page for sub-sections. Streamlit renamed these
+   from data-baseweb to data-testid, so the old rules matched nothing and the
+   sub-tabs had drifted back to sentence-case body text. */
+[data-testid="stTabs"] [role="tablist"] {
+  gap: 1.6rem; border-bottom: 1px solid var(--line); flex-wrap: wrap;
 }
-.stTabs [aria-selected="true"] { color: var(--brass) !important; }
-.stTabs [data-baseweb="tab-highlight"] { background: var(--brass); }
+[data-testid="stTab"] {
+  font-family: var(--chrome) !important; font-size: 0.78rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--muted); background: transparent;
+  padding: .3rem 0 .8rem;
+}
+[data-testid="stTab"] p {
+  font-family: var(--chrome) !important; font-size: 0.78rem !important;
+  letter-spacing: .16em; text-transform: uppercase; color: inherit; margin: 0;
+}
+[data-testid="stTab"][aria-selected="true"], 
+[data-testid="stTab"][aria-selected="true"] p { color: var(--brass) !important; }
+[data-testid="stTabs"] [role="tablist"] + div { background: var(--brass); }
+
+/* Navigation: a running order, not a row of tabs -------------------------- */
+/* Ten pages will not fit across the top without wrapping into an ugly second
+   row, and the number matters as much as the name, so it reads as a contents
+   page down the side. The radio dots are hidden: the brass rule does the work. */
+[data-testid="stSidebar"] [role="radiogroup"] { gap: 0; margin: 0 0 1.5rem; }
+[data-testid="stSidebar"] [role="radiogroup"] label {
+  padding: .34rem 0 .34rem .85rem; margin: 0; border-left: 2px solid transparent;
+  transition: border-color .15s ease, color .15s ease;
+}
+[data-testid="stSidebar"] [role="radiogroup"] label:hover { border-left-color: var(--line); }
+/* Kill the radio dot itself. The brass rule down the left says which page you
+   are on far more quietly than a filled circle does. The dot is three divs deep
+   inside the label, after a visually-hidden span holding the real input. */
+[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div > div:first-child {
+  display: none !important;
+}
+[data-testid="stSidebar"] [data-testid="stRadioOption"] > div > div { gap: 0; }
+[data-testid="stSidebar"] [role="radiogroup"] label p {
+  font-family: var(--chrome); font-size: 0.80rem; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--muted); margin: 0; white-space: nowrap;
+}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) {
+  border-left-color: var(--brass);
+}
+[data-testid="stSidebar"] [role="radiogroup"] label:has(input:checked) p {
+  color: var(--brass); font-weight: 500;
+}
+
+/* The masthead, in the sidebar where it belongs -------------------------- */
+.brand { padding: .2rem 0 1.3rem; margin-bottom: 1.2rem; border-bottom: 1px solid var(--line); }
+.brand h1 {
+  font-family: var(--display); font-weight: 400; font-size: 1.72rem;
+  color: var(--cream); margin: 0; line-height: 1.05; letter-spacing: .01em;
+}
+.brand h1 em { font-style: italic; color: var(--brass); }
+.brand .sub {
+  font-family: var(--chrome); font-size: 0.60rem; letter-spacing: .17em;
+  text-transform: uppercase; color: var(--muted); margin-top: .55rem; line-height: 1.7;
+}
+
+/* Streamlit's own chrome. The deploy button and the hamburger belong to the
+   framework, not to this app, and they sit on top of the masthead. */
+[data-testid="stToolbar"], [data-testid="stDecoration"],
+[data-testid="stStatusWidget"], #MainMenu, footer { display: none !important; }
+.stAppHeader, header[data-testid="stHeader"] { background: transparent; height: 0; }
+.stMainBlockContainer, [data-testid="stMainBlockContainer"] { padding-top: 2.4rem; }
+
+/* Alerts. Streamlit paints stAlertContainer a translucent yellow, which in this
+   walnut palette looks like a hi-vis vest at a funeral. The panel does the work
+   instead, and the left edge carries the severity: brass for something to know,
+   red for something wrong. */
+[data-testid="stAlert"] { background: transparent !important; }
+[data-testid="stAlertContainer"] {
+  background: var(--panel) !important; border: 1px solid var(--line);
+  border-left: 2px solid var(--brass); border-radius: 0;
+  padding: .85rem 1rem; gap: 0;
+}
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentWarning"]),
+[data-testid="stAlertContainer"]:has([data-testid="stAlertContentError"]) {
+  border-left-color: var(--bad);
+}
+[data-testid="stAlertContainer"] p {
+  font-family: var(--prose); font-size: .86rem; line-height: 1.6;
+  color: var(--cream); margin: 0;
+}
+[data-testid="stAlertContainer"] svg { display: none; }
+
+/* The page you are on, announced once at the top ------------------------- */
+.page-head {
+  display: flex; align-items: baseline; gap: .85rem;
+  margin: 0 0 1.5rem; padding-bottom: .7rem; border-bottom: 1px solid var(--line);
+}
+.page-head h2 {
+  font-family: var(--display); font-weight: 400; font-size: 1.9rem;
+  color: var(--cream); margin: 0; line-height: 1.1;
+}
+.alarm {
+  font-family: var(--chrome); font-size: 0.72rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--bad); margin: 0 0 .9rem;
+  padding-left: .7rem; border-left: 2px solid var(--bad);
+}
+.page-no {
+  font-family: var(--data); font-size: 0.8rem; color: var(--brass);
+  border: 1px solid var(--line); border-radius: 2px;
+  padding: .18rem .5rem; line-height: 1;
+}
 
 /* Meter ------------------------------------------------------------------- */
 .meter { margin: 0 0 1.4rem; }
