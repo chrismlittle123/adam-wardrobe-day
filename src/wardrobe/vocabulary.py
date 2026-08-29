@@ -206,7 +206,12 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "Warm accents": (
         ("Dusty pink", "#C9A29B"), ("Terracotta", "#B5613F"),
-        ("Mustard", "#C08A2E"), ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
+        ("Mustard", "#C08A2E"),
+        # A true red, not the browned one. Rust is orange gone dark and burgundy
+        # has purple in it; this is the one between them, and unlike its two
+        # neighbours it sits well clear of his colouring.
+        ("Red", "#A62B2B"),
+        ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
         ("Oxblood", "#4A1F23"),
     ),
     # A group of its own, because these are not colours in the sense the rest of
