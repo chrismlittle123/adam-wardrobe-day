@@ -244,7 +244,7 @@ def subject_editor(profile: Profile) -> None:
     with st.expander("Edit subject"):
         with st.form("subject"):
             s.name = st.text_input("Name", s.name)
-            s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 176)
+            s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 178)
             s.body_fat_pct = st.number_input("Body fat (%)", 0, 50, s.body_fat_pct)
             s.build = st.text_input("Build", s.build)
             s.skin_tone_hex = st.color_picker("Skin", s.skin_tone_hex)

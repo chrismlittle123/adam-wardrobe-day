@@ -2,7 +2,7 @@
 
 The whole point of the profile is that the model keeps getting told the same
 true things about the man: his height, his build, his colouring. Left to itself
-an image model will quietly hand a lean 1.76 m subject the proportions of a
+an image model will quietly hand a lean 1.78 m subject the proportions of a
 2 m fashion-week mannequin, so the physique line is repeated as an instruction,
 not just as description.
 """

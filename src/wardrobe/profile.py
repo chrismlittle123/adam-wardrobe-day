@@ -43,7 +43,7 @@ class Subject:
 
     @property
     def height_imperial(self) -> str:
-        """1.76 m as 5 ft 9 in, for the benefit of the shops that still think so."""
+        """1.78 m as 5 ft 10 in, for the benefit of the shops that still think so."""
         if not self.height_cm:
             return ""
         total_inches = round(self.height_cm / CM_PER_INCH)

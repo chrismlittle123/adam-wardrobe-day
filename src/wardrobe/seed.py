@@ -108,7 +108,7 @@ ANSWERS: dict[str, str] = {
 
 PRINCIPLES: tuple[tuple[str, str, str], ...] = (
     ("Silhouette", "Keep the volume in one place only.",
-     "At 1.76 m, loose on top and loose below reads as swamped rather than relaxed."),
+     "At 1.78 m, loose on top and loose below reads as swamped rather than relaxed."),
     ("Silhouette", "Buy the shoulder, alter everything else.",
      "A shoulder seam cannot be moved; a sleeve and a waist can, cheaply."),
     ("Colour", "Build every outfit from two base colours and at most one accent.",
