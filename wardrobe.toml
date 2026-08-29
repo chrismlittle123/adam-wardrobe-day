@@ -3,7 +3,9 @@ id = "hopsack-wool-mid-grey-suit"
 name = "Hopsack Wool Mid Grey Suit"
 category = "Outerwear"
 garment = "Suit"
-colour = "Mid grey"
+colours = [
+    "Mid grey",
+]
 colour_hex = "#7A7A78"
 fabric = "Wool hopsack"
 grade = ""
@@ -27,7 +29,9 @@ id = "purple-brown-suede-loafers"
 name = "Purple Brown Suede Loafers"
 category = "Shoes"
 garment = "Loafers"
-colour = "Oxblood"
+colours = [
+    "Oxblood",
+]
 colour_hex = "#4A1F23"
 fabric = "Suede"
 grade = ""
@@ -50,7 +54,9 @@ id = "camp-collar-stitched-black-and-white"
 name = "Camp Collar Stitched Black and White Shirt"
 category = "Top"
 garment = "Shirt"
-colour = "Cream"
+colours = [
+    "Cream",
+]
 colour_hex = "#F2E9D8"
 fabric = "Cotton jersey"
 grade = "Everyday"
@@ -73,7 +79,9 @@ id = "african-printed-blue-shirt"
 name = "African Printed Blue Shirt"
 category = "Top"
 garment = "Shirt"
-colour = "Mid blue"
+colours = [
+    "Mid blue",
+]
 colour_hex = "#4A6E96"
 fabric = "Cotton jersey"
 grade = "Everyday"
@@ -96,7 +104,9 @@ id = "plaid-shirt"
 name = "Plaid Shirt"
 category = "Top"
 garment = "Shirt"
-colour = "Forest"
+colours = [
+    "Forest",
+]
 colour_hex = "#2F4032"
 fabric = "Cotton jersey"
 grade = "Everyday"
@@ -119,7 +129,9 @@ id = "sand-linen-shirt"
 name = "Sand Linen Shirt"
 category = "Top"
 garment = "Shirt"
-colour = "Sand"
+colours = [
+    "Sand",
+]
 colour_hex = "#D9C9A8"
 fabric = "Linen"
 grade = "Everyday"
@@ -142,7 +154,9 @@ id = "sun-black-and-white-viscose-camp-col"
 name = "Sun Black and White Viscose Camp Collar"
 category = "Top"
 garment = "Shirt"
-colour = "Multicolour"
+colours = [
+    "Multicolour",
+]
 colour_hex = "#8A7767"
 fabric = ""
 grade = "Everyday"
@@ -154,7 +168,82 @@ description = ""
 starred = false
 link = ""
 wait_for_sale = false
-product_photo = ""
+product_photo = "out/products/sun-black-and-white-viscose-camp-col.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "black-cotton-crew-neck-jumper"
+name = "Black Cotton Crew Neck Jumper"
+category = "Top"
+garment = "Knitwear"
+colours = [
+    "Black",
+]
+colour_hex = "#1B1918"
+fabric = "Cotton jersey"
+grade = "Knitted"
+fit = "Regular"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/black-cotton-crew-neck-jumper.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/black-cotton-crew-neck-jumper.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "sky-blue-light-denim-jacket"
+name = "Sky Blue Light Denim Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Sky blue",
+]
+colour_hex = "#8FB3D0"
+fabric = "Washed denim"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/sky-blue-light-denim-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/sky-blue-light-denim-jacket.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "L"
+
+[[items]]
+id = "sleeveless-denim-jacket"
+name = "Sleeveless Denim Jacket"
+category = "Outerwear"
+garment = "Jacket"
+colours = [
+    "Denim",
+]
+colour_hex = "#3E5C79"
+fabric = "Washed denim"
+grade = ""
+fit = ""
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/sleeveless-denim-jacket.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/sleeveless-denim-jacket.png"
 product_copy = ""
 
 [items.sizes]

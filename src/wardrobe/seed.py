@@ -173,7 +173,7 @@ def seed_inventory(inventory: Inventory | None = None) -> Inventory:
         held.add(name)
         inventory.add(Item(
             name=name, garment=garment, category=category_for(garment),
-            colour=colour, colour_hex=hex_code, fabric=fabric, sizes=dict(sizes),
+            colours=[colour] if colour else [], colour_hex=hex_code, fabric=fabric, sizes=dict(sizes),
             status=ASPIRATIONAL if wanted else "owned", grade=grade, fit=fit,
         ))
     inventory.save()

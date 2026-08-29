@@ -41,7 +41,7 @@ RARELY_WORN: frozenset[str] = frozenset({
 
 # Worn constantly and worn out, so a used one has little life left in it.
 WORN_OUT: frozenset[str] = frozenset({
-    "T-shirt", "Socks", "Jeans", "Sweatshirt", "Polo",
+    "T-shirt", "Socks", "Jeans", "Sweatshirt", "Hoodie", "Polo",
 })
 
 HIGH_STREET, ONLINE, TAILORING, SHOES, SECONDHAND, OFF_PRICE = (
@@ -66,8 +66,8 @@ class Retailer:
 
 
 
-TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Overshirt",
-        "Waistcoat")
+TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Hoodie",
+        "Overshirt", "Waistcoat")
 BOTTOMS = ("Trousers", "Chinos", "Jeans", "Shorts")
 OUTER = ("Blazer", "Jacket", "Overcoat", "Overshirt", "Gilet", "Suit")
 FOOTWEAR = ("Loafers", "Derbies", "Boots", "Trainers", "Sandals")

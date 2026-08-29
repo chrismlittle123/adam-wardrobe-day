@@ -69,7 +69,7 @@ def copy_prompt(profile: Profile, item: Item, principles: str = "") -> str:
 
 {item.name or item.garment}
 Type: {item.garment}
-Colour: {item.colour or "unspecified"}
+Colour: {item.colour_line or "unspecified"}
 Cloth: {item.fabric or "unspecified"}
 Size label he is after: {labels}
 His own note: {item.description or "none"}
@@ -115,7 +115,7 @@ def photo_prompt(item: Item) -> str:
     Product photography is a genre with rules, and the model follows them better
     when they are named: one garment, centred, seamless white, soft even light.
     """
-    described = " ".join(b for b in (item.colour, item.fabric, item.garment.lower()) if b)
+    described = " ".join(b for b in (item.colour_line, item.fabric, item.garment.lower()) if b)
     detail = f" {item.description.strip()}" if item.description.strip() else ""
     return (
         f"E-commerce product photograph of a single {described}, and nothing else."
@@ -131,7 +131,7 @@ def restage_prompt(item: Item) -> str:
     nicer garment. This is a restaging: the same piece, the same cloth, the same
     cut, the same wear, moved onto a white background.
     """
-    described = " ".join(b for b in (item.colour, item.fabric, item.garment.lower()) if b)
+    described = " ".join(b for b in (item.colour_line, item.fabric, item.garment.lower()) if b)
     detail = f"\n\nWhat it is: {item.description.strip()}" if item.description.strip() else ""
     return (
         "Photograph THE EXACT GARMENT in the reference image, restaged as an "

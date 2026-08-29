@@ -102,13 +102,30 @@ def category_for(garment: str) -> str:
     return current().category_for(garment)
 
 
+def _migrate(row: dict, allowed: set[str]) -> dict:
+    """Read a row written before a garment could have more than one colour.
+
+    Every file on disk says colour = "Navy". Rather than rewrite them all and
+    hope nothing was missed, the single value is folded into the list on read,
+    which also means a snapshot taken last week still restores.
+    """
+    kept = {k: v for k, v in row.items() if k in allowed}
+    legacy = row.get("colour")
+    if legacy and not kept.get("colours"):
+        kept["colours"] = [legacy]
+    return kept
+
+
 @dataclass
 class Item:
     id: str = ""
     name: str = ""
     category: str = "Top"
     garment: str = "Shirt"
-    colour: str = ""
+    # A garment is often more than one colour: a stripe, a check, a contrast
+    # collar. The list is the truth; `colour` below is the lead one, because
+    # most of the app wants a single word and a single swatch.
+    colours: list[str] = field(default_factory=list)
     colour_hex: str = "#CCCCCC"
     fabric: str = ""
     # The three axes a sourcing route matches on. Each is optional; the more of
@@ -132,6 +149,20 @@ class Item:
     sizes: dict[str, str] = field(default_factory=dict)
 
     @property
+    def colour(self) -> str:
+        """The lead colour: the one the swatch and the prompts use."""
+        return self.colours[0] if self.colours else ""
+
+    @property
+    def colour_line(self) -> str:
+        """All of them, as a person would say it. "Navy and cream", not a list."""
+        if not self.colours:
+            return ""
+        if len(self.colours) == 1:
+            return self.colours[0]
+        return ", ".join(self.colours[:-1]) + f" and {self.colours[-1].lower()}"
+
+    @property
     def owned(self) -> bool:
         return self.status == OWNED
 
@@ -140,7 +171,7 @@ class Item:
         """What the search boxes show. Colour separates near-duplicates."""
         bits = [self.name or self.garment]
         if self.colour and self.colour.lower() not in (self.name or "").lower():
-            bits.append(f"({self.colour})")
+            bits.append(f"({self.colour_line})")
         if self.status == ASPIRATIONAL:
             bits.append("· wanted")
         elif self.status == RETIRED:
@@ -176,7 +207,7 @@ class Item:
     def describe(self) -> str:
         """One line for the image prompt. Photographs beat adjectives, but when
         there is no photograph the adjectives have to carry it."""
-        bits = [b for b in (self.colour, self.fabric, self.garment.lower()) if b]
+        bits = [b for b in (self.colour_line, self.fabric, self.garment.lower()) if b]
         line = " ".join(bits) or self.name
         if self.description:
             line = f"{line} ({self.description})"
@@ -226,7 +257,7 @@ class Item:
 
     def searchable(self) -> str:
         return " ".join(
-            [self.name, self.colour, self.fabric, self.garment, self.grade,
+            [self.name, " ".join(self.colours), self.fabric, self.garment, self.grade,
              self.fit, self.category, self.description, *self.sizes.values()]
         ).lower()
 
@@ -243,7 +274,7 @@ class Inventory:
             return cls(path=path)
         raw = tomllib.loads(path.read_text())
         allowed = {f.name for f in fields(Item)}
-        items = [Item(**{k: v for k, v in row.items() if k in allowed}) for row in raw.get("items", [])]
+        items = [Item(**_migrate(row, allowed)) for row in raw.get("items", [])]
         return cls(items=items, path=path)
 
     def save(self) -> Path:

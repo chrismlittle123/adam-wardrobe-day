@@ -31,7 +31,8 @@ DEFAULT_CATEGORIES: dict[str, tuple[str, ...]] = {
     "Bottom": ("Chinos", "Jeans", "Shorts", "Trousers"),
     "Outerwear": ("Blazer", "Gilet", "Jacket", "Overcoat", "Overshirt", "Suit"),
     "Shoes": ("Boots", "Derbies", "Loafers", "Sandals", "Trainers"),
-    "Top": ("Knitwear", "Polo", "Shirt", "Sweatshirt", "T-shirt", "Waistcoat"),
+    "Top": ("Hoodie", "Knitwear", "Polo", "Shirt", "Sweatshirt", "T-shirt",
+            "Waistcoat"),
 }
 SINGLE_SLOT: tuple[str, ...] = ("Top", "Bottom", "Outerwear", "Shoes")
 
@@ -250,7 +251,7 @@ DEFAULT_SCHEMES: dict[str, tuple[str, ...]] = {
     "Boots": ("Shoe",), "Derbies": ("Shoe",), "Loafers": ("Shoe",),
     "Sandals": ("Shoe",), "Trainers": ("Shoe",),
     "Knitwear": ("Alpha", "Chest and length"), "Polo": ("Alpha",),
-    "Sweatshirt": ("Alpha",), "T-shirt": ("Alpha",),
+    "Hoodie": ("Alpha",), "Sweatshirt": ("Alpha",), "T-shirt": ("Alpha",),
     "Shirt": ("Collar and sleeve", "Alpha"),
 }
 
@@ -425,6 +426,21 @@ class Vocabulary:
         return {k: out[k] for k in sorted(out)}
 
     def add_garment(self, garment: Garment) -> Garment:
+        """Add one, filling in whatever the caller did not decide.
+
+        The sizing scheme and whether a garment carries a grade or a fit follow
+        from what it is, and defaults() has always worked them out from the
+        tables. This did not, so anything added afterwards arrived as free-text
+        sizing with no grade and no fit. A hoodie came in that way: every other
+        top is alpha sized and carries both.
+        """
+        if not garment.schemes:
+            garment.schemes = list(DEFAULT_SCHEMES.get(garment.name, ("Free text",)))
+        if not garment.takes_grade:
+            garment.takes_grade = garment.category in GRADED_CATEGORIES
+        if not garment.takes_fit:
+            garment.takes_fit = (garment.category in FITTED_CATEGORIES
+                                 or garment.name in FITTED_EXTRAS)
         self.garments.append(garment)
         return garment
 

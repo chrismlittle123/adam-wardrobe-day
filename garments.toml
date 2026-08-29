@@ -192,6 +192,15 @@ takes_grade = false
 takes_fit = false
 
 [[garments]]
+name = "Hoodie"
+category = "Top"
+schemes = [
+    "Alpha",
+]
+takes_grade = true
+takes_fit = true
+
+[[garments]]
 name = "Jacket"
 category = "Outerwear"
 schemes = [

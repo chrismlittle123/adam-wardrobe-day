@@ -595,27 +595,49 @@ def check_garment_colour_comes_from_the_catalogue() -> str:
     app = app.run()
     assert not app.exception, f"the app raised: {app.exception[0].value}"
 
-    boxes = [w for w in app.selectbox if w.label == "Colour"]
+    boxes = [w for w in app.multiselect if w.label == "Colours"]
     assert boxes, "no colour picker on the inventory form"
+    assert not [w for w in app.selectbox if w.label == "Colour"], \
+        "the single-colour dropdown is back"
     for box in boxes:
-        assert list(box.options) == ["", *colour_names()], \
+        assert list(box.options) == list(colour_names()), \
             f"the colour list is not the catalogue: {list(box.options)[:4]}"
 
     page = "\n".join(m.value for m in app.markdown)
     assert "#CCCCCC" not in page, "the placeholder swatch is still on the page"
     assert "Swatch" not in page, "the swatch preview is back"
 
-    # The hex still follows from the name, since the cards and the prompts use it.
-    item = Item(name="x", colour="Navy")
+    # A garment is often more than one colour: a stripe, a check, a contrast
+    # collar. The list is the truth and the first is the lead, because the
+    # swatch and the prompts want one word.
+    striped = Item(name="x", colours=["Navy", "Cream"])
+    assert striped.colour == "Navy", "the lead colour is not the first one"
+    assert striped.colour_line == "Navy and cream", f"reads as {striped.colour_line!r}"
+    assert "cream" in striped.searchable(), "a second colour is not searchable"
+    assert Item(name="y", colours=["Navy"]).colour_line == "Navy", "one colour got a conjunction"
+    assert Item(name="z").colour_line == "" and Item(name="z").colour == "", \
+        "an item with no colour invented one"
+
+    # The hex still follows from the lead, since the cards and the prompts use it.
+    item = Item(name="x", colours=["Navy"])
     item.colour_hex = hex_for(item.colour)
     assert item.colour_hex == "#26303F", "the hex no longer follows the name"
-    return f"colour picked from {len(colour_names())} catalogue names, no hex on the form"
+
+    # Every file on disk was written when a garment had one colour. Reading one
+    # of those must fold it into the list rather than lose it.
+    from .inventory import Inventory
+    legacy = paths.inventory()
+    legacy.write_text('[[items]]\nid = "old"\nname = "Old shirt"\ncolour = "Olive"\n')
+    back = Inventory.load().items[0]
+    assert back.colours == ["Olive"], f"a file written before this lost its colour: {back.colours}"
+    return (f"colours picked from {len(colour_names())} catalogue names, several at a "
+            "time, and old files still read")
 
 
 def check_pattern_removed() -> str:
     from .inventory import Item
     assert "pattern" not in Item().__dataclass_fields__, "the pattern field is back"
-    described = Item(name="X", colour="olive", fabric="linen", garment="Overshirt").describe()
+    described = Item(name="X", colours=["olive"], fabric="linen", garment="Overshirt").describe()
     assert described == "olive linen overshirt", f"describe() changed shape: {described!r}"
     return f"no pattern field; describe() gives {described!r}"
 
@@ -911,6 +933,46 @@ def _palette():
     ):
         palette.add(Colour(name=name, hex=hex_code, role=role, categories=categories))
     return palette
+
+
+def check_added_garments_get_their_rules() -> str:
+    """A garment added after the defaults were built must still get them.
+
+    Sizing scheme, whether it carries a grade, whether it carries a fit: all
+    three follow from what the garment is, and defaults() has always worked them
+    out from the tables. add_garment did not, so anything added later arrived
+    with free-text sizing, no grade and no fit. The hoodie came in that way, and
+    every other top is alpha sized and carries both.
+    """
+    from .vocabulary import (DEFAULT_CATEGORIES, FITTED_CATEGORIES, Garment,
+                             GRADED_CATEGORIES, Vocabulary, current)
+
+    assert "Hoodie" in DEFAULT_CATEGORIES["Top"], "the hoodie is not a top"
+    live = current()
+    hoodie = next((g for g in live.garments if g.name == "Hoodie"), None)
+    assert hoodie is not None, "the hoodie is not in the catalogue"
+    assert hoodie.schemes == ["Alpha"], f"a hoodie is alpha sized, not {hoodie.schemes}"
+    assert hoodie.takes_grade and hoodie.takes_fit, "a hoodie carries a grade and a fit"
+
+    # Every top agrees with every other top, which is what caught this.
+    for top in (g for g in live.garments if g.category == "Top"):
+        assert top.schemes, f"{top.name} has no sizing scheme"
+        assert top.takes_grade, f"{top.name} does not carry a grade"
+        assert top.takes_fit, f"{top.name} does not carry a fit"
+
+    # And the rule is applied on add, not just written into the defaults once.
+    vocab = Vocabulary.load()
+    vocab.add_garment(Garment(name="Cagoule", category="Top"))
+    added = next(g for g in vocab.garments if g.name == "Cagoule")
+    assert added.schemes == ["Free text"], "an unknown garment lost its fallback scheme"
+    assert added.takes_grade is (("Top") in GRADED_CATEGORIES), "grade not applied on add"
+    assert added.takes_fit is (("Top") in FITTED_CATEGORIES), "fit not applied on add"
+
+    # A caller that has decided keeps its decision.
+    vocab.add_garment(Garment(name="Cape", category="Outerwear", schemes=["One size"]))
+    kept = next(g for g in vocab.garments if g.name == "Cape")
+    assert kept.schemes == ["One size"], "an explicit scheme was overwritten"
+    return f"a hoodie is an alpha-sized top with a grade and a fit, like every other top"
 
 
 def check_fabric_families() -> str:
@@ -1398,7 +1460,7 @@ def check_secondhand_rule() -> str:
     from .inventory import Item
     from .retailers import RARELY_WORN, SECONDHAND, WORN_OUT, suggest
 
-    coat = Item(name="Camel wool overcoat", garment="Overcoat", colour="Camel",
+    coat = Item(name="Camel wool overcoat", garment="Overcoat", colours=["Camel"],
                 fabric="Wool melton")
     top = suggest(coat, limit=3)
     assert top[0].retailer.name == "Vinted", f"Vinted did not lead: {top[0].retailer.name}"
@@ -1411,7 +1473,7 @@ def check_secondhand_rule() -> str:
         assert suggest(Item(name="x", garment=garment), limit=1)[0].retailer.kind == SECONDHAND, \
             f"{garment} did not lead with a resale site"
 
-    tee = suggest(Item(name="White tee", garment="T-shirt", colour="White"), limit=3)
+    tee = suggest(Item(name="White tee", garment="T-shirt", colours=["White"]), limit=3)
     assert all(s.retailer.kind != SECONDHAND for s in tee), \
         "a tee is worn out, so it should be bought new"
     every = suggest(Item(name="x", garment="T-shirt"), limit=99)
@@ -1493,7 +1555,7 @@ def check_retailer_catalogue() -> str:
     coverable = {g for r in RETAILERS for g in r.strengths}
     unsold = [g for g in garments() if g not in coverable]
     assert not unsold, f"no retailer sells: {unsold}"
-    assert query_for(Item(garment="Blazer", colour="navy", fabric="Linen")) == "navy Linen Blazer"
+    assert query_for(Item(garment="Blazer", colours=["navy"], fabric="Linen")) == "navy Linen Blazer"
     return f"{len(RETAILERS)} retailers across {len(KINDS)} kinds, every garment covered"
 
 
@@ -1502,7 +1564,7 @@ def check_tactics() -> str:
     from .inventory import Item
     from .retailers import tactics
 
-    coat = Item(name="Camel overcoat", garment="Overcoat", colour="Camel",
+    coat = Item(name="Camel overcoat", garment="Overcoat", colours=["Camel"],
                 sizes={"chest": "38"})
     names = [t.name for t in tactics(coat)]
     assert "Save the Vinted search" in names, "no saved search for a rarely-worn coat"
@@ -1657,7 +1719,7 @@ def check_restaging_uses_the_photograph() -> str:
 
     inventory = Inventory.load()
     item = inventory.add(Item(name="Cream camp-collar shirt", garment="Shirt",
-                              colour="Cream", fabric="Cotton poplin",
+                              colours=["Cream"], fabric="Cotton poplin",
                               description="Gold chain-stitch trim on the collar"))
     described = shop_mod.photo_prompt(item)
     assert not item.has_photo, "the fixture already has a photograph"
@@ -1691,7 +1753,7 @@ def check_restaging_uses_the_photograph() -> str:
         assert "EXACT GARMENT" in seen["prompt"], "a photographed garment was described, not restaged"
         assert seen["refs"] == [Path(item.photo)], "the photograph was not sent as a reference"
 
-        bare = Item(name="Camel overcoat", garment="Overcoat", colour="Camel")
+        bare = Item(name="Camel overcoat", garment="Overcoat", colours=["Camel"])
         shop_mod.generate_photo(bare)
         assert "EXACT GARMENT" not in seen["prompt"], "a garment with no photo was restaged"
         assert not seen["refs"], "a reference was sent for a garment with no photograph"
@@ -1751,7 +1813,7 @@ def check_product_prompts() -> str:
     from .seed import seed_all
 
     item = Item(id="camel", name="Camel wool overcoat", garment="Overcoat",
-                colour="Camel", fabric="Wool melton", status="aspirational")
+                colours=["Camel"], fabric="Wool melton", status="aspirational")
     shot = photo_prompt(item)
     for phrase in ("Camel", "Wool melton", "overcoat", "no person", "seamless pure white"):
         assert phrase in shot, f"{phrase!r} missing from the product shot prompt"
@@ -2778,6 +2840,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
     (COLOUR, "Fifty named colours, all distinct", check_named_colours),
+    (DATA, "An added garment gets its rules", check_added_garments_get_their_rules),
     (DATA, "Fabrics are filed by how they behave", check_fabric_families),
     (COLOUR, "Three roles, shoes exempt by slot", check_roles),
     (COLOUR, "Four seasonal palettes out of one", check_seasons),

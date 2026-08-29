@@ -568,14 +568,13 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
                               )
     c1, c3 = st.columns(2)
-    options = ["", *colour_names()]
-    item.colour = c1.selectbox(
-        "Colour", options,
-        index=options.index(item.colour) if item.colour in options else 0,
+    item.colours = c1.multiselect(
+        "Colours", colour_names(), default=[c for c in item.colours if c in colour_names()],
         key=f"{key}-colour",
-        help="From the colour catalogue only. Typed free-hand this became "
-             "chocolate, Chocolate and dark brown, which is one colour wearing "
-             "three names.")
+        help="Pick as many as the garment actually has; the first is the one "
+             "the swatch uses. From the catalogue only, because typed free-hand "
+             "this became chocolate, Chocolate and dark brown, which is one "
+             "colour wearing three names.")
     item.colour_hex = hex_for(item.colour) if item.colour else item.colour_hex
     item.fabric = c3.selectbox(
         "Fabric", fabric_options(),
@@ -742,7 +741,7 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
     st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
     badge = {OWNED: "", ASPIRATIONAL: "wanted", RETIRED: "retired"}[item.status]
     shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, badge)
-    detail = " · ".join(b for b in (item.garment, item.colour, item.fabric) if b)
+    detail = " · ".join(b for b in (item.garment, item.colour_line, item.fabric) if b)
     spec = " · ".join(b for b in (item.grade, item.fit) if b)
     sizes = item.size_line()
     st.markdown(
@@ -1580,7 +1579,7 @@ def fabric_section(vocab, inventory: Inventory) -> None:
 
 def colour_section(vocab, inventory: Inventory) -> None:
     """The colour names every garment and every palette entry is drawn from."""
-    counts = {c.name: sum(1 for i in inventory.items if i.colour == c.name)
+    counts = {c.name: sum(1 for i in inventory.items if c.name in i.colours)
               for c in vocab.colours}
     st.markdown('<div class="look-cap">The names a garment\'s colour is picked '
                 'from, and the swatches the palette is built out of. '
@@ -1962,14 +1961,14 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             grade = (c3.selectbox("Grade", grades(), key="asp-grade")
                      if takes_grade(garment) else "")
             c4, c6 = st.columns(2)
-            colour = c4.selectbox("Colour", ["", *colour_names()], key="asp-colour")
-            colour_hex = hex_for(colour) if colour else "#CCCCCC"
+            colours = c4.multiselect("Colours", colour_names(), key="asp-colour")
+            colour_hex = hex_for(colours[0]) if colours else "#CCCCCC"
             fabric = c6.selectbox("Fabric", fabric_options(), key="asp-fabric")
             fit = st.selectbox("Fit", fits(), key="asp-fit") if takes_fit(garment) else ""
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
-                    colour=colour, colour_hex=colour_hex, grade=grade, fit=fit,
+                    colours=list(colours), colour_hex=colour_hex, grade=grade, fit=fit,
                     fabric="" if fabric == NONE else fabric,
                     status=ASPIRATIONAL,
                 ))
@@ -2846,7 +2845,7 @@ def product_card(profile: Profile, item: Item, inventory: Inventory,
             else "look secondhand" if item.garment in retailers.RARELY_WORN else "")
     shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, flag)
     sizes = shop_mod.size_line(profile, item)
-    detail = " · ".join(b for b in (item.fabric, item.colour) if b)
+    detail = " · ".join(b for b in (item.fabric, item.colour_line) if b)
     st.markdown(
         f'<div class="product">{shot}<div class="body">'
         f'<div class="nm">{item.name or item.garment}</div>'
@@ -2906,7 +2905,7 @@ def item_view(profile: Profile, item_id: str) -> None:
     # section does, and assigning it lower down leaves it unbound up here.
     catalogue = retailers.Catalogue.load()
     detail = " · ".join(b for b in (item.garment, item.grade, item.fit,
-                                    item.fabric, item.colour) if b)
+                                    item.fabric, item.colour_line) if b)
     st.markdown(
         f'<div class="masthead"><h1>{item.name or item.garment}</h1>'
         f'<div class="sub">{detail}</div></div>', unsafe_allow_html=True)
