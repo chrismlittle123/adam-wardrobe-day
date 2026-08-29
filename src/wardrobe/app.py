@@ -17,8 +17,8 @@ from pathlib import Path
 import streamlit as st
 
 from wardrobe import (
-    conversation,
     palette as pal_mod,
+    revisions,
     retailers,
     shop as shop_mod,
     sourcing,
@@ -329,15 +329,13 @@ def guide_panel(profile: Profile, answers: Answers) -> None:
         f'{len(markdown.split()):,} words &middot; built from {done} of {total} answers'
         f'</div>', unsafe_allow_html=True)
 
-    read, edit, discuss = st.tabs(["Read", "Edit", "Discuss"])
+    read, edit = st.tabs(["Read", "Edit"])
     with read:
         st.download_button("Download markdown", markdown, paths.guide().name, "text/markdown")
         st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>',
                     unsafe_allow_html=True)
     with edit:
         edit_guide_panel(markdown)
-    with discuss:
-        discuss_guide_panel(profile, answers, markdown)
 
     version_panel()
 
@@ -359,61 +357,12 @@ def edit_guide_panel(markdown: str) -> None:
                 st.warning("That would leave the guide empty. Delete the file if you "
                            "mean to start again.")
             else:
-                conversation.save_edit(draft)
-                st.rerun()
-
-
-def discuss_guide_panel(profile: Profile, answers: Answers, markdown: str) -> None:
-    chat = conversation.Conversation.load()
-    ui.blurb(
-        "Argue with it. Ask why it chose something, or tell it what to change. A "
-        "question is answered and nothing moves; an instruction rewrites the guide "
-        "and keeps the previous version. It only knows what you told the "
-        "questionnaire, so it will not invent a life for you."
-    )
-
-    if not chat.messages:
-        st.markdown(
-            '<div class="look-cap">Try: “the palette is too safe, give me one colour '
-            'that frightens me” &middot; “why navy and not charcoal?” &middot; “cut the '
-            'uniforms down to five” &middot; “rewrite the thesis in half the words”</div>',
-            unsafe_allow_html=True)
-
-    for message in chat.messages:
-        with st.chat_message("user" if message.role == "user" else "assistant"):
-            st.markdown(message.text)
-            tail = " · rewrote the guide" if message.revised else ""
-            if message.when:
-                st.markdown(f'<div class="look-cap">{message.when}{tail}</div>',
-                            unsafe_allow_html=True)
-
-    with st.form("guide-chat", clear_on_submit=True):
-        said = st.text_area("Say something", height=90, key="guide-say",
-                            placeholder="Cut the shopping list to the three things "
-                                        "that matter most.")
-        c1, c2 = st.columns([1, 3])
-        sent = c1.form_submit_button("Send", type="primary")
-        if c2.form_submit_button("Clear the conversation"):
-            chat.clear()
-            chat.save()
-            st.rerun()
-        if sent:
-            if not said.strip():
-                st.warning("Say something first.")
-            else:
-                with st.spinner("Thinking…"):
-                    try:
-                        _, changed = conversation.talk(profile, answers, said.strip(), chat)
-                    except GEMINI_ERRORS as exc:
-                        st.error(str(exc))
-                        return
-                if changed:
-                    st.success("The guide was rewritten. The previous version is kept below.")
+                revisions.save_edit(draft)
                 st.rerun()
 
 
 def version_panel() -> None:
-    history = conversation.versions()
+    history = revisions.versions()
     if not history:
         return
     with st.expander(f"Earlier versions · {len(history)}"):
@@ -424,7 +373,7 @@ def version_panel() -> None:
             c1.markdown(f'<div class="look-cap">{version.label} &middot; '
                         f'{version.words:,} words</div>', unsafe_allow_html=True)
             if c2.button("Restore", key=f"gv-{version.path.name}", type="secondary"):
-                conversation.restore(version)
+                revisions.restore(version)
                 st.rerun()
 
 

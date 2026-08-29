@@ -1127,84 +1127,26 @@ def check_product_prompts() -> str:
     return f"{len(listed)} on the list, prompts carry cloth, price and size"
 
 
-# --- Guide conversation -------------------------------------------------------
+# --- Guide revisions -------------------------------------------------------
 
 def check_guide_edit_and_versions() -> str:
     """Hand edits write, and never lose what they replaced."""
-    from . import conversation, paths
+    from . import paths, revisions
     paths.guide().write_text("# Style Guide\n\n## The thesis\n\nOriginal words.\n")
 
-    conversation.save_edit("# Style Guide\n\n## The thesis\n\nEdited by hand.")
+    revisions.save_edit("# Style Guide\n\n## The thesis\n\nEdited by hand.")
     assert "Edited by hand" in paths.guide().read_text(), "the edit did not write"
-    history = conversation.versions()
+    history = revisions.versions()
     assert len(history) == 1, f"the replaced version was not kept: {len(history)}"
     assert "Original words" in history[0].path.read_text(), "the wrong version was kept"
 
-    conversation.save_edit("# Style Guide\n\n## The thesis\n\nEdited by hand.")
-    assert len(conversation.versions()) == 1, "an identical save made a pointless version"
+    revisions.save_edit("# Style Guide\n\n## The thesis\n\nEdited by hand.")
+    assert len(revisions.versions()) == 1, "an identical save made a pointless version"
 
-    conversation.restore(history[0])
+    revisions.restore(history[0])
     assert "Original words" in paths.guide().read_text(), "restore did not put it back"
-    assert len(conversation.versions()) == 2, "restoring did not keep the current version"
-    return f"edit, dedupe, restore; {len(conversation.versions())} versions kept"
-
-
-def check_guide_conversation() -> str:
-    """A question leaves the guide alone; an instruction rewrites it.
-
-    The model is stubbed, so this tests the wiring rather than the writing: the
-    marker parsing, the file replacement, the snapshot, and the transcript.
-    """
-    from . import conversation, paths
-    from .philosophy import Answers
-    from .profile import Profile
-    from .seed import seed_answers
-
-    original = "# Style Guide\n\n## The thesis\n\nQuiet clothes, worn easily.\n"
-    paths.guide().write_text(original)
-    answers, profile = seed_answers(), Profile.load()
-    chat = conversation.Conversation()
-
-    real = conversation.generate_text
-    seen: dict[str, str] = {}
-
-    def stub(prompt, *, system=None, temperature=0.7, model=None, settings=None):
-        seen["prompt"], seen["system"] = prompt, system or ""
-        if "why" in prompt.lower().split("# what he is asking now")[-1]:
-            return "Navy because it flatters warm skin by contrast."
-        return ("Cut the thesis in half.\n" + conversation.MARKER +
-                "\n# Style Guide\n\n## The thesis\n\nQuiet clothes.\n")
-
-    conversation.generate_text = stub
-    try:
-        reply, changed = conversation.talk(profile, answers, "Why navy?", chat)
-        assert not changed, "a question rewrote the guide"
-        assert paths.guide().read_text() == original, "the guide moved on a question"
-        assert "flatters warm skin" in reply, "the reply was lost"
-
-        reply, changed = conversation.talk(profile, answers, "Halve the thesis.", chat)
-        assert changed, "an instruction did not rewrite the guide"
-        assert paths.guide().read_text().strip().endswith("Quiet clothes."), \
-            "the revision was not written"
-        assert conversation.MARKER not in reply, "the marker leaked into the reply"
-        assert conversation.versions(), "the replaced guide was not kept"
-    finally:
-        conversation.generate_text = real
-
-    saved = conversation.Conversation.load()
-    assert len(saved.messages) == 4, f"transcript wrong length: {len(saved.messages)}"
-    assert [m.role for m in saved.messages] == ["user", "guide", "user", "guide"], \
-        "the transcript roles are wrong"
-    assert saved.messages[-1].revised and not saved.messages[1].revised, \
-        "the rewrite flag is on the wrong turn"
-
-    # The model must be given the guide, the answers and the history, or it will
-    # rewrite from nothing and quietly drop half the document.
-    for needed in ("The guide as it stands", "Quiet clothes", "The conversation so far",
-                   "Why navy?", "Grey hoodie"):
-        assert needed in seen["prompt"], f"{needed!r} never reached the model"
-    assert "never a diff" in seen["system"], "the whole-document rule was not sent"
-    return "questions leave it alone, instructions rewrite it and keep the old one"
+    assert len(revisions.versions()) == 2, "restoring did not keep the current version"
+    return f"edit, dedupe, restore; {len(revisions.versions())} versions kept"
 
 
 # --- App ----------------------------------------------------------------------
@@ -1580,7 +1522,6 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Generate look actually runs when clicked", check_generate_button_runs),
     (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
     (APP, "Guide edits keep what they replace", check_guide_edit_and_versions),
-    (APP, "Talking to the guide revises only on request", check_guide_conversation),
     (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),

@@ -38,13 +38,11 @@ Six tabs, in the order the work happens.
    makes him spend 20 points across practicality, comfort, aesthetics and cost.
    That allocation becomes the tie-breaker whenever two recommendations
    conflict. Answers land in `style-answers.toml` and synthesise into
-   `STYLE-GUIDE.md`, which is then read, edited by hand, or argued with.
+   `STYLE-GUIDE.md`, which is then read or edited by hand.
 
-   The guide is a conversation, not a delivery. **Read** renders it, **Edit**
-   gives you the raw markdown, and **Discuss** lets you ask why it chose
-   something or tell it what to change. A question is answered and the file does
-   not move; an instruction rewrites it. Every rewrite and every hand edit keeps
-   the version it replaced, and any of them can be restored.
+   The guide is a draft, not a delivery. **Read** renders it and **Edit** gives
+   you the raw markdown. Every save keeps the version it replaced, and any of
+   them can be restored, so nothing here can lose an afternoon.
 2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
    and sizes in whatever scheme that garment actually uses: a collar for a
    shirt, chest and a length letter for a jacket, waist and leg for trousers,
