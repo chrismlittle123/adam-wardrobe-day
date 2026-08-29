@@ -275,15 +275,17 @@ def check_uk_sizing() -> str:
     a shop prints is a UK size, and the labels have to say which is which.
     """
     from .fitspec import Body, HOW_TO_MEASURE, LABELS, spec_table, target_spec
-    from .inventory import garments, size_scheme
+    from .inventory import garments, schemes_for, size_scheme
 
     for garment in garments():
         for spec in size_scheme(garment):
             assert spec.key != "us", f"{garment} still offers a US size"
             assert "cm" not in spec.label.lower(), \
                 f"{garment}'s {spec.label} mixes a measurement into a size label"
-    labelled = {f.label for g in garments() for f in size_scheme(g)}
-    assert any("UK" in l for l in labelled), "no size is marked as a UK size"
+    labelled = {f.label for g in garments() for s in schemes_for(g)
+                for f in size_scheme(g, s)}
+    assert not any("EU" in l or "US" in l for l in labelled), \
+        "a continental or American size survived"
 
     # Every measurement the engine produces is centimetres, with no inches in sight.
     rows = spec_table(target_spec("Blazer", Body(chest=96, waist=78, hip=94), 176))
@@ -299,9 +301,9 @@ def check_uk_sizing() -> str:
     scheme_chest = next(f for f in size_scheme("Blazer") if f.key == "chest")
     target_chest = next(t for t in target_spec("Blazer", Body(chest=96), 176)
                         if t.key == "chest")
-    assert scheme_chest.label == "UK size", "the jacket label is not marked as a size"
+    assert scheme_chest.label == "Chest", "the jacket size box is mislabelled"
     assert target_chest.value > 96, "the finished garment does not exceed the body"
-    return (f"labels are UK sizes, measurements are cm; a UK {scheme_chest.options[3]} "
+    return (f"labels are UK sizes, measurements are cm; a {scheme_chest.options[3]} "
             f"jacket wants {target_chest.value:g} cm round the chest")
 
 
@@ -332,18 +334,26 @@ def check_alphabetical() -> str:
 
 
 def check_size_schemes() -> str:
-    from .inventory import garments, size_scheme
+    from .inventory import garments, schemes_for, size_scheme
     keyed = {}
     for garment in garments():
-        scheme = size_scheme(garment)
-        keys = [f.key for f in scheme]
-        assert len(keys) == len(set(keys)), f"{garment} has duplicate size keys"
-        keyed[garment] = keys
-    assert "collar" in keyed["Shirt"], "a shirt is sized by its collar"
+        for scheme in schemes_for(garment):
+            keys = [f.key for f in size_scheme(garment, scheme)]
+            assert len(keys) == len(set(keys)), f"{garment}/{scheme} has duplicate keys"
+        keyed[garment] = [f.key for f in size_scheme(garment)]
+    assert "collar" in keyed["Shirt"], "a shirt defaults to its collar"
     assert "chest" in keyed["Blazer"] and "length" in keyed["Blazer"], "blazer needs chest and length"
-    assert {"waist", "leg"} <= set(keyed["Trousers"]), "trousers need waist and leg"
-    assert {"uk", "eu"} <= set(keyed["Loafers"]), "shoes need UK and EU"
-    assert "us" not in keyed["Loafers"], "US sizing does not belong in a UK wardrobe"
+    assert {"waist", "leg"} <= set(keyed["Trousers"]), "trousers default to waist and leg"
+
+    # The point of the rebuild: one garment, several possible labels.
+    assert "Alpha" in schemes_for("Trousers"), "a trouser can also be S/M/L"
+    assert "Alpha" in schemes_for("Blazer"), "a blazer can also be S/M/L"
+    assert [f.key for f in size_scheme("Trousers", "Alpha")] == ["alpha"], \
+        "asking for the alpha scheme did not give alpha boxes"
+    assert len(schemes_for("T-shirt")) == 1, "a tee only comes one way"
+    assert "uk" in keyed["Loafers"], "shoes need a UK size"
+    assert not ({"eu", "us"} & set(keyed["Loafers"])), \
+        "continental and American sizing do not belong in a UK wardrobe"
     assert keyed["Bag"] == [], "a bag has no size"
     return "shirt/blazer/trouser/shoe schemes all distinct"
 
@@ -434,7 +444,7 @@ def check_size_line_and_category() -> str:
     item = Item(garment="Blazer", sizes={"chest": "38", "length": "Regular", "cut": "—",
                                           "bogus": "x"})
     line = item.size_line()
-    assert "UK size 38" in line and "Regular" in line, "size line missing real values"
+    assert "Chest 38" in line and "Regular" in line, "size line missing real values"
     assert "—" not in line and "bogus" not in line, "size line shows placeholders or junk"
     assert category_for("Blazer") == "Outerwear" and category_for("Loafers") == "Shoes"
     return line
@@ -587,7 +597,7 @@ def check_roles() -> str:
 def check_colour_arithmetic() -> str:
     """Hue, lightness and the round trip through hex."""
     from .palette import contrast, from_hsl, hsl, hue_distance, hue_name, lightness, to_hex, to_rgb
-    assert to_hex(to_rgb("#C58466")).upper() == "#C58466", "hex round trip lost precision"
+    assert to_hex(to_rgb("#A0583C")).upper() == "#A0583C", "hex round trip lost precision"
     assert hsl("#FFFFFF")[2] == 1.0 and hsl("#000000")[2] == 0.0, "lightness poles wrong"
     assert lightness("#F2E9D8") > lightness("#26303F"), "cream is not lighter than navy"
     assert _near(contrast("#FFFFFF", "#000000"), 1.0), "maximum contrast is not 1"
@@ -608,7 +618,8 @@ def check_colour_arithmetic() -> str:
 def check_warmth_against_skin() -> str:
     """The verdicts have to match what is actually true of warm skin."""
     from .palette import warmth
-    skin = "#C58466"
+    from .palette import DEFAULT_SKIN
+    skin = DEFAULT_SKIN
     assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should sit in his family"
     assert warmth("#6B4426", skin)[0] == "harmonious", "chocolate should sit in his family"
     assert warmth("#26303F", skin)[0] == "flattering", "navy should flatter by contrast"
@@ -619,7 +630,21 @@ def check_warmth_against_skin() -> str:
     assert warmth("#7A7A78", skin)[0] == "careful", "flat grey should be flagged"
     assert all(warmth(h, skin)[1] for h in ("#C19A6B", "#26303F", "#7A7A78")), \
         "a verdict came back with no reason"
-    return "camel harmonious, navy flattering, flat grey flagged"
+
+    # Hue and lightness are separate questions. At his depth a mid-brown can be
+    # perfectly harmonious in family and still vanish against him, and the
+    # engine has to be able to say both things at once.
+    from .palette import blurs_at_the_collar, value_gap
+    from .profile import Profile
+    assert Profile.load().subject.skin_tone_hex == skin, \
+        "the profile and the engine disagree about his skin"
+    assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should still be in family"
+    assert blurs_at_the_collar("#C19A6B", skin), "camel is too close in value to pass"
+    assert not blurs_at_the_collar("#F2E9D8", skin), "cream is light enough to contrast"
+    assert not blurs_at_the_collar("#26303F", skin), "navy is dark enough to contrast"
+    assert value_gap("#7A7A78", skin) < 0.10, "flat grey should sit almost on his own value"
+    return (f"camel harmonious but blurs at {value_gap('#C19A6B', skin):.2f}; "
+            f"cream and navy both clear the gap")
 
 
 def check_harmonies_are_wearable() -> str:
@@ -1615,7 +1640,8 @@ def check_garment_catalogue() -> str:
     assert before == len(vocab.garments), "the lookup disagrees with the file"
     assert "Blazer" in garments() and "Wool flannel" in fabric_options()
 
-    vocab.add_garment(vocabulary.Garment(name="Cardigan", category="Top", scheme="Top"))
+    vocab.add_garment(vocabulary.Garment(name="Cardigan", category="Top",
+                                        schemes=["Alpha", "Chest"]))
     vocab.add_fabric(vocabulary.Fabric(name="Cotton lyocell", family="Cotton"))
     vocab.fits = ["", "Slim", "Regular", "Relaxed", "Oversized", "Cropped"]
     vocab.grades = ["", "Everyday", "Dress", "Souvenir"]
@@ -1629,6 +1655,8 @@ def check_garment_catalogue() -> str:
     assert "Cardigan" in categories()["Top"], "the new garment landed in no category"
     assert [f.label for f in size_scheme("Cardigan")] == ["Size"], \
         f"the new garment got the wrong scheme: {[f.label for f in size_scheme('Cardigan')]}"
+    assert [f.label for f in size_scheme("Cardigan", "Chest")] == ["Chest"], \
+        "the alternative scheme is not reachable"
 
     vocabulary.Vocabulary.load().restore_defaults()
     assert "Cardigan" not in garments(), "restoring defaults did not undo the edit"

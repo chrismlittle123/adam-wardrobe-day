@@ -62,7 +62,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 }
 .masthead h1 em { font-style: italic; color: var(--brass); }
 .masthead .sub {
-  font-family: var(--chrome); font-size: .68rem; letter-spacing: .22em;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .22em;
   text-transform: uppercase; color: var(--muted); margin-top: .6rem;
   margin-bottom: .2rem;
 }
@@ -81,7 +81,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 .docket dl { margin: 0; }
 .docket .row { display: flex; align-items: baseline; margin: 0 0 .55rem; }
 .docket dt {
-  font-family: var(--chrome); font-size: .64rem; letter-spacing: .13em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .13em;
   text-transform: uppercase; color: var(--muted); white-space: nowrap;
 }
 .docket .leader {
@@ -89,12 +89,12 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
   margin: 0 .5rem; transform: translateY(-.28rem); min-width: .8rem;
 }
 .docket dd {
-  margin: 0; font-family: var(--data); font-size: .78rem; text-align: right;
+  margin: 0; font-family: var(--data); font-size: 0.82rem; text-align: right;
 }
-.docket dd.prose { font-family: var(--prose); font-size: .8rem; max-width: 64%; }
+.docket dd.prose { font-family: var(--prose); font-size: 0.82rem; max-width: 64%; }
 .docket .note {
   margin: .9rem 0 0; padding-top: .8rem; border-top: 1px solid var(--line);
-  font-size: .76rem; color: var(--muted); line-height: 1.5;
+  font-size: 0.82rem; color: var(--muted); line-height: 1.5;
 }
 .chip {
   display: inline-block; width: .78rem; height: .78rem; margin-right: .45rem;
@@ -105,7 +105,7 @@ html, body, [class*="css"], .stMarkdown, p, li, label, div[data-baseweb] {
 .plate { border: 1px solid var(--line); padding: .4rem; background: var(--panel); }
 .plate img { display: block; width: 100%; }
 .plate .cap {
-  font-family: var(--chrome); font-size: .62rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted); padding: .55rem .2rem .1rem;
   display: flex; justify-content: space-between; gap: .6rem;
 }
@@ -122,7 +122,7 @@ div[data-baseweb="select"] > div, div[data-baseweb="input"] {
 }
 .stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
   background: var(--brass); color: #17110E; border: none; border-radius: 0;
-  font-family: var(--chrome); font-size: .68rem; letter-spacing: .16em;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .16em;
   text-transform: uppercase; padding: .6rem 1.2rem; font-weight: 500;
   transition: background .18s ease, transform .18s ease;
 }
@@ -137,17 +137,17 @@ div[data-baseweb="select"] > div, div[data-baseweb="input"] {
 }
 .stButton > button[kind="secondary"]:hover { color: var(--cream); border-color: var(--brass); background: transparent; }
 label, .stSlider label, .stSelectbox label, .stMultiSelect label, .stNumberInput label {
-  font-family: var(--chrome); font-size: .66rem !important;
+  font-family: var(--chrome); font-size: 0.74rem !important;
   letter-spacing: .14em !important; text-transform: uppercase !important; color: var(--muted) !important;
 }
-details summary { font-family: var(--chrome); font-size: .68rem !important;
+details summary { font-family: var(--chrome); font-size: 0.74rem !important;
   letter-spacing: .14em !important; text-transform: uppercase !important; }
-.stCode, pre, code { font-family: var(--data); font-size: .76rem !important; }
+.stCode, pre, code { font-family: var(--data); font-size: 0.82rem !important; }
 
 /* Tabs -------------------------------------------------------------------- */
 .stTabs [data-baseweb="tab-list"] { gap: 1.6rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .stTabs [data-baseweb="tab"] {
-  font-family: var(--chrome); font-size: .7rem; letter-spacing: .16em;
+  font-family: var(--chrome); font-size: 0.78rem; letter-spacing: .16em;
   text-transform: uppercase; color: var(--muted); background: transparent; padding: .3rem 0 .8rem;
 }
 .stTabs [aria-selected="true"] { color: var(--brass) !important; }
@@ -158,7 +158,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .meter .track { height: 2px; background: rgba(240,230,219,.12); }
 .meter .fill { height: 2px; background: var(--brass); }
 .meter .read {
-  font-family: var(--chrome); font-size: .66rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted); display: flex;
   justify-content: space-between; padding-bottom: .45rem;
 }
@@ -167,7 +167,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 /* Stats ------------------------------------------------------------------- */
 .stats { display: flex; gap: 2.2rem; flex-wrap: wrap; margin: 0 0 1.4rem; }
 .stat .k {
-  font-family: var(--chrome); font-size: .62rem; letter-spacing: .16em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .16em;
   text-transform: uppercase; color: var(--muted);
 }
 .stat .v { font-family: var(--display); font-size: 1.7rem; line-height: 1.2; }
@@ -178,12 +178,12 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .item .top { display: flex; align-items: center; gap: .6rem; margin-bottom: .5rem; }
 .item .nm { font-family: var(--display); font-size: 1.05rem; line-height: 1.2; }
 .item .meta {
-  font-family: var(--chrome); font-size: .64rem; color: var(--muted);
+  font-family: var(--chrome); font-size: 0.70rem; color: var(--muted);
   letter-spacing: .08em; line-height: 1.7;
 }
 .item .price { color: var(--cream); }
 .badge {
-  font-family: var(--chrome); font-size: .56rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; padding: .12rem .4rem; border: 1px solid var(--line);
   color: var(--muted); white-space: nowrap;
 }
@@ -193,10 +193,10 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .swatch { width: 100%; height: 5.2rem; border: 1px solid var(--line); }
 
 /* Tables ------------------------------------------------------------------ */
-.tbl { width: 100%; border-collapse: collapse; font-family: var(--data); font-size: .74rem; }
+.tbl { width: 100%; border-collapse: collapse; font-family: var(--data); font-size: 0.82rem; }
 .tbl th {
   text-align: left; color: var(--muted); font-weight: 400; letter-spacing: .14em;
-  text-transform: uppercase; font-size: .6rem; padding: .4rem .6rem; border-bottom: 1px solid var(--line);
+  text-transform: uppercase; font-size: 0.70rem; padding: .4rem .6rem; border-bottom: 1px solid var(--line);
 }
 .tbl td { padding: .45rem .6rem; border-bottom: 1px solid rgba(240,230,219,.07); }
 .tbl td.num { text-align: right; color: var(--cream); }
@@ -210,7 +210,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .step .n { font-family: var(--display); font-size: 1.2rem; color: var(--brass); }
 .step .pieces { font-size: .92rem; }
 .step .cost { font-family: var(--data); font-size: .95rem; }
-.step .why { font-family: var(--prose); font-size: .64rem; color: var(--muted);
+.step .why { font-family: var(--prose); font-size: 0.70rem; color: var(--muted);
              letter-spacing: .08em; margin-top: .45rem; line-height: 1.7; }
 
 .guide-body { background: var(--panel); border: 1px solid var(--line); padding: 1.6rem 1.8rem; }
@@ -226,7 +226,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
          color: var(--muted); font-size: .88rem; }
 /* Small text sits above things: an expander, a plate, a table. Without a bottom
    margin it presses against the box below and reads as part of it. */
-.look-cap { font-family: var(--chrome); font-size: .64rem; letter-spacing: .1em;
+.look-cap { font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .1em;
             color: var(--muted); padding-top: .45rem; margin-bottom: .55rem;
             line-height: 1.6; }
 /* Except as the last line inside a card, where it would pad the card instead. */
@@ -245,7 +245,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
   border-left: 2px solid var(--brass); padding: .2rem 0 .2rem 1.4rem;
 }
 .answer-nav {
-  font-family: var(--chrome); font-size: .66rem; letter-spacing: .12em;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .12em;
   text-transform: uppercase; color: var(--muted); display: flex; gap: 1.6rem;
   flex-wrap: wrap; padding: 1.2rem 0; border-top: 1px solid var(--line); margin-top: 2rem;
 }
@@ -260,7 +260,7 @@ details summary { font-family: var(--chrome); font-size: .68rem !important;
 .alloc .s2 { background: #7E6626; }
 .alloc .s3 { background: #584820; }
 .alloc-read {
-  font-family: var(--chrome); font-size: .64rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted); display: flex;
   justify-content: space-between; margin-bottom: .6rem;
 }
@@ -366,7 +366,7 @@ SHOP_CSS = """
 .product .shot img { display: block; width: 100%; }
 .product .none {
   height: 16rem; display: flex; align-items: center; justify-content: center;
-  color: #8A7767; font-family: var(--chrome); font-size: .66rem;
+  color: #8A7767; font-family: var(--chrome); font-size: 0.74rem;
   letter-spacing: .16em; text-transform: uppercase; background: var(--raise);
 }
 .product .body { padding: 1rem 1.1rem 1.2rem; }
@@ -375,7 +375,7 @@ SHOP_CSS = """
   margin-bottom: .2rem;
 }
 .product .kind {
-  font-family: var(--chrome); font-size: .62rem; letter-spacing: .18em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .18em;
   text-transform: uppercase; color: var(--muted);
 }
 .product .price {
@@ -383,24 +383,24 @@ SHOP_CSS = """
   margin: .6rem 0 .3rem;
 }
 .product .route {
-  font-family: var(--chrome); font-size: .62rem; letter-spacing: .1em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .1em;
   color: var(--brass); border-top: 1px solid var(--line); padding-top: .5rem;
   margin-top: .5rem; line-height: 1.6;
 }
 .product .route.none { color: var(--bad); }
 .product .size {
-  font-family: var(--data); font-size: .62rem; color: var(--muted);
+  font-family: var(--data); font-size: 0.70rem; color: var(--muted);
   line-height: 1.7;
 }
 .product .flag {
   position: absolute; top: .6rem; left: .6rem; background: var(--brass); color: #17110E;
-  font-family: var(--chrome); font-size: .56rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; padding: .2rem .5rem;
 }
 .product a.view {
   display: block; text-align: center; padding: .7rem; margin-top: .9rem;
   background: var(--brass); color: #17110E; text-decoration: none;
-  font-family: var(--chrome); font-size: .66rem; letter-spacing: .16em;
+  font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .16em;
   text-transform: uppercase;
 }
 .product a.view:hover { background: var(--cream); }
@@ -413,15 +413,15 @@ SHOP_CSS = """
 .buy .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 .buy .who { font-family: var(--display); font-size: 1.15rem; }
 .buy .kind {
-  font-family: var(--chrome); font-size: .58rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted);
 }
 .buy .why {
-  font-family: var(--prose); font-size: .82rem; color: var(--muted);
+  font-family: var(--prose); font-size: 0.82rem; color: var(--muted);
   margin-top: .35rem; line-height: 1.6;
 }
 .buy a {
-  font-family: var(--chrome); font-size: .62rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--brass); text-decoration: none;
 }
 .buy a:hover { border-bottom: 1px solid var(--brass); }
@@ -432,18 +432,18 @@ SHOP_CSS = """
 .route-card .hd { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; }
 .route-card .who { font-family: var(--display); font-size: 1.35rem; }
 .route-card .kind {
-  font-family: var(--chrome); font-size: .58rem; letter-spacing: .16em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .16em;
   text-transform: uppercase; color: var(--brass);
 }
 .route-card .term {
-  font-family: var(--data); font-size: .68rem; color: var(--cream);
+  font-family: var(--data); font-size: 0.74rem; color: var(--cream);
   letter-spacing: .06em; margin-top: .5rem;
 }
 .route-card .term b { color: var(--muted); font-weight: 400; margin-right: .5rem; }
 .route-card .why { color: var(--muted); font-size: .85rem; line-height: 1.6; margin-top: .7rem; }
 .route-card .links { margin-top: .9rem; display: flex; gap: 1.2rem; flex-wrap: wrap; }
 .route-card .links a {
-  font-family: var(--chrome); font-size: .64rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: #17110E; background: var(--brass);
   padding: .5rem .9rem; text-decoration: none;
 }
@@ -452,7 +452,7 @@ SHOP_CSS = """
 .tactic .t { font-family: var(--display); font-size: 1.05rem; }
 .tactic .d { color: var(--muted); font-size: .84rem; line-height: 1.65; margin-top: .2rem; }
 .tactic .w {
-  font-family: var(--chrome); font-size: .58rem; letter-spacing: .14em;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--brass); margin-top: .3rem;
 }
 </style>

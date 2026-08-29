@@ -8,10 +8,11 @@ height_cm = 176
 build = "very lean and athletic, narrow waist, defined shoulders"
 body_fat_pct = 10
 
-# Sampled from reference/adam-neutral.png: mean of forehead, both cheeks and
-# nose bridge, excluding the stubble shadow along the jaw.
-skin_tone_hex = "#C58466"
-skin_tone = "warm medium brown with a golden undertone"
+# Hue 17, lightness 0.43. The lightness matters as much as the hue: at 0.43 he
+# is mid-deep, so a colour needs to clear 0.63 or fall below 0.23 to read as
+# contrast next to his face rather than as a tonal blur.
+skin_tone_hex = "#A0583C"
+skin_tone = "warm medium-deep brown with a red-gold undertone"
 
 hair = "short dark natural curls, cropped close at the sides"
 facial_hair = "light moustache and short stubble along the jaw"

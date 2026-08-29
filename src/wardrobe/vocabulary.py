@@ -83,68 +83,46 @@ DEFAULT_GRADES: tuple[str, ...] = (
 DEFAULT_FITS: tuple[str, ...] = ("", "Slim", "Regular", "Relaxed", "Oversized")
 
 _alpha = SizeField("alpha", "Size", ALPHA)
-_collar = SizeField("collar", "Collar (UK)", (NONE, *_range(13.5, 18.5, 0.5, '"')),
+_collar = SizeField("collar", "Collar", (NONE, *_range(13.5, 18.5, 0.5, '"')),
                     "UK shirts are labelled by collar in inches. 15\" is about 38 cm, "
                     "15.5\" about 39 cm, 16\" about 41 cm.")
-_sleeve = SizeField("sleeve", "Sleeve (UK)", (NONE, *_range(31, 37, 1, '"')),
+_sleeve = SizeField("sleeve", "Sleeve", (NONE, *_range(31, 37, 1, '"')),
                     "Dress shirts only, in inches on the label. Casual shirts rarely "
                     "quote it.")
-_chest = SizeField("chest", "UK size", (NONE, *_range(34, 48, 2)),
+_chest = SizeField("chest", "Chest", (NONE, *_range(34, 48, 2)),
                    "The number on a UK jacket label. It is a size, not a chest "
                    "measurement: the finished garment measures rather more.")
 _jkt_len = SizeField("length", "Length", (NONE, "Short", "Regular", "Long"),
                      "38S, 38R and 38L share a chest and differ in body and sleeve length.")
-_eu_jkt = SizeField("eu", "EU size", (NONE, *_range(42, 62, 2)),
-                    "Half of Vinted is listed in these. Roughly the UK size plus 10.")
-_waist = SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"')),
+_waist = SizeField("waist", "Waist", (NONE, *_range(26, 44, 1, '"')),
                    "Inches on the label. Rarely the same as your actual waist.")
-_leg = SizeField("leg", "Leg (UK)", (NONE, *_range(28, 38, 1, '"')),
+_leg = SizeField("leg", "Leg", (NONE, *_range(28, 38, 1, '"')),
                  "Inside leg in inches, the half of trouser sizing shops most often "
                  "ignore. 30\" is about 76 cm, 32\" about 81 cm.")
 _uk_shoe = SizeField("uk", "UK", (NONE, *_range(5, 14, 0.5)))
-_eu_shoe = SizeField("eu", "EU", (NONE, *_range(38, 49, 0.5)),
-                     "For listings from the continent. Roughly UK plus 33.")
 _width = SizeField("width", "Width", (NONE, "Narrow", "Standard", "Wide", "D", "E", "F", "G"))
 
-SHOE_SCHEME = (_uk_shoe, _eu_shoe, _width)
-JACKET_SCHEME = (_chest, _jkt_len, _eu_jkt)
-TROUSER_SCHEME = (_waist, _leg)
-TOP_SCHEME = (_alpha,)
-DEFAULT_SCHEME = (SizeField("size", "Size", (), "However this one happens to be sized."),)
+_head = SizeField("head", "Head", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm")))
+_socks = SizeField("socks", "Size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14"))
+_case = SizeField("case", "Case", (NONE, *_range(34, 46, 1, "mm")))
+_free = SizeField("size", "Size", (), "However this one happens to be sized.")
 
-# Named so a garment can point at one by name and the catalogue can offer the
-# list without anyone typing a tuple of field definitions into a form.
+# Every scheme a British label might use. A garment points at the ones that can
+# apply to it; an item records which one its own label actually used.
 SCHEMES: dict[str, tuple[SizeField, ...]] = {
-    "Shoes": SHOE_SCHEME,
-    "Jacket": JACKET_SCHEME,
-    "Trousers": TROUSER_SCHEME,
-    "Top": TOP_SCHEME,
-    "Shirt": (_collar, _alpha, _sleeve),
-    "Alpha only": (_alpha,),
-    "Waist only": (_waist,),
-    "Watch": (SizeField("case", "Case", (NONE, *_range(34, 46, 1, "mm"))),),
-    "Belt": (SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"'))), _alpha),
-    "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
-    "Socks": (SizeField("socks", "UK size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
-    "None": (),
-    "Free text": (SizeField("size", "Size", (), "However this one happens to be sized."),),
-}
-
-DEFAULT_SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
-    "Bag": (), "Jewellery": (), "Scarf": (), "Sunglasses": (),
-    "Watch": (SizeField("case", "Case", (NONE, *_range(34, 46, 1, "mm"))),),
-    "Belt": (SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"'))), _alpha),
-    "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
-    "Socks": (SizeField("socks", "UK size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
-    "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME, "Suit": JACKET_SCHEME,
-    "Jacket": (_alpha, _chest), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
-    "Waistcoat": (_chest, _alpha),
-    "Chinos": TROUSER_SCHEME, "Jeans": TROUSER_SCHEME, "Trousers": TROUSER_SCHEME,
-    "Shorts": (_waist,),
-    "Boots": SHOE_SCHEME, "Derbies": SHOE_SCHEME, "Loafers": SHOE_SCHEME,
-    "Sandals": SHOE_SCHEME, "Trainers": SHOE_SCHEME,
-    "Knitwear": TOP_SCHEME, "Polo": TOP_SCHEME, "Sweatshirt": TOP_SCHEME, "T-shirt": TOP_SCHEME,
-    "Shirt": (_collar, _alpha, _sleeve),
+    "Alpha": (_alpha,),
+    "Chest": (_chest,),
+    "Chest and length": (_chest, _jkt_len),
+    "Collar": (_collar,),
+    "Collar and sleeve": (_collar, _sleeve),
+    "Waist": (_waist,),
+    "Waist and leg": (_waist, _leg),
+    "Shoe": (_uk_shoe, _width),
+    "Head": (_head,),
+    "Sock": (_socks,),
+    "Watch case": (_case,),
+    "One size": (),
+    "Free text": (_free,),
 }
 
 
@@ -173,20 +151,30 @@ DEFAULT_FABRICS: dict[str, tuple[str, ...]] = {
 # reading; the dropdown is for finding.
 
 
-# Which named scheme each garment uses by default. A garment the catalogue has
-# never heard of falls back to free text rather than to nothing.
-DEFAULT_SCHEME_NAMES: dict[str, str] = {
-    "Bag": "None", "Jewellery": "None", "Scarf": "None", "Sunglasses": "None",
-    "Watch": "Watch", "Belt": "Belt", "Hat": "Hat", "Socks": "Socks",
-    "Blazer": "Jacket", "Overcoat": "Jacket", "Suit": "Jacket",
-    "Jacket": "Jacket", "Overshirt": "Top", "Gilet": "Alpha only",
-    "Waistcoat": "Jacket",
-    "Chinos": "Trousers", "Jeans": "Trousers", "Trousers": "Trousers",
-    "Shorts": "Waist only",
-    "Boots": "Shoes", "Derbies": "Shoes", "Loafers": "Shoes",
-    "Sandals": "Shoes", "Trainers": "Shoes",
-    "Knitwear": "Top", "Polo": "Top", "Sweatshirt": "Top", "T-shirt": "Top",
-    "Shirt": "Shirt",
+# Which schemes can apply to each garment, most specific first. The first is
+# what a new item defaults to; the rest are there because the next label will
+# disagree with the last one. A trouser is 32/32 from one maker and M from the
+# next, and both are true.
+DEFAULT_SCHEMES: dict[str, tuple[str, ...]] = {
+    "Bag": ("One size",), "Jewellery": ("One size",), "Scarf": ("One size",),
+    "Sunglasses": ("One size",),
+    "Watch": ("Watch case",), "Socks": ("Sock",),
+    "Belt": ("Waist", "Alpha"), "Hat": ("Head", "Alpha"),
+    "Blazer": ("Chest and length", "Chest", "Alpha"),
+    "Suit": ("Chest and length", "Chest"),
+    "Overcoat": ("Chest and length", "Chest", "Alpha"),
+    "Jacket": ("Alpha", "Chest"),
+    "Waistcoat": ("Chest", "Alpha"),
+    "Overshirt": ("Alpha",), "Gilet": ("Alpha",),
+    "Chinos": ("Waist and leg", "Waist", "Alpha"),
+    "Jeans": ("Waist and leg", "Waist"),
+    "Trousers": ("Waist and leg", "Waist", "Alpha"),
+    "Shorts": ("Waist", "Alpha"),
+    "Boots": ("Shoe",), "Derbies": ("Shoe",), "Loafers": ("Shoe",),
+    "Sandals": ("Shoe",), "Trainers": ("Shoe",),
+    "Knitwear": ("Alpha", "Chest"), "Polo": ("Alpha",),
+    "Sweatshirt": ("Alpha",), "T-shirt": ("Alpha",),
+    "Shirt": ("Collar and sleeve", "Collar", "Alpha"),
 }
 
 
@@ -194,7 +182,11 @@ DEFAULT_SCHEME_NAMES: dict[str, str] = {
 class Garment:
     name: str = ""
     category: str = "Top"
-    scheme: str = "Free text"
+    schemes: list[str] = field(default_factory=lambda: ["Free text"])
+
+    @property
+    def default_scheme(self) -> str:
+        return self.schemes[0] if self.schemes else "Free text"
 
 
 @dataclass
@@ -215,7 +207,7 @@ class Vocabulary:
     def defaults(cls, path: Path | None = None) -> "Vocabulary":
         garments = [
             Garment(name=name, category=category,
-                    scheme=DEFAULT_SCHEME_NAMES.get(name, "Free text"))
+                    schemes=list(DEFAULT_SCHEMES.get(name, ("Free text",))))
             for category, names in DEFAULT_CATEGORIES.items() for name in names
         ]
         fabrics = [Fabric(name=name, family=family)
@@ -282,9 +274,20 @@ class Vocabulary:
         found = self.garment(name)
         return found.category if found else "Accessory"
 
-    def scheme_for(self, name: str) -> tuple[SizeField, ...]:
+    def schemes_for(self, name: str) -> tuple[str, ...]:
+        """Every scheme that can apply to this garment, most specific first."""
         found = self.garment(name)
-        return SCHEMES.get(found.scheme, SCHEMES["Free text"]) if found else SCHEMES["Free text"]
+        return tuple(found.schemes) if found and found.schemes else ("Free text",)
+
+    def scheme_for(self, name: str, scheme: str = "") -> tuple[SizeField, ...]:
+        """The boxes to show for this garment sized in this scheme.
+
+        An item naming a scheme its garment does not offer falls back to the
+        garment's first, which is what happens when a piece is re-classified.
+        """
+        applicable = self.schemes_for(name)
+        chosen = scheme if scheme in applicable else applicable[0]
+        return SCHEMES.get(chosen, SCHEMES["Free text"])
 
     def fabric_names(self) -> tuple[str, ...]:
         return tuple(f.name for f in self.fabrics)

@@ -65,8 +65,14 @@ def fabric_family(fabric: str) -> str:
     return current().fabric_family(fabric)
 
 
-def size_scheme(garment: str) -> tuple[SizeField, ...]:
-    return current().scheme_for(garment)
+def schemes_for(garment: str) -> tuple[str, ...]:
+    """Every sizing scheme that can apply to this garment, most specific first."""
+    return current().schemes_for(garment)
+
+
+def size_scheme(garment: str, scheme: str = "") -> tuple[SizeField, ...]:
+    """The size boxes for this garment, in whichever scheme its label used."""
+    return current().scheme_for(garment, scheme)
 
 
 def category_for(garment: str) -> str:
@@ -86,6 +92,9 @@ class Item:
     # them are set, the more precisely the right shop can be chosen.
     grade: str = ""
     fit: str = ""
+    # Which sizing scheme this particular label used. Trousers are 32/32 from
+    # one maker and M from the next, and the garment allows both.
+    scheme: str = ""
     status: str = OWNED
     photo: str = ""
     description: str = ""
@@ -145,7 +154,7 @@ class Item:
 
     def size_line(self) -> str:
         """The sizes as one readable line, in this garment's own scheme."""
-        labels = {f.key: f.label for f in size_scheme(self.garment)}
+        labels = {f.key: f.label for f in size_scheme(self.garment, self.scheme)}
         return " · ".join(
             f"{labels.get(k, k)} {v}" for k, v in self.sizes.items()
             if v and v != NONE and k in labels
@@ -159,7 +168,7 @@ class Item:
         And when a scheme's options change, an old value survives as something
         the dropdown cannot select and nobody can correct. Both go.
         """
-        scheme = {f.key: f for f in size_scheme(self.garment)}
+        scheme = {f.key: f for f in size_scheme(self.garment, self.scheme)}
         kept: dict[str, str] = {}
         for key, value in self.sizes.items():
             spec = scheme.get(key)

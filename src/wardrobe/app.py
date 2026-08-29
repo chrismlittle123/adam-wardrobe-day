@@ -30,7 +30,7 @@ from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
     ASPIRATIONAL, NONE, OWNED, RETIRED, STATUSES, Inventory, Item,
-    categories, fabric_options, fits, garments, grades, size_scheme,
+    categories, fabric_options, fits, garments, grades, schemes_for, size_scheme,
 )
 from wardrobe.outfits import (
     Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
@@ -449,12 +449,12 @@ def points_warning(question: Question, answer: str) -> str:
 
 # --- 3. inventory -------------------------------------------------------------
 
-def shape_row(item: Item, key: str) -> tuple[str, str]:
-    """Garment and status, chosen outside the form.
+def shape_row(item: Item, key: str) -> tuple[str, str, str]:
+    """Garment, status and sizing scheme, chosen outside the form.
 
-    Both change the shape of the form beneath: the garment decides which size
-    boxes exist. Inside a Streamlit form that would not take effect until submit,
-    so they sit above it.
+    All three change the shape of the form beneath: the garment decides which
+    schemes apply, the scheme decides which size boxes exist. Inside a Streamlit
+    form none of that takes effect until submit, so they sit above it.
     """
     c1, c2 = st.columns(2)
     garment = c1.selectbox(
@@ -465,13 +465,24 @@ def shape_row(item: Item, key: str) -> tuple[str, str]:
         "Status", STATUSES, index=STATUSES.index(item.status), key=f"{key}-status",
         help="Wanted pieces behave like owned ones in the generator, and are what "
              "the shopping plan spends money on.")
-    return garment, status
+
+    applicable = schemes_for(garment)
+    scheme = applicable[0]
+    if len(applicable) > 1:
+        scheme = st.selectbox(
+            "Sized as", applicable,
+            index=applicable.index(item.scheme) if item.scheme in applicable else 0,
+            key=f"{key}-scheme",
+            help="What this label uses. A trouser is 32/32 from one maker and M "
+                 "from the next; both are true, so the garment allows both.")
+    return garment, status, scheme
 
 
-def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
+def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) -> Item:
     """The shared add/edit form body. Returns the item with form values applied."""
     item.garment = garment
     item.status = status
+    item.scheme = scheme
     item.category = inv_mod.category_for(garment)
 
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
@@ -511,12 +522,12 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     item.fit = g2.selectbox(
         "Fit", fits(), index=fits().index(item.fit) if item.fit in fits() else 0,
         key=f"{key}-fit", help="How it is cut.")
-    scheme = size_scheme(garment)
-    if scheme:
-        st.markdown(f'<div class="look-cap">Sizes, as {garment.lower()} are actually '
-                    f'sized</div>', unsafe_allow_html=True)
-        cols = st.columns(min(len(scheme), 4))
-        for n, field in enumerate(scheme):
+    boxes = size_scheme(garment, scheme)
+    if boxes:
+        st.markdown(f'<div class="look-cap">Sizes, as this {garment.lower()} is '
+                    f'labelled &middot; {scheme.lower()}</div>', unsafe_allow_html=True)
+        cols = st.columns(min(len(boxes), 4))
+        for n, field in enumerate(boxes):
             col = cols[n % len(cols)]
             current = item.sizes.get(field.key, "")
             if field.options:
@@ -554,9 +565,9 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
         unsafe_allow_html=True)
 
     with st.expander("Add an item", expanded=not inventory.items):
-        garment, status = shape_row(Item(), "new")
+        garment, status, scheme = shape_row(Item(), "new")
         with st.form("add-item", clear_on_submit=True):
-            draft = item_fields(Item(), "new", garment, status)
+            draft = item_fields(Item(), "new", garment, status, scheme)
             photo = st.file_uploader("Photo", type=["png", "jpg", "jpeg", "webp"], key="new-photo")
             if st.form_submit_button("Add to wardrobe"):
                 if not draft.name.strip():
@@ -662,9 +673,9 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
             st.caption(f"Worn in {len(used)} outfit(s): "
                        f"{', '.join(o.name for o in used[:3])}"
                        f"{'…' if len(used) > 3 else ''}. Deleting takes it out of them.")
-        garment, status = shape_row(item, f"e-{item.id}")
+        garment, status, scheme = shape_row(item, f"e-{item.id}")
         with st.form(f"edit-{item.id}"):
-            edited = item_fields(item, f"e-{item.id}", garment, status)
+            edited = item_fields(item, f"e-{item.id}", garment, status, scheme)
             new_photo = st.file_uploader("Replace photo", type=["png", "jpg", "jpeg", "webp"],
                                          key=f"ph-{item.id}")
             c1, c2 = st.columns(2)
@@ -1232,13 +1243,19 @@ def garment_catalogue_panel() -> None:
 
     ui.eyebrow("Garments")
     ui.blurb("Each one belongs to a category, which decides the outfit slot it fills, "
-             "and uses a size scheme, which decides the boxes on its form.")
+             "and allows one or more sizing schemes, which decide the boxes on its "
+             "form. A trouser is 32/32 from one maker and M from the next, so it "
+             "allows both and the piece says which its own label used.")
     with st.expander("Add a garment"):
         with st.form("add-garment", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
             name = c1.text_input("Name", placeholder="Cardigan")
             category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
-            scheme = c3.selectbox("Size scheme", list(vocabulary.SCHEMES), key="ag-scheme")
+            picked = c3.multiselect("Size schemes", list(vocabulary.SCHEMES),
+                                    default=["Alpha"], key="ag-scheme",
+                                    help="Every scheme a label for this garment might "
+                                         "use. The first is what a new piece defaults "
+                                         "to.")
             if st.form_submit_button("Add garment"):
                 if not name.strip():
                     st.warning("Give it a name.")
@@ -1246,7 +1263,8 @@ def garment_catalogue_panel() -> None:
                     st.warning(f"{name.strip()} is already in the catalogue.")
                 else:
                     vocab.add_garment(vocabulary.Garment(
-                        name=name.strip(), category=category, scheme=scheme))
+                        name=name.strip(), category=category,
+                        schemes=list(picked) or ["Free text"]))
                     vocab.save()
                     st.rerun()
 
@@ -1256,8 +1274,7 @@ def garment_catalogue_panel() -> None:
         for name in names:
             garment = vocab.garment(name)
             in_use = name in used_garments
-            fields = [f.label for f in vocab.scheme_for(name)] or ["no size fields"]
-            with st.expander(f"{name}  ·  {garment.scheme}  ·  {', '.join(fields)}"
+            with st.expander(f"{name}  ·  {', '.join(garment.schemes) or 'no scheme'}"
                              + ("  ·  in use" if in_use else "")):
                 with st.form(f"g-{name}"):
                     e1, e2 = st.columns(2)
@@ -1266,11 +1283,12 @@ def garment_catalogue_panel() -> None:
                         index=vocab.category_names().index(garment.category)
                         if garment.category in vocab.category_names() else 0,
                         key=f"gc-{name}")
-                    schemes = list(vocabulary.SCHEMES)
-                    garment.scheme = e2.selectbox(
-                        "Size scheme", schemes,
-                        index=schemes.index(garment.scheme)
-                        if garment.scheme in schemes else 0, key=f"gs-{name}")
+                    garment.schemes = e2.multiselect(
+                        "Size schemes", list(vocabulary.SCHEMES),
+                        default=[x for x in garment.schemes if x in vocabulary.SCHEMES],
+                        key=f"gs-{name}",
+                        help="Most specific first. The first is what a new piece of "
+                             "this kind defaults to.")
                     b1, b2 = st.columns(2)
                     if b1.form_submit_button("Save"):
                         vocab.save()

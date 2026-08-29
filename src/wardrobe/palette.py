@@ -35,6 +35,15 @@ from . import paths
 
 # --- roles --------------------------------------------------------------------
 
+# His skin, measured rather than guessed. Every warmth verdict is relative to
+# it, so it lives in one place; the app passes the profile's value in, and this
+# is only the fallback for calling the maths directly.
+DEFAULT_SKIN = "#A0583C"
+
+# How far a colour's lightness must sit from his before it reads as contrast
+# rather than as a tonal blur next to the face.
+VALUE_GAP = 0.20
+
 GROUND, FIELD, ACCENT = "Ground", "Field", "Accent"
 
 ROLES: dict[str, str] = {
@@ -186,13 +195,28 @@ def contrast(a: str, b: str) -> float:
     return abs(lightness(a) - lightness(b))
 
 
+def value_gap(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
+    """How far a colour sits from his own lightness.
+
+    A separate question from hue, and the one that decides whether something
+    next to the face reads as contrast or as a tonal blur. At 0.43 he is
+    mid-deep, so a mid-brown can be perfectly harmonious in family and still
+    disappear against him.
+    """
+    return abs(lightness(hex_code) - lightness(skin_hex))
+
+
+def blurs_at_the_collar(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
+    return value_gap(hex_code, skin_hex) < VALUE_GAP
+
+
 def hue_distance(a: str, b: str) -> float:
     """Shortest way round the wheel, in degrees."""
     difference = abs(hsl(a)[0] - hsl(b)[0]) % 360
     return min(difference, 360 - difference)
 
 
-def warmth(hex_code: str, skin_hex: str = "#C58466") -> tuple[str, str]:
+def warmth(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[str, str]:
     """How a colour sits against his skin. Returns (verdict, why).
 
     Near his skin hue is harmonious, the far side is flattering by contrast, and
@@ -275,7 +299,7 @@ class Colour:
     def family(self) -> str:
         return hue_name(self.hex)
 
-    def verdict(self, skin_hex: str = "#C58466") -> tuple[str, str]:
+    def verdict(self, skin_hex: str = DEFAULT_SKIN) -> tuple[str, str]:
         return warmth(self.hex, skin_hex)
 
 
@@ -387,7 +411,7 @@ class Combination:
                 "borderline" if self.score >= 50 else "no")
 
 
-def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> Combination:
+def score_combination(pieces: dict[str, Colour], skin_hex: str = DEFAULT_SKIN) -> Combination:
     """Score one colour recipe out of 100, and say why.
 
     Every rule here is a real menswear rule expressed as arithmetic, and every
@@ -425,7 +449,9 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> C
     elif len(families) <= 2:
         reasons.append(f"held to {len(families)} hue famil{'y' if len(families) == 1 else 'ies'}")
 
-    # 3. What sits next to the face.
+    # 3. What sits next to the face. Two separate questions: is the hue right,
+    # and is it far enough from his own lightness to read as a garment rather
+    # than as more of him.
     if top:
         verdict, why = warmth(top.hex, skin_hex)
         if verdict == "careful":
@@ -433,6 +459,13 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> C
             faults.append(f"next to the face: {why}")
         else:
             reasons.append(f"next to the face: {why}")
+        gap = value_gap(top.hex, skin_hex)
+        if gap < VALUE_GAP:
+            score -= 14
+            faults.append(f"only {gap:.2f} from his own lightness, so it blurs at the "
+                          "collar rather than framing the face")
+        else:
+            reasons.append(f"{gap:.2f} of separation from his own colouring")
 
     # 4. Chroma budget. One loud thing may be interesting; two argue. Shoes are
     # exempt: a chestnut shoe is saturated by the numbers and is never the event.
@@ -467,7 +500,7 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> C
 
 
 def combinations(palette: Palette, *, with_outerwear: bool = False,
-                 skin_hex: str = "#C58466", limit: int = 12,
+                 skin_hex: str = DEFAULT_SKIN, limit: int = 12,
                  minimum: int = 55, season: str = "") -> list[Combination]:
     """Every colour recipe the palette allows, best first.
 
