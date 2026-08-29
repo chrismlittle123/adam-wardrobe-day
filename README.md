@@ -70,11 +70,11 @@ Six tabs, in the order the work happens.
 
 ### Where to buy, and how not to pay retail
 
-Anything at **£70 or over goes secondhand first**. Not out of thrift, but because
+Anything from **£50 goes secondhand first**. Not out of thrift, but because
 the garments that cost that much are the ones worn least: a blazer worn twenty
 times a year spends most of its life in a wardrobe whether it was bought new or
 not, and Vinted is full of them barely worn. Below that line the sum flips, and a
-£25 t-shirt is bought new from whoever cuts it well.
+£20 t-shirt is bought new from whoever cuts it well.
 
 36 UK retailers are ranked per garment and price: Vinted, eBay, Vestiaire and
 Watchfinder for secondhand; Uniqlo, Zara, H&M, Mango, COS, Arket, Massimo Dutti,

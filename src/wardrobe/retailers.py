@@ -1,12 +1,12 @@
 """Where to actually buy each thing, and how not to pay retail for it.
 
-The strategy has one governing idea: **anything over about £70 new gets looked
+The strategy has one governing idea: **anything from about £50 new gets looked
 for secondhand first**. Not out of thrift for its own sake, but because the
 garments that cost that much are usually the ones worn least, and a blazer worn
 twenty times a year spends most of its life in a wardrobe whether it was bought
 new or not. Vinted is full of them, barely worn, at a third of the price.
 
-Below that line the calculation flips. A £25 t-shirt secondhand saves eight
+Below that line the calculation flips. A £20 t-shirt secondhand saves a few
 pounds and costs a week of waiting, so it is bought new from whoever cuts that
 garment well.
 
@@ -22,7 +22,7 @@ import urllib.parse
 from dataclasses import dataclass, field
 
 # Above this, look secondhand before paying retail.
-SECONDHAND_THRESHOLD = 70.0
+SECONDHAND_THRESHOLD = 50.0
 
 # Garments that are expensive per wear: worn rarely, kept for years, and so the
 # secondhand market is full of them in near-new condition.
@@ -231,7 +231,7 @@ def suggest(item, *, limit: int = 8) -> list[Suggestion]:
                                "and kept for years, which is exactly what fills this site")
             elif dear:
                 score += 30
-                reasons.append(f"over £{SECONDHAND_THRESHOLD:.0f} new, so look here first")
+                reasons.append(f"£{SECONDHAND_THRESHOLD:.0f} or more new, so look here first")
             else:
                 score -= 20
                 reasons.append("cheap enough new that the wait is not worth it")

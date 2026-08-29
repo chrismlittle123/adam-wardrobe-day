@@ -768,7 +768,11 @@ def check_guide_prompt() -> str:
 # --- Shop ---------------------------------------------------------------------
 
 def check_secondhand_rule() -> str:
-    """Over the threshold goes secondhand first; under it does not."""
+    """At or over the threshold goes secondhand first; under it does not.
+
+    Asserted from the constant rather than a literal, so moving the line moves
+    the test with it and only the two sides of it are ever hard-coded.
+    """
     from .inventory import Item
     from .retailers import SECONDHAND, SECONDHAND_THRESHOLD, suggest
 
@@ -786,10 +790,20 @@ def check_secondhand_rule() -> str:
     assert all(s.retailer.kind != SECONDHAND for s in cheap), \
         "a £25 tee should not send him secondhand"
 
+    # The line moved to £50, so a mid-price knit now crosses it and a cheap one
+    # still does not. Both sides get asserted or the threshold is untested.
+    knit = Item(name="Merino crew", garment="Knitwear", colour="navy", price=55)
+    assert suggest(knit, limit=1)[0].retailer.kind == SECONDHAND, \
+        "£55 is over the line and should go secondhand first"
+    polo = Item(name="Piqué polo", garment="Polo", colour="ecru", price=40)
+    assert suggest(polo, limit=1)[0].retailer.kind != SECONDHAND, \
+        "£40 is under the line and should stay retail"
+
     edge = Item(name="Knit", garment="Knitwear", colour="navy", price=SECONDHAND_THRESHOLD)
     assert suggest(edge, limit=1)[0].retailer.kind == SECONDHAND, \
         f"exactly £{SECONDHAND_THRESHOLD:.0f} should still go secondhand first"
-    return f"£420 coat leads with {top[0].retailer.name}; £25 tee stays on the high street"
+    return (f"line at £{SECONDHAND_THRESHOLD:.0f}: £420 coat and £55 knit go secondhand, "
+            f"£40 polo and £25 tee stay retail")
 
 
 def check_retailer_catalogue() -> str:
@@ -1179,7 +1193,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
     (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
     (COLOUR, "Palette round trips with patterns", check_palette_round_trip),
-    (SHOP, "Over £70 goes secondhand first", check_secondhand_rule),
+    (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
     (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
