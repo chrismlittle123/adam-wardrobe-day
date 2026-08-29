@@ -278,17 +278,19 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
   color: var(--cream); margin: 1.4rem 0 .5rem; padding-bottom: .35rem;
   border-bottom: 1px solid var(--line);
 }
-.dict-h span { font-family: var(--chrome); font-size: 0.74rem; color: var(--muted);
-               letter-spacing: .14em; text-transform: uppercase; margin-left: .6rem; }
-.dict-row { font-family: var(--prose); font-size: 0.86rem; color: var(--cream);
-            padding: .34rem 0; line-height: 1.5; }
-.dict-row .meta { font-family: var(--chrome); font-size: 0.74rem; color: var(--muted);
-                  letter-spacing: .06em; }
+.dict-h span { font-family: var(--chrome); font-size: 0.82rem; color: var(--muted);
+               letter-spacing: .12em; text-transform: uppercase; margin-left: .6rem; }
+/* These are read down a page, one line per thing, so they are set at reading
+   size. They were at caption size and looked like footnotes to themselves. */
+.dict-row { font-family: var(--prose); font-size: 0.95rem; color: var(--cream);
+            padding: .38rem 0; line-height: 1.55; }
+.dict-row .meta { font-family: var(--chrome); font-size: 0.86rem; color: var(--muted);
+                  letter-spacing: .04em; }
 .dict-row .unused { color: var(--muted); }
 .dict-chip {
-  display: inline-block; font-family: var(--chrome); font-size: 0.74rem;
-  letter-spacing: .08em; color: var(--muted); border: 1px solid var(--line);
-  padding: .16rem .5rem; margin: 0 .3rem .3rem 0;
+  display: inline-block; font-family: var(--chrome); font-size: 0.82rem;
+  letter-spacing: .06em; color: var(--muted); border: 1px solid var(--line);
+  padding: .2rem .55rem; margin: 0 .3rem .3rem 0;
 }
 .dict-chip.on { color: var(--brass); border-color: var(--brass); }
 
