@@ -27,8 +27,8 @@ from wardrobe import (
 from wardrobe.gemini_image import GeminiImageError, Settings, generate_images
 from wardrobe.gemini_text import GeminiTextError
 from wardrobe.inventory import (
-    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, FITS, GARMENTS, GRADES, NONE,
-    OWNED, RETIRED, STATUSES, Inventory, Item, size_scheme,
+    ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, FABRICS, FITS, GARMENTS, GRADES,
+    NONE, OWNED, RETIRED, STATUSES, Inventory, Item, size_scheme,
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.palette import (
@@ -95,7 +95,7 @@ def render() -> None:
     tabs = st.tabs([
         "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles", "4 · Colour",
         "5 · Outfit Generator", "6 · Outfit Gallery", "7 · Body Measurements",
-        "8 · Shopping Guide", "⚙ Diagnostics",
+        "8 · Where to Buy", "9 · Shopping Guide", "⚙ Diagnostics",
     ])
     with tabs[0]:
         style_guide_tab(profile, answers)
@@ -112,8 +112,10 @@ def render() -> None:
     with tabs[6]:
         body_tab(profile)
     with tabs[7]:
-        shop_tab(profile, inventory, outfits, principles)
+        where_to_buy_tab(inventory)
     with tabs[8]:
+        shop_tab(profile, inventory, outfits, principles)
+    with tabs[9]:
         diagnostics_tab()
 
 
@@ -1432,11 +1434,170 @@ def body_tab(profile: Profile) -> None:
     size_targets_panel(profile)
 
 
-# --- 8. shopping guide --------------------------------------------------------
+# --- 8. where to buy ----------------------------------------------------------
+
+def where_to_buy_tab(inventory: Inventory) -> None:
+    plan = sourcing.Plan.load()
+    ui.blurb(
+        "Which shops each kind of garment comes from, and on what terms. A route "
+        "states only the constraints it cares about, on three optional axes: grade, "
+        "fabric and fit. It matches only if the garment satisfies every one of them, "
+        "and where several match, the one stating the most wins. A route stating "
+        "nothing is simply the default for its type."
+    )
+
+    garments = list(GARMENTS)
+    ui.stats([
+        ("Routes", str(len(plan.routes))),
+        ("Types covered", f"{len(plan.covered())} of {len(garments)}"),
+        ("Shops in use", str(len({s for r in plan.routes for s in r.stores}))),
+    ], brass_first=True)
+
+    unrouted = [i for i in inventory.items
+                if i.status == ASPIRATIONAL and not sourcing.route_for(i, plan)]
+    if unrouted:
+        st.warning(
+            "On your shopping list with no route: "
+            + "; ".join(f"**{i.name or i.garment}** ({i.spec_line() or i.garment})"
+                        for i in unrouted)
+            + ". Either add a route below, or set the garment's grade and fabric so an "
+              "existing one matches it."
+        )
+
+    add_route_panel(plan)
+
+    ui.eyebrow("The plan")
+    for garment, routes in plan.by_garment().items():
+        st.markdown(f'<div class="look-cap">{garment}</div>', unsafe_allow_html=True)
+        for route in routes:
+            route_editor(plan, route)
+
+    empty_types = plan.uncovered(garments)
+    if empty_types:
+        with st.expander(f"No route at all · {len(empty_types)} garment types"):
+            ui.blurb("Not all of these need one. A watch and a pair of sandals can "
+                     "reasonably be bought wherever they turn up.")
+            st.markdown(f'<div class="look-cap">{", ".join(empty_types)}</div>',
+                        unsafe_allow_html=True)
+
+    with st.expander("Start again"):
+        ui.blurb("Throws away every edit and reloads the plan the app ships with.")
+        if st.button("Restore the default plan", type="secondary"):
+            plan.restore_defaults()
+            st.rerun()
+
+
+def route_editor(plan: sourcing.Plan, route: sourcing.Route) -> None:
+    shops = " or ".join(r.name for r in route.retailers) or "no shop set"
+    matched = ", ".join(f"{k.lower()} {v}" for k, v in route.constraints.items()) or "any"
+    terms = route.terms or "no conditions"
+    with st.expander(f"{route.label or route.garment}  ·  {shops}  ·  {matched}"):
+        with st.form(f"route-{route.id or route.label}"):
+            c1, c2 = st.columns([2, 1])
+            route.label = c1.text_input("Name it", route.label, key=f"rl-{route.id}")
+            route.garment = c2.selectbox(
+                "Garment", GARMENTS,
+                index=GARMENTS.index(route.garment) if route.garment in GARMENTS else 0,
+                key=f"rg-{route.id}")
+
+            route.stores = st.multiselect(
+                "Shops, in the order you would try them", list(retailers.BY_ID),
+                default=[s for s in route.stores if s in retailers.BY_ID],
+                format_func=lambda i: f"{retailers.BY_ID[i].name} · {retailers.BY_ID[i].kind}",
+                key=f"rs-{route.id}")
+
+            st.markdown('<div class="look-cap">Match on, all optional. Leave every one '
+                        'blank to make this the default for the garment.</div>',
+                        unsafe_allow_html=True)
+            m1, m2, m3, m4 = st.columns(4)
+            route.grade = m1.selectbox(
+                "Grade", GRADES, index=GRADES.index(route.grade) if route.grade in GRADES else 0,
+                key=f"rgr-{route.id}")
+            fabrics = ["", *FABRIC_OPTIONS[1:]]
+            route.fabric = m2.selectbox(
+                "Exact fabric", fabrics,
+                index=fabrics.index(route.fabric) if route.fabric in fabrics else 0,
+                key=f"rf-{route.id}")
+            families = ["", *FABRICS]
+            route.family = m3.selectbox(
+                "Fabric family", families,
+                index=families.index(route.family) if route.family in families else 0,
+                key=f"rfam-{route.id}",
+                help="One line covering a whole family, so Wool catches flannel, "
+                     "worsted and hopsack at once.")
+            route.fit = m4.selectbox(
+                "Fit", FITS, index=FITS.index(route.fit) if route.fit in FITS else 0,
+                key=f"rfit-{route.id}")
+
+            t1, t2 = st.columns(2)
+            route.condition = t1.text_input("Condition", route.condition,
+                                            placeholder="Very Good condition or above",
+                                            key=f"rc-{route.id}")
+            route.timing = t2.text_input("Timing", route.timing,
+                                         placeholder="wait for the sale",
+                                         key=f"rt-{route.id}")
+            route.spec = st.text_input("Insist on", route.spec,
+                                       placeholder="100% cotton, 200 gsm or heavier",
+                                       key=f"rsp-{route.id}")
+            route.note = st.text_area("Note", route.note, height=68, key=f"rn-{route.id}")
+
+            s1, s2 = st.columns(2)
+            if s1.form_submit_button("Save this route"):
+                if route.fabric and route.family:
+                    st.warning("Set an exact fabric or a family, not both. The family "
+                               "was kept.")
+                    route.fabric = ""
+                plan.save()
+                st.rerun()
+            if s2.form_submit_button("Delete"):
+                plan.remove(route.id)
+                plan.save()
+                st.rerun()
+        st.markdown(f'<div class="look-cap">Currently: {shops} · {terms}</div>',
+                    unsafe_allow_html=True)
+
+
+def add_route_panel(plan: sourcing.Plan) -> None:
+    with st.expander("Add a route"):
+        with st.form("add-route", clear_on_submit=True):
+            c1, c2 = st.columns([2, 1])
+            label = c1.text_input("Name it", placeholder="Loafers")
+            garment = c2.selectbox("Garment", GARMENTS, key="ar-garment")
+            stores = st.multiselect(
+                "Shops, in the order you would try them", list(retailers.BY_ID),
+                format_func=lambda i: f"{retailers.BY_ID[i].name} · {retailers.BY_ID[i].kind}",
+                key="ar-stores")
+            m1, m2, m3, m4 = st.columns(4)
+            grade = m1.selectbox("Grade", GRADES, key="ar-grade")
+            fabric = m2.selectbox("Exact fabric", ["", *FABRIC_OPTIONS[1:]], key="ar-fabric")
+            family = m3.selectbox("Fabric family", ["", *FABRICS], key="ar-family")
+            fit = m4.selectbox("Fit", FITS, key="ar-fit")
+            t1, t2 = st.columns(2)
+            condition = t1.text_input("Condition", placeholder="Very Good condition or above")
+            timing = t2.text_input("Timing", placeholder="wait for the sale")
+            spec = st.text_input("Insist on", placeholder="Goodyear welted")
+            note = st.text_area("Note", height=68, key="ar-note")
+            if st.form_submit_button("Add route"):
+                if not stores:
+                    st.warning("Pick at least one shop.")
+                elif fabric and family:
+                    st.warning("Set an exact fabric or a family, not both.")
+                else:
+                    plan.add(sourcing.Route(
+                        label=label.strip() or garment, garment=garment, stores=list(stores),
+                        grade=grade, fabric=fabric, family=family, fit=fit,
+                        condition=condition.strip(), timing=timing.strip(),
+                        spec=spec.strip(), note=note.strip()))
+                    plan.save()
+                    st.rerun()
+
+
+# --- 9. shopping guide --------------------------------------------------------
 
 def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
              principles: Principles) -> None:
     st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
+    plan = sourcing.Plan.load()
     wanted = shop_mod.to_buy(inventory)
     if not wanted:
         ui.empty("Nothing on the list. Mark pieces as wanted in the Wardrobe Inventory, "
@@ -1460,7 +1621,7 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         "look for, and where to find it."
     )
 
-    routeless = [i for i in wanted if not sourcing.route_for(i)]
+    routeless = [i for i in wanted if not sourcing.route_for(i, plan)]
     if routeless:
         st.warning(
             "No route in the sourcing plan for: "
@@ -1480,7 +1641,7 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                           or "any",
             "Where": route.where,
             "Terms": route.terms or "—",
-        } for route in sourcing.plan()])
+        } for route in plan.routes])
 
     plan_panel(inventory, outfits)
 
@@ -1501,11 +1662,11 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     for chunk in (shown[i:i + 2] for i in range(0, len(shown), 2)):
         for column, item in zip(st.columns(2, gap="large"), chunk):
             with column:
-                product_card(profile, item, inventory, principles)
+                product_card(profile, item, inventory, principles, plan)
 
 
 def product_card(profile: Profile, item: Item, inventory: Inventory,
-                 principles: Principles) -> None:
+                 principles: Principles, plan: "sourcing.Plan") -> None:
     flag = "look secondhand" if item.price >= retailers.SECONDHAND_THRESHOLD else ""
     shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, flag)
     sizes = shop_mod.size_line(profile, item)
@@ -1626,7 +1787,7 @@ def item_view(profile: Profile, item_id: str) -> None:
                         unsafe_allow_html=True)
 
     ui.eyebrow("Where to buy it")
-    route = sourcing.route_for(item)
+    route = sourcing.route_for(item, sourcing.Plan.load())
     if route:
         terms = "".join(
             f'<div class="term"><b>{label}</b> {value}</div>'

@@ -860,7 +860,10 @@ def check_sourcing_routes() -> str:
     """
     from .inventory import GARMENTS, GRADES, FITS, Item
     from .retailers import BY_ID
-    from .sourcing import BY_GARMENT, ROUTES, route_for, uncovered, why
+    from .sourcing import Plan, route_for, uncovered, why
+
+    plan = Plan.load()
+    ROUTES = plan.routes
 
     for route in ROUTES:
         assert route.stores, f"{route.label} names no shop"
@@ -908,8 +911,55 @@ def check_sourcing_routes() -> str:
     assert route_for(Item(name="x", garment="Trousers", fabric="Cotton twill")) is None, \
         "an unmatched trouser was pushed down a route it does not belong to"
     assert "Loafers" in uncovered(GARMENTS), "a known gap stopped being reported"
-    return (f"{len(ROUTES)} routes over {len(BY_GARMENT)} types, selected on grade, "
+    return (f"{len(ROUTES)} routes over {len(plan.covered())} types, selected on grade, "
             f"fabric and fit; name no longer decides anything")
+
+
+def check_plan_is_editable() -> str:
+    """The plan is data, not a constant: it round trips and it can be changed."""
+    from .inventory import GARMENTS, Item
+    from .sourcing import DEFAULT_ROUTES, Plan, Route, route_for
+
+    fresh = Plan.load()
+    assert not fresh.path.is_file(), "loading wrote a file it should not have"
+    assert len(fresh.routes) == len(DEFAULT_ROUTES), "defaults did not load"
+    assert route_for(Item(name="x", garment="Loafers"), fresh) is None, \
+        "the fixture already covers loafers, so this proves nothing"
+
+    fresh.add(Route(label="Loafers", garment="Loafers", stores=["vinted"],
+                    condition="Very Good condition or above"))
+    fresh.save()
+    again = Plan.load()
+    assert again.path.is_file(), "save wrote nothing"
+    assert len(again.routes) == len(DEFAULT_ROUTES) + 1, "the added route was lost"
+    added = route_for(Item(name="x", garment="Loafers"), again)
+    assert added and added.where == "Vinted", "the added route does not resolve"
+    assert "Very Good" in added.condition, "the condition did not survive the round trip"
+    assert all(r.id for r in again.routes), "a route was saved without an id"
+    # Ids key the edit widgets, so duplicates take the whole page down.
+    ids = [r.id for r in again.routes]
+    assert len(ids) == len(set(ids)), f"duplicate route ids: {ids}"
+    assert all(r.id for r in Plan.load().routes), "loaded defaults carry no id"
+
+    # Editing an existing route must take effect, not be shadowed by the default.
+    tee = next(r for r in again.routes if r.garment == "T-shirt" and not r.grade)
+    tee.stores = ["marks"]
+    again.save()
+    assert route_for(Item(name="x", garment="T-shirt"), Plan.load()).where == \
+        "Marks & Spencer", "editing a route had no effect"
+
+    edited = Plan.load()
+    edited.remove(added.id)
+    edited.save()
+    assert route_for(Item(name="x", garment="Loafers"), Plan.load()) is None, \
+        "a deleted route still resolves"
+
+    restored = Plan.load().restore_defaults()
+    assert len(restored.routes) == len(DEFAULT_ROUTES), "restoring defaults did not"
+    assert route_for(Item(name="x", garment="T-shirt"), restored).where == "Uniqlo", \
+        "restoring did not undo the edit"
+    assert "Loafers" in restored.uncovered(GARMENTS), "coverage is not recomputed"
+    return f"{len(DEFAULT_ROUTES)} defaults; add, edit, delete and restore all persist"
 
 
 def check_product_prompts() -> str:
@@ -955,11 +1005,12 @@ def check_app_renders_empty() -> str:
     app = _render()
     labels = [t.label for t in app.tabs]
     numbered = [l for l in labels if l[0].isdigit()]
-    assert len(numbered) == 8, f"expected 8 numbered tabs, got {numbered}"
-    assert [l[0] for l in numbered] == list("12345678"), f"tabs out of order: {numbered}"
+    assert len(numbered) == 9, f"expected 9 numbered tabs, got {numbered}"
+    assert [l[0] for l in numbered] == list("123456789"), f"tabs out of order: {numbered}"
     assert "Colour" in numbered[3], f"Colour is not the fourth tab: {numbered[3]}"
     assert "Body Measurements" in numbered[6], "body measurements did not get its own tab"
-    assert "Shopping" in numbered[7], "shopping guide is not last"
+    assert "Where to Buy" in numbered[7], "Where to Buy is not before the shop"
+    assert "Shopping" in numbered[8], "shopping guide is not last"
     assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
     return f"{len(labels)} tabs: " + " · ".join(labels)
 
@@ -1260,6 +1311,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
     (SHOP, "The sourcing plan routes each garment", check_sourcing_routes),
+    (SHOP, "The plan is editable and persists", check_plan_is_editable),
     (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),

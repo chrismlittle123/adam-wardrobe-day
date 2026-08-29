@@ -81,3 +81,9 @@ id = "dress-one-notch-above-the-room-never"
 text = "Dress one notch above the room, never two."
 reason = "One notch reads as self-respect, two reads as a costume."
 group = "Occasion"
+
+[[principles]]
+id = "keep-the-volume-in-one-place-only-2"
+text = "Keep the volume in one place only"
+reason = "Loose on bottom in casual wear only eg jeans"
+group = "Silhouette"

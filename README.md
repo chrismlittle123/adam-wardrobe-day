@@ -62,7 +62,10 @@ Six tabs, in the order the work happens.
    between what is already owned and what is still to buy.
 7. **Body Measurements** — ten measurements, all takeable on yourself with a tape
    and a mirror, and the finished garment dimensions derived from them.
-8. **Shopping Guide** — a shop. Each wanted piece is a product card with a
+8. **Where to Buy** — the sourcing plan, editable. Which shops each garment type
+   comes from, what to match on, and on what terms. Add, edit and delete routes,
+   or restore the defaults.
+9. **Shopping Guide** — a shop. Each wanted piece is a product card with a
    generated catalogue photograph, its price and the size to look for. Open one
    and it fills a browser tab: the cloth, the cut, what to check before buying,
    how that garment usually goes wrong, the finished measurements on his body,
@@ -70,7 +73,8 @@ Six tabs, in the order the work happens.
 
 ### The sourcing plan
 
-`sourcing.py` holds the decisions rather than the ranking: heavyweight tees from
+`sourcing.py` holds the decisions rather than the ranking, editable on the
+Where to Buy page and stored in `sourcing.toml`: heavyweight tees from
 Asos or Next at 200 gsm, plain ones from Uniqlo in supima; blazers, jackets,
 dress shoes, boots and overcoats from Vinted in Very Good condition or above;
 dress shirts from Charles Tyrwhitt on sale, linen from Mango; chinos, jeans,

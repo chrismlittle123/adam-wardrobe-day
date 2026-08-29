@@ -28,8 +28,14 @@ carried through to the product page rather than left in his head.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import re
+import tomllib
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
 
+import tomli_w
+
+from . import paths
 from .retailers import BY_ID, Retailer
 
 VINTED_VG = "Very Good condition or above"
@@ -37,11 +43,12 @@ VINTED_NWT = "New with tags only"
 ON_SALE = "wait for the sale"
 
 
-@dataclass(frozen=True)
+@dataclass
 class Route:
-    label: str                       # how he says it: "Heavyweight t-shirt"
-    garment: str                     # the type the app tracks
-    stores: tuple[str, ...]          # retailer ids, in order of preference
+    label: str = ""                  # how he says it: "Heavyweight t-shirt"
+    garment: str = ""                # the type the app tracks
+    stores: list[str] = field(default_factory=list)   # retailer ids, in preference order
+    id: str = ""
     grade: str = ""                  # "" means the grade does not matter
     fabric: str = ""                 # an exact cloth
     family: str = ""                 # or a whole fabric family
@@ -90,61 +97,137 @@ class Route:
         return not (self.fit and item.fit != self.fit)
 
 
-# His plan. Order within a garment does not matter; specificity decides.
-ROUTES: tuple[Route, ...] = (
+# The plan he started from. Editable in the app; this is what a fresh install
+# gets and what the file is seeded with the first time it is saved.
+DEFAULT_ROUTES: tuple[Route, ...] = (
     Route("Heavyweight t-shirt", "T-shirt", ("asos", "next"), grade="Heavyweight",
           spec="100% cotton, 200 gsm or heavier",
           note="The weight is the whole point. Anything thinner drapes like a vest."),
-    Route("Plain t-shirt", "T-shirt", ("uniqlo",),
+    Route("Plain t-shirt", "T-shirt", ["uniqlo"],
           spec="Supima cotton",
           note="The default tee. Cheap enough to replace rather than nurse."),
 
-    Route("Blazer", "Blazer", ("vinted",), condition=VINTED_VG),
-    Route("Jacket", "Jacket", ("vinted",), condition=VINTED_VG),
-    Route("Dress shoes", "Derbies", ("vinted",), condition=VINTED_VG,
+    Route("Blazer", "Blazer", ["vinted"], condition=VINTED_VG),
+    Route("Jacket", "Jacket", ["vinted"], condition=VINTED_VG),
+    Route("Dress shoes", "Derbies", ["vinted"], condition=VINTED_VG,
           note="Goodyear-welted if you can, so they can be resoled."),
-    Route("Boots", "Boots", ("vinted",), condition=VINTED_VG),
-    Route("Overcoat", "Overcoat", ("vinted",), condition=VINTED_VG),
+    Route("Boots", "Boots", ["vinted"], condition=VINTED_VG),
+    Route("Overcoat", "Overcoat", ["vinted"], condition=VINTED_VG),
 
-    Route("Dress shirt", "Shirt", ("tyrwhitt",), grade="Dress", timing=ON_SALE,
+    Route("Dress shirt", "Shirt", ["tyrwhitt"], grade="Dress", timing=ON_SALE,
           note="Sized by collar and sleeve, which is the only sane way to buy one."),
-    Route("Linen shirt", "Shirt", ("mango",), family="Linen and hemp", timing=ON_SALE),
-    Route("Linen trousers", "Trousers", ("mango",), family="Linen and hemp", timing=ON_SALE),
+    Route("Linen shirt", "Shirt", ["mango"], family="Linen and hemp", timing=ON_SALE),
+    Route("Linen trousers", "Trousers", ["mango"], family="Linen and hemp", timing=ON_SALE),
     Route("Wool trousers", "Trousers", ("marks", "next"), family="Wool",
           note="The nine months of the year linen cannot do. Check the composition: "
                "a wool blend below about 60% drapes like a school trouser."),
-    Route("Knitted polo", "Polo", ("mango",), grade="Knitted", timing=ON_SALE),
+    Route("Knitted polo", "Polo", ["mango"], grade="Knitted", timing=ON_SALE),
 
-    Route("Polo", "Polo", ("uniqlo",), spec="Piqué cotton"),
+    Route("Polo", "Polo", ["uniqlo"], spec="Piqué cotton"),
     Route("Chinos", "Chinos", ("uniqlo",)),
     Route("Jeans", "Jeans", ("uniqlo",)),
     Route("Overshirt", "Overshirt", ("uniqlo",)),
     Route("Jumper", "Knitwear", ("marks", "uniqlo")),
 
-    Route("Smart trainers", "Trainers", ("vinted",), grade="Smart", condition=VINTED_NWT,
+    Route("Smart trainers", "Trainers", ["vinted"], grade="Smart", condition=VINTED_NWT,
           note="New with tags only. A worn sole has already taken someone else's gait."),
     Route("Branded trainers", "Trainers", ("adidas", "newbalance", "nike"),
           grade="Branded", timing=ON_SALE,
           note="Check the outlet section before the sale section."),
 
-    Route("Suit", "Suit", ("marks",), timing="then have it altered",
+    Route("Suit", "Suit", ["marks"], timing="then have it altered",
           note="Off the peg for the cloth, a tailor for the fit. The alteration is "
                "what makes it look like a suit rather than a costume."),
 )
 
-BY_GARMENT: dict[str, list[Route]] = {}
-for _route in ROUTES:
-    BY_GARMENT.setdefault(_route.garment, []).append(_route)
+@dataclass
+class Plan:
+    """The sourcing plan, as editable data.
+
+    Defaults come from DEFAULT_ROUTES until the file is written, so a fresh
+    install arrives with a sensible plan rather than an empty page, and editing
+    any of it persists the lot.
+    """
+
+    routes: list[Route] = field(default_factory=list)
+    path: Path = field(default_factory=paths.sourcing)
+
+    @classmethod
+    def load(cls, path: Path | str | None = None) -> "Plan":
+        path = Path(path) if path else paths.sourcing()
+        plan = cls(routes=[], path=path)
+        if not path.is_file():
+            source = [Route(**asdict(r)) for r in DEFAULT_ROUTES]
+        else:
+            allowed = {f.name for f in fields(Route)}
+            source = [Route(**{k: v for k, v in row.items() if k in allowed})
+                      for row in tomllib.loads(path.read_text()).get("routes", [])]
+        # Ids are assigned on the way in, not on the way out. They key the edit
+        # widgets, and two routes sharing a blank id collide on the page.
+        for route in source:
+            route.id = ""
+            plan.add(route)
+        return plan
+
+    def save(self) -> Path:
+        for route in self.routes:
+            route.id = route.id or self.unique_id(route.label or route.garment)
+        self.path.write_text(tomli_w.dumps({"routes": [asdict(r) for r in self.routes]}))
+        return self.path
+
+    def by_id(self, route_id: str) -> Route | None:
+        return next((r for r in self.routes if r.id == route_id), None)
+
+    def add(self, route: Route) -> Route:
+        route.id = route.id or self.unique_id(route.label or route.garment)
+        self.routes.append(route)
+        return route
+
+    def remove(self, route_id: str) -> None:
+        self.routes = [r for r in self.routes if r.id != route_id]
+
+    def unique_id(self, label: str) -> str:
+        base = re.sub(r"[^a-z0-9]+", "-", (label or "route").lower()).strip("-")[:36] or "route"
+        taken = {r.id for r in self.routes}
+        if base not in taken:
+            return base
+        n = 2
+        while f"{base}-{n}" in taken:
+            n += 1
+        return f"{base}-{n}"
+
+    def by_garment(self) -> dict[str, list[Route]]:
+        out: dict[str, list[Route]] = {}
+        for route in self.routes:
+            out.setdefault(route.garment, []).append(route)
+        return {k: sorted(v, key=lambda r: -r.precision) for k, v in sorted(out.items())}
+
+    def covered(self) -> set[str]:
+        return {r.garment for r in self.routes}
+
+    def uncovered(self, garments) -> list[str]:
+        covered = self.covered()
+        return [g for g in garments if g not in covered]
+
+    def restore_defaults(self) -> "Plan":
+        self.routes = []
+        for route in DEFAULT_ROUTES:
+            fresh = Route(**asdict(route))
+            fresh.id = ""
+            self.add(fresh)
+        self.save()
+        return self
 
 
-def route_for(item) -> Route | None:
+def route_for(item, plan: Plan | None = None) -> Route | None:
     """The route this garment follows, or None if the plan does not cover it.
 
     The most constrained matching route wins. A dress shirt satisfies both the
     dress route and the type's default, and the dress route states more, so it
     takes it.
     """
-    matching = [r for r in BY_GARMENT.get(item.garment, []) if r.matches(item)]
+    plan = plan if plan is not None else Plan.load()
+    matching = [r for r in plan.routes if r.matches(item)]
     if not matching:
         return None
     return max(matching, key=lambda r: r.precision)
@@ -158,15 +241,10 @@ def why(item, route: Route) -> str:
     return ", ".join(f"{axis.lower()} {value}" for axis, value in route.constraints.items())
 
 
-def covered() -> set[str]:
-    return set(BY_GARMENT)
+def covered(plan: Plan | None = None) -> set[str]:
+    return (plan or Plan.load()).covered()
 
 
-def uncovered(garments) -> list[str]:
+def uncovered(garments, plan: Plan | None = None) -> list[str]:
     """Garment types with no route at all, so the gaps stay visible."""
-    return [g for g in garments if g not in BY_GARMENT]
-
-
-def plan() -> list[Route]:
-    """The whole list, grouped the way he wrote it."""
-    return list(ROUTES)
+    return (plan or Plan.load()).uncovered(garments)

@@ -49,6 +49,10 @@ def palette() -> Path:
     return home() / "palette.toml"
 
 
+def sourcing() -> Path:
+    return home() / "sourcing.toml"
+
+
 def photos() -> Path:
     return home() / "inventory" / "photos"
 
@@ -73,6 +77,7 @@ DATA: dict[str, str] = {
     "guide": "Style guide",
     "principles": "Principles",
     "palette": "Colour palette",
+    "sourcing": "Where to buy",
     "inventory": "Wardrobe inventory",
     "outfits": "Outfits",
     "photos": "Item photos",
