@@ -677,7 +677,7 @@ def check_named_colours() -> str:
 
 def check_seasons() -> str:
     """Four palettes out of one, and a colour with no season is worn all year."""
-    from .palette import ACCENT, Colour, GROUND, Palette, SEASONS, combinations, coverage
+    from .palette import ACCENT, Colour, GROUND, Palette, SEASONS, coverage
 
     palette = _palette()
     for colour in palette.colours:
@@ -700,39 +700,45 @@ def check_seasons() -> str:
     always = next(c for c in palette.colours if c.name == "Navy")
     assert all(always in every[s] for s in SEASONS), "an all-year colour missed a season"
 
-    # A season filter must actually narrow the recipes, not be decorative.
-    all_year = combinations(palette, limit=99, minimum=0)
-    just_summer = combinations(palette, limit=99, minimum=0, season="Summer")
-    assert len(just_summer) < len(all_year), "the season filter changed nothing"
-    for recipe in just_summer:
-        assert all(c.in_season("Summer") for c in recipe.pieces.values()), \
-            "an out-of-season colour got into a summer recipe"
-    assert coverage(palette, "Summer")["Top"] < coverage(palette)["Top"] or True
-    return (f"{len(SEASONS)} palettes; summer drops {len(all_year) - len(just_summer)} "
-            f"of {len(all_year)} recipes")
+    # A seasonal palette has to be usable, which means having something for each
+    # slot. A season with no trouser colour is a mood board.
+    summer_cover = coverage(palette, "Summer")
+    all_cover = coverage(palette)
+    assert summer_cover["Top"] <= all_cover["Top"], "a season has more than the whole"
+    assert sum(summer_cover.values()) < sum(all_cover.values()), \
+        "restricting to a season changed nothing"
+    return (f"{len(SEASONS)} palettes; summer holds {len(palette.for_season('Summer'))} "
+            f"of {len(palette.colours)} colours")
 
 
 def check_roles() -> str:
-    """Three roles, and shoes exempt from the loud budget without one of their own."""
-    from .palette import ACCENT, Colour, FIELD, GROUND, ROLES, ROLE_CATEGORIES, score_combination
+    """Three roles, and every garment slot reachable from one of them.
+
+    A role is the whole reason a palette is more than a list: navy as the ground
+    under everything is a different garment from navy next to the face. If a slot
+    no role can reach, a seasonal palette can have a hole nobody can fill.
+    """
+    from .palette import (ACCENT, CATEGORIES, Colour, FIELD, GROUND, ROLES,
+                          ROLE_CATEGORIES, Palette, coverage)
+
     assert set(ROLES) == {GROUND, FIELD, ACCENT}, f"roles drifted: {list(ROLES)}"
     assert "Leather" not in ROLES, "the leather role came back"
+    assert all(ROLES[r].strip() for r in ROLES), "a role has no explanation"
+
+    reachable = {c for role in ROLES for c in ROLE_CATEGORIES[role]}
+    assert set(CATEGORIES) <= reachable, \
+        f"no role can be worn on: {sorted(set(CATEGORIES) - reachable)}"
     assert "Shoes" in ROLE_CATEGORIES[GROUND], "no role can be worn on the feet"
 
-    # A saturated brown shoe is not the loud thing in an outfit, and used to be
-    # exempted by having its own role. The slot does that job now.
-    shoe = Colour(name="Chestnut", hex="#8B5A2B", role=GROUND, categories=["Shoes"])
-    tee = Colour(name="Cream", hex="#F2E9D8", role=FIELD)
-    trouser = Colour(name="Navy", hex="#26303F", role=GROUND)
-    quiet = score_combination({"Top": tee, "Bottom": trouser, "Shoes": shoe})
-    assert not any("competing" in f for f in quiet.faults), \
-        f"a brown shoe was counted as loud: {quiet.faults}"
-
-    loud_top = Colour(name="Rust", hex="#8E3B2E", role=ACCENT)
-    busy = score_combination({"Top": loud_top, "Bottom": Colour(name="Terracotta",
-                             hex="#B5613F", role=ACCENT), "Shoes": shoe})
-    assert any("competing" in f for f in busy.faults), "two loud garments went unnoticed"
-    return "three roles; shoes exempt from the loud budget by slot, not by role"
+    # A colour with no categories of its own falls back to its role's, so a
+    # palette is usable the moment colours are added, without filling in a grid.
+    palette = Palette()
+    palette.add(Colour(name="Navy", hex="#26303F", role=GROUND))
+    palette.add(Colour(name="Cream", hex="#F2E9D8", role=FIELD))
+    covered = coverage(palette)
+    assert covered["Bottom"] and covered["Top"] and covered["Shoes"], \
+        f"role defaults leave slots empty: {covered}"
+    return f"{len(ROLES)} roles reaching all {len(CATEGORIES)} slots"
 
 
 def check_colour_arithmetic() -> str:
@@ -814,52 +820,6 @@ def check_warmth_against_skin() -> str:
     return (f"CIELAB distance in three bands: terracotta {skin_distance('#B5613F', skin):.0f} "
             f"too close, burgundy {skin_distance('#6E2C33', skin):.0f} tonal, "
             f"cobalt {skin_distance('#0F4C9E', skin):.0f} clear")
-
-
-def check_combination_scoring() -> str:
-    """The scorer must prefer real outfits and reject muddy ones."""
-    from .palette import combinations, coverage, score_combination
-    palette = _palette()
-    counts = coverage(palette)
-    assert counts["Top"] and counts["Bottom"] and counts["Shoes"], "roles gave no coverage"
-
-    best = combinations(palette, limit=5)
-    assert best, "nothing scored at all"
-    top = best[0]
-    assert top.score >= 90, f"the best recipe only scored {top.score}"
-    assert {"Top", "Bottom", "Shoes"} == set(top.pieces), "a slot is missing"
-    assert top.reasons, "a perfect score with nothing to say for itself"
-
-    def by_name(name):
-        return next(c for c in palette.colours if c.name == name)
-
-    muddy = score_combination({"Top": by_name("Rust"), "Bottom": by_name("Olive"),
-                               "Shoes": by_name("Chocolate")})
-    assert muddy.score < 55, f"rust on olive scored {muddy.score}, it should not"
-    assert any("one garment" in f for f in muddy.faults), "the muddy fault was not named"
-
-    classic = score_combination({"Top": by_name("Cream"), "Bottom": by_name("Navy"),
-                                 "Shoes": by_name("Chocolate")})
-    assert classic.score > muddy.score + 30, "cream/navy/brown is not beating rust on olive"
-    assert classic.verdict == "wear it", f"the safest outfit in menswear got {classic.verdict}"
-    return f"best {top.score} ({top.name}); rust on olive {muddy.score}"
-
-
-def check_colour_rules_are_obeyed() -> str:
-    """A colour not ticked for a category must never appear in that slot."""
-    from .palette import combinations, score_combination
-    palette = _palette()
-    navy = next(c for c in palette.colours if c.name == "Navy")
-    navy.categories = ["Bottom"]
-    cream = next(c for c in palette.colours if c.name == "Cream")
-    cream.categories = ["Top"]
-
-    for combination in combinations(palette, limit=40, minimum=0):
-        assert combination.pieces["Top"].id != navy.id, "navy appeared as a top"
-        assert combination.pieces["Bottom"].id != cream.id, "cream appeared as a bottom"
-    assert palette.for_category("Bottom"), "the grid removed every trouser colour"
-    assert navy not in palette.for_category("Top"), "for_category ignores the grid"
-    return "the grid is obeyed; navy never a top, cream never a bottom"
 
 
 def check_palette_round_trip() -> str:
@@ -2256,8 +2216,6 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Four seasonal palettes out of one", check_seasons),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
     (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
-    (COLOUR, "Combinations prefer real outfits", check_combination_scoring),
-    (COLOUR, "The colour grid is obeyed", check_colour_rules_are_obeyed),
     (COLOUR, "Palette round trips", check_palette_round_trip),
     (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),

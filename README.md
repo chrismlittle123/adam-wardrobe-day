@@ -142,11 +142,11 @@ walk-away price before a sale email arrives.
 
 ### The colour maths
 
-Coordination is two measurable things. **Value contrast**: a top and a bottom
-within 0.10 of each other in lightness read as one garment whatever their hues.
-**Temperature**: where a hue sits relative to his skin at `#C58466`. Near it is
-harmonious, the far side flatters by contrast (which is why navy suits everyone),
-and the near-miss between them is where sallow greens live.
+How far a colour sits from his skin is measured in CIELAB, which counts hue and
+lightness together and counts them the way an eye does. Under 20 it reads as more
+of him than as a garment; 20 to 32 is tonal, a deliberate close-toned look; over
+32 it plainly frames him. Separately, `warmth()` says whether a hue is in his
+family, flatters by contrast, or sits in the near-miss between the two.
 
 Colours are named the way cloth is described, not the way a colour wheel divides.
 Equal 30° sectors put navy in "cyan" and olive in "amber"; brown and olive and

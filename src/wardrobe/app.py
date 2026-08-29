@@ -829,6 +829,7 @@ def handwrite_panel(principles: Principles) -> None:
 # --- 5. colour ----------------------------------------------------------------
 
 VERDICT_BADGE = {"harmonious": "ok", "flattering": "ok", "careful": "no"}
+AGAINST_BADGE = {"clear": "ok", "tonal": "want", "too close": "no"}
 
 
 def colour_tab(profile: Profile, palette: Palette) -> None:
@@ -844,7 +845,6 @@ def colour_tab(profile: Profile, palette: Palette) -> None:
     palette_panel(palette, skin)
     season_panel(palette)
     rules_panel(palette)
-    combination_panel(palette, skin)
 
 
 def palette_panel(palette: Palette, skin: str) -> None:
@@ -904,6 +904,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
         for colour in colours:
             c1, c2 = st.columns([9, 1], vertical_alignment="center")
             verdict, why = colour.verdict(skin)
+            against = pal_mod.reads_against_skin(colour.hex, skin)
             note_line = f"<br>{colour.note}" if colour.note else ""
             c1.markdown(
                 f'<div class="step" style="border-left-color:{colour.hex}">'
@@ -911,7 +912,9 @@ def palette_panel(palette: Palette, skin: str) -> None:
                 f'<span class="chip" style="background:{colour.hex}"></span>'
                 f'{colour.name}</div><div class="cost">{colour.hex}</div></div>'
                 f'<div class="why"><span class="badge {VERDICT_BADGE[verdict]}">{verdict}</span> '
-                f'{why}<br>{colour.family}, lightness {colour.light:.2f} &middot; '
+                f'{why}<br><span class="badge {AGAINST_BADGE[against]}">{against}</span> '
+                f'{pal_mod.separation_reason(colour.hex, skin)}<br>'
+                f'{colour.family}, lightness {colour.light:.2f} &middot; '
                 f'{", ".join(colour.allowed)} &middot; {colour.season_line}'
                 f'{note_line}</div></div>',
                 unsafe_allow_html=True)
@@ -1749,8 +1752,8 @@ def rules_panel(palette: Palette) -> None:
         return
     ui.blurb(
         "The grid is the rule. A colour ticked for Bottom is a trouser colour and "
-        "will never be offered as a shirt. This is what stops the combinations "
-        "below from proposing cream trousers under a chocolate shirt."
+        "not a shirt colour, which is what makes a seasonal palette a plan rather "
+        "than a mood board: four colours are no use if none of them is a trouser."
     )
     with st.form("colour-rules"):
         header = st.columns([3] + [1] * len(COLOUR_CATEGORIES))
@@ -1779,59 +1782,10 @@ def rules_panel(palette: Palette) -> None:
 
     gaps = [c for c, n in pal_mod.coverage(palette).items() if not n]
     if gaps:
-        st.info(f"Nothing is allowed on: {', '.join(gaps)}. "
-                "Combinations need a colour for Top, Bottom and Shoes at minimum.")
+        st.info(f"Nothing is allowed on: {', '.join(gaps)}. A palette with no "
+                "trouser colour or no shoe colour is not a wardrobe you can dress "
+                "out of.")
 
-
-def combination_panel(palette: Palette, skin: str) -> None:
-    ui.eyebrow("What actually goes together")
-    counts = pal_mod.coverage(palette)
-    if not all(counts[c] for c in ("Top", "Bottom", "Shoes")):
-        ui.empty("Needs at least one colour allowed on Top, Bottom and Shoes.")
-        return
-
-    c1, c2, c3 = st.columns([1, 1, 2])
-    season = c1.selectbox("Season", ["All year", *SEASONS], key="comb-season")
-    with_coat = c2.toggle("Include a coat", key="comb-coat")
-    minimum = c3.slider("Minimum score", 0, 100, 55, step=5, key="comb-min")
-    season = "" if season == "All year" else season
-    counts = pal_mod.coverage(palette, season)
-    if not all(counts[c] for c in ("Top", "Bottom", "Shoes")):
-        ui.empty(f"Nothing for {season.lower() or 'that'} in one of the slots. "
-                 "Widen the seasons on some colours.")
-        return
-    total = (counts["Top"] * counts["Bottom"] * counts["Shoes"]
-             * (counts["Outerwear"] if with_coat else 1))
-    st.markdown(f'<div class="look-cap">{total:,} recipes scored, best first. Every one '
-                f'is enumerated, so nothing plausible is missed and nothing implausible '
-                f'gets a free pass.</div>', unsafe_allow_html=True)
-
-    found = pal_mod.combinations(palette, with_outerwear=with_coat, skin_hex=skin,
-                                 limit=15, minimum=minimum, season=season)
-    if not found:
-        ui.empty("Nothing clears that score. Lower it, or widen the grid above.")
-        return
-
-    for combination in found:
-        badge = ("ok" if combination.score >= 80 else
-                 "want" if combination.score >= 65 else "no")
-        pieces = "".join(
-            f'<div style="flex:1"><div style="background:{c.hex};height:3.2rem;'
-            f'border:1px solid var(--line)"></div>'
-            f'<div class="look-cap">{slot}<br>{c.name}</div></div>'
-            for slot, c in combination.pieces.items())
-        good = "".join(f"<br>+ {r}" for r in combination.reasons)
-        bad = "".join(f"<br>&minus; {f}" for f in combination.faults)
-        st.markdown(
-            f'<div class="step"><div class="hd"><div class="pieces">'
-            f'<span class="badge {badge}">{combination.verdict}</span> '
-            f'{combination.name}</div><div class="cost">{combination.score}</div></div>'
-            f'<div style="display:flex;gap:.5rem;margin:.7rem 0 .2rem">{pieces}</div>'
-            f'<div class="why">{(good + bad).lstrip("<br>")}</div></div>',
-            unsafe_allow_html=True)
-
-
-# --- 6. outfit generator ------------------------------------------------------
 
 def item_picker(label: str, options: list[Item], key: str, multi: bool = False):
     """A searchable box over inventory. Streamlit's select boxes filter as you type."""
