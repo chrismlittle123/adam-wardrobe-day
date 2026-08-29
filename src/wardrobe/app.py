@@ -684,6 +684,8 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
                     restage(edited, inventory)
                 st.rerun()
             if delete:
+                reset_mod.before(f"before deleting {item.name or item.garment}",
+                                 "inventory", "outfits")
                 # Cascade, or the outfits keep an id that resolves to nothing and
                 # quietly report themselves as wearable.
                 if outfits.forget_item(item.id):
@@ -765,6 +767,8 @@ def kept_panel(principles: Principles) -> None:
                 f'<div class="step"><div class="pieces">{p.text}</div>'
                 f'<div class="why">{p.reason}</div></div>', unsafe_allow_html=True)
             if c2.button("Drop", key=f"drop-{p.id}", type="secondary"):
+                reset_mod.before(f"before dropping the principle “{p.text[:48]}”",
+                                 "principles")
                 principles.remove(p.id)
                 principles.save()
                 st.rerun()
@@ -873,6 +877,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
                 f'{note_line}</div></div>',
                 unsafe_allow_html=True)
             if c2.button("Drop", key=f"pdrop-{colour.id}", type="secondary"):
+                reset_mod.before(f"before dropping the colour {colour.name}", "palette")
                 palette.remove(colour.id)
                 palette.save()
                 st.rerun()
@@ -1275,6 +1280,8 @@ def garment_catalogue_panel() -> None:
                             st.warning(f"{name} is used by pieces in the wardrobe. "
                                        "Re-classify them first.")
                         else:
+                            reset_mod.before(f"before removing the garment {name}",
+                                             "vocabulary")
                             vocab.remove_garment(name)
                             vocab.save()
                             st.rerun()
@@ -1313,6 +1320,8 @@ def garment_catalogue_panel() -> None:
                 if fabric.name in used_fabrics:
                     st.warning(f"{fabric.name} is on pieces in the wardrobe.")
                 else:
+                    reset_mod.before(f"before removing the fabric {fabric.name}",
+                                     "vocabulary")
                     vocab.remove_fabric(fabric.name)
                     vocab.save()
                     st.rerun()
@@ -1339,6 +1348,8 @@ def garment_catalogue_panel() -> None:
                  "with. Pieces naming a garment or fabric you added will be left "
                  "pointing at a word the catalogue no longer knows.")
         if st.button("Restore the default catalogue", type="secondary"):
+            reset_mod.before("before restoring the default garment catalogue",
+                             "vocabulary")
             vocab.restore_defaults()
             st.rerun()
 
@@ -1432,6 +1443,8 @@ def retailer_catalogue_view() -> None:
                         catalogue.save()
                         st.rerun()
                     if b2.form_submit_button("Remove from the catalogue"):
+                        reset_mod.before(f"before removing the shop {shop.name}",
+                                         "retailers")
                         catalogue.remove(shop.id)
                         catalogue.save()
                         if used_by:
@@ -1441,6 +1454,8 @@ def retailer_catalogue_view() -> None:
 
     with st.expander("Start again"):
         if st.button("Restore the default catalogue", type="secondary"):
+            reset_mod.before("before restoring the default retailer catalogue",
+                             "retailers")
             catalogue.restore_defaults()
             st.rerun()
 
@@ -1821,6 +1836,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
                 outfits.save()
                 st.rerun()
             if s2.form_submit_button("Delete"):
+                reset_mod.before(f"before deleting the outfit {outfit.name}", "outfits")
                 outfits.remove(outfit.id)
                 outfits.save()
                 st.rerun()
@@ -2129,25 +2145,51 @@ def reset_panel() -> None:
 def snapshots_panel() -> None:
     ui.eyebrow("Snapshots")
     taken = reset_mod.snapshots()
+    ui.blurb(
+        "Nothing in this app deletes without leaving a copy here first. Every "
+        "deletion, every restore-to-defaults and every clearing takes one, and says "
+        "why it took it. They are targeted: deleting an outfit copies the outfit "
+        "list, not the generated images the deletion was never going to touch, which "
+        "is why they are kilobytes rather than megabytes. Restoring is itself "
+        "snapshotted, so going back to the wrong point is not the end of it."
+    )
     if not taken:
-        ui.empty("No snapshots yet. One is taken automatically before anything is cleared.")
+        ui.empty("No snapshots yet. One appears the first time anything is deleted.")
         return
-    for snap in taken[:12]:
-        c1, c2, c3 = st.columns([4, 1, 1])
-        c1.markdown(
-            f'<div class="look-cap">{snap.label} &middot; {snap.size} &middot; '
-            f'{", ".join(paths.DATA.get(k, k).lower() for k in snap.keys)}</div>',
-            unsafe_allow_html=True)
-        if c2.button("Restore", key=f"res-{snap.path.name}", type="secondary"):
-            restored = reset_mod.restore(snap)
-            st.success(f"Restored {len(restored)} item(s) from {snap.label}.")
-            st.rerun()
-        if c3.button("Delete", key=f"del-{snap.path.name}", type="secondary"):
-            reset_mod.forget(snap)
-            st.rerun()
 
+    ui.stats([
+        ("Snapshots", str(len(taken))),
+        ("Store", reset_mod.store_size()),
+        ("Oldest", taken[-1].label.split(",")[0]),
+    ])
+    st.markdown(f'<div class="look-cap">The most recent {reset_mod.KEEP} are kept; '
+                f'older ones are dropped as new ones arrive.</div>',
+                unsafe_allow_html=True)
 
-# --- 8. body measurements -----------------------------------------------------
+    for snap in taken[:20]:
+        with st.expander(f"{snap.label}  ·  {snap.reason or 'no reason recorded'}"):
+            st.markdown(
+                f'<div class="look-cap">{snap.size} &middot; holds {snap.what}</div>',
+                unsafe_allow_html=True)
+            with st.form(f"snap-{snap.path.name}"):
+                wanted = st.multiselect(
+                    "Put back", snap.keys, default=snap.keys,
+                    format_func=lambda k: paths.DATA.get(k, k),
+                    help="Restore the whole snapshot, or only the part you want.")
+                c1, c2 = st.columns(2)
+                if c1.form_submit_button("Restore"):
+                    if not wanted:
+                        st.warning("Pick at least one thing to put back.")
+                    else:
+                        back = reset_mod.restore(snap, list(wanted))
+                        st.success("Restored "
+                                   + ", ".join(paths.DATA.get(k, k).lower() for k in back)
+                                   + ". The state it replaced was snapshotted first.")
+                        st.rerun()
+                if c2.form_submit_button("Forget this one"):
+                    reset_mod.forget(snap)
+                    st.rerun()
+
 
 def body_tab(profile: Profile) -> None:
     ui.blurb(
@@ -2220,6 +2262,7 @@ def where_to_buy_tab(inventory: Inventory) -> None:
     with st.expander("Start again"):
         ui.blurb("Throws away every edit and reloads the plan the app ships with.")
         if st.button("Restore the default plan", type="secondary"):
+            reset_mod.before("before restoring the default sourcing plan", "sourcing")
             plan.restore_defaults()
             st.rerun()
 
@@ -2289,6 +2332,7 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route,
                 plan.save()
                 st.rerun()
             if s2.form_submit_button("Delete"):
+                reset_mod.before(f"before deleting the route {route.label}", "sourcing")
                 plan.remove(route.id)
                 plan.save()
                 st.rerun()

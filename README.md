@@ -200,10 +200,25 @@ touch the real wardrobe even if a check is wrong. `WARDROBE_HOME` is what makes
 that possible: every path in the app resolves through `paths.py`, which resolves
 through that variable.
 
-Clearing is reversible. Anything deleted is copied into
-`.wardrobe-backups/<timestamp>/` first, and any snapshot can be restored whole.
-The subject profile is left out of the default selection, because his height and
-skin tone are not test data.
+### The backup store
+
+Nothing in the app deletes without leaving a copy first. Every deletion, every
+restore-to-defaults and every clearing calls `reset.before()` with a reason and
+the data it is about to touch, and a copy goes into
+`.wardrobe-backups/<timestamp>/`.
+
+Snapshots carry a **reason**, because "before deleting Camel wool overcoat" tells
+you what you are restoring and a timestamp does not. They are **targeted**:
+deleting an outfit copies the outfit list, not the generated images the deletion
+was never going to touch, which is why they are kilobytes rather than megabytes.
+They can be restored **whole or in part**. And restoring is itself snapshotted,
+so going back to the wrong point is not the end of it.
+
+The most recent 60 are kept. A check walks the app's syntax tree, finds every
+destructive call, and fails if any one of them is not preceded by a snapshot.
+
+The subject profile is left out of the default selection when clearing, because
+his height and skin tone are not test data.
 
 ## Status
 

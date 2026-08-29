@@ -1384,6 +1384,88 @@ def check_diagnostics_renders() -> str:
     return f"{len(labels)} reset checkboxes, confirmation and restore present"
 
 
+def check_every_deletion_is_snapshotted() -> str:
+    """Nothing may delete without leaving a copy first.
+
+    Found by counting: the app had eleven destructive actions and exactly one of
+    them took a snapshot. Deleting an item, an outfit, a route, a shop, a colour
+    or a principle all destroyed data with no way back.
+    """
+    import ast as _ast
+
+    source = (Path(__file__).parent / "app.py").read_text()
+    tree = _ast.parse(source)
+    lines = source.splitlines()
+
+    destructive = []
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Call) or not isinstance(node.func, _ast.Attribute):
+            continue
+        if node.func.attr in ("remove", "remove_garment", "remove_fabric",
+                              "restore_defaults"):
+            owner = getattr(node.func.value, "id", "")
+            if owner in ("inventory", "outfits", "principles", "palette", "plan",
+                         "catalogue", "vocab"):
+                destructive.append(node.lineno)
+
+    assert destructive, "no destructive calls found, so this check proves nothing"
+    unguarded = []
+    for line in destructive:
+        window = "\n".join(lines[max(0, line - 8):line])
+        if "reset_mod.before(" not in window:
+            unguarded.append(f"{line}: {lines[line - 1].strip()}")
+    assert not unguarded, "deletions with no snapshot first: " + "; ".join(unguarded)
+    return f"{len(destructive)} destructive calls, every one snapshotted first"
+
+
+def check_snapshot_store() -> str:
+    """Reasons, targeting, selective restore, and a store that does not grow forever."""
+    from . import paths, reset
+    from .inventory import Inventory
+    from .outfits import Outfits
+    _seeded()
+    paths.looks().mkdir(parents=True, exist_ok=True)
+    (paths.looks() / "big.png").write_bytes(b"x" * 400_000)
+
+    snap = reset.before("before deleting Camel wool overcoat", "inventory", "outfits")
+    assert snap, "before() took nothing"
+    assert snap.reason == "before deleting Camel wool overcoat", "the reason was lost"
+    assert set(snap.keys) == {"inventory", "outfits"}, f"wrong keys: {snap.keys}"
+    assert "looks" not in snap.keys, "a targeted snapshot swept in the image directory"
+    assert snap.bytes < 200_000, f"targeted snapshot is {snap.bytes} bytes"
+    assert "inventory" in snap.what and "outfit" in snap.what, "the summary is unhelpful"
+
+    inventory = Inventory.load()
+    before_count = len(inventory.items)
+    inventory.remove(inventory.items[-1].id)
+    inventory.save()
+    outfits = Outfits.load()
+    outfits.remove(outfits.outfits[0].id)
+    outfits.save()
+
+    # Restoring one part must leave the other alone.
+    reset.restore(snap, ["inventory"])
+    assert len(Inventory.load().items) == before_count, "selective restore did not work"
+    assert len(Outfits.load().outfits) == len(outfits.outfits), \
+        "restoring the inventory also restored the outfits"
+
+    # And restoring is itself snapshotted, so a wrong restore is recoverable.
+    assert any("before restoring" in s.reason for s in reset.snapshots()), \
+        "restoring left no way back"
+
+    reloaded = next(s for s in reset.snapshots() if s.reason == snap.reason)
+    assert reloaded.keys == snap.keys, "the manifest did not survive a reload"
+
+    # The store is capped.
+    for n in range(reset.KEEP + 5):
+        reset.before(f"filler {n}", "inventory")
+    assert len(reset.snapshots()) <= reset.KEEP, \
+        f"the store grew past its limit: {len(reset.snapshots())}"
+    assert reset.store_size().endswith(("KB", "MB")), "the store size is unreadable"
+    return (f"reasons kept, {snap.bytes // 1024} KB targeted not "
+            f"{400_000 // 1024} KB, selective restore, capped at {reset.KEEP}")
+
+
 def check_snapshots_do_not_collide() -> str:
     """Two wipes inside the same second must not share a directory."""
     from . import reset
@@ -1868,6 +1950,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),
+    (APP, "Every deletion is snapshotted first", check_every_deletion_is_snapshotted),
+    (APP, "The backup store keeps reasons and restores in part", check_snapshot_store),
     (APP, "Snapshots in the same second stay apart", check_snapshots_do_not_collide),
     (LIVE, "Gemini returns text", check_live_text),
     (LIVE, "Gemini returns an image", check_live_image),

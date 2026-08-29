@@ -1,11 +1,19 @@
-"""Clearing the data, reversibly.
+"""The backup store: nothing is deleted without a copy being kept first.
 
-A button that deletes a man's wardrobe is a cliff, so this is built as a ledge:
-every wipe takes a snapshot first, into .wardrobe-backups/<timestamp>/, and any
-snapshot can be restored whole. Nothing here deletes without leaving a copy.
+A button that deletes a man's wardrobe is a cliff, so this is built as a ledge.
+Every destructive action in the app calls `before()` with a reason and the data
+it is about to touch, a copy goes into .wardrobe-backups/<timestamp>/, and any
+snapshot can be put back whole or one part at a time.
 
-The subject profile is excluded from the default selection. His height and skin
-tone are not test data and losing them to a stray click would be maddening.
+Two things make it usable rather than merely present. Snapshots carry a reason,
+because "before deleting Camel wool overcoat" tells you what you are restoring
+and a timestamp does not. And they are targeted: deleting one outfit copies the
+outfit list, not the two hundred megabytes of generated images that the deletion
+was never going to touch.
+
+The subject profile is excluded from the default selection when clearing. His
+height and skin tone are not test data and losing them to a stray click would be
+maddening.
 """
 
 from __future__ import annotations
@@ -16,9 +24,16 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import tomli_w
+
 from . import paths
 
 STAMP = "%Y%m%d-%H%M%S"
+
+
+# Automatic snapshots pile up fast. Kept generously, since they are small once
+# the image directories are left out of them.
+KEEP = 60
 
 
 @dataclass
@@ -26,10 +41,15 @@ class Snapshot:
     path: Path
     when: dt.datetime
     keys: list[str] = field(default_factory=list)
+    reason: str = ""
 
     @property
     def label(self) -> str:
         return f"{self.when:%d %b %Y, %H:%M:%S}"
+
+    @property
+    def what(self) -> str:
+        return ", ".join(paths.DATA.get(k, k).lower() for k in self.keys) or "nothing"
 
     @property
     def bytes(self) -> int:
@@ -76,7 +96,7 @@ def present() -> dict[str, str]:
     return {key: text for key in paths.DATA if (text := describe(key))}
 
 
-def snapshot(keys: list[str] | None = None) -> Snapshot | None:
+def snapshot(keys: list[str] | None = None, reason: str = "") -> Snapshot | None:
     """Copy the named data into a timestamped backup. None if there is nothing."""
     keys = [k for k in (keys or list(paths.DATA)) if paths.resolve(k).exists()]
     if not keys:
@@ -98,13 +118,48 @@ def snapshot(keys: list[str] | None = None) -> Snapshot | None:
             shutil.copytree(source, target, dirs_exist_ok=True)
         else:
             shutil.copy2(source, target.with_suffix(source.suffix))
-    (destination / "KEYS").write_text("\n".join(keys))
-    return Snapshot(destination, when, keys)
+    (destination / "manifest.toml").write_text(tomli_w.dumps({
+        "when": when.isoformat(timespec="seconds"),
+        "reason": reason,
+        "keys": keys,
+    }))
+    prune()
+    return Snapshot(destination, when, keys, reason)
 
 
-def wipe(keys: list[str], *, snapshot_first: bool = True) -> tuple[Snapshot | None, list[str]]:
+def before(reason: str, *keys: str) -> Snapshot | None:
+    """Take a copy of exactly what is about to change, and say why.
+
+    Called by every destructive action. Targeted on purpose: deleting one outfit
+    copies the outfit list, not the generated images it was never going to touch.
+    """
+    return snapshot([k for k in keys if k in paths.DATA], reason)
+
+
+def prune(keep: int = KEEP) -> list[Snapshot]:
+    """Drop the oldest snapshots past the limit. Returns what went."""
+    everything = snapshots()
+    dropped = everything[keep:]
+    for old in dropped:
+        forget(old)
+    return dropped
+
+
+def store_size() -> str:
+    root = paths.backups()
+    if not root.is_dir():
+        return "0 KB"
+    total = sum(f.stat().st_size for f in root.rglob("*") if f.is_file())
+    return (f"{total / 1_048_576:.1f} MB" if total >= 1_048_576
+            else f"{max(total // 1024, 1)} KB")
+
+
+def wipe(keys: list[str], *, snapshot_first: bool = True,
+         reason: str = "") -> tuple[Snapshot | None, list[str]]:
     """Delete the named data. Returns the snapshot taken and what was removed."""
-    taken = snapshot(keys) if snapshot_first else None
+    taken = snapshot(keys, reason or "before clearing " +
+                     ", ".join(paths.DATA.get(k, k).lower() for k in keys)) \
+        if snapshot_first else None
     removed: list[str] = []
     for key in keys:
         target = paths.resolve(key)
@@ -131,16 +186,30 @@ def snapshots() -> list[Snapshot]:
             when = dt.datetime.strptime(directory.name.split(".")[0], STAMP)
         except ValueError:
             continue
-        keys_file = directory / "KEYS"
-        keys = keys_file.read_text().split() if keys_file.is_file() else []
-        out.append(Snapshot(directory, when, keys))
+        manifest, keys, reason = directory / "manifest.toml", [], ""
+        if manifest.is_file():
+            try:
+                read = tomllib.loads(manifest.read_text())
+                keys, reason = list(read.get("keys", [])), read.get("reason", "")
+            except Exception:
+                pass
+        else:                                   # written before manifests existed
+            legacy = directory / "KEYS"
+            keys = legacy.read_text().split() if legacy.is_file() else []
+        out.append(Snapshot(directory, when, keys, reason))
     return sorted(out, key=lambda s: (s.when, s.path.name), reverse=True)
 
 
-def restore(snap: Snapshot) -> list[str]:
-    """Put a snapshot back, overwriting whatever is there now."""
+def restore(snap: Snapshot, keys: list[str] | None = None) -> list[str]:
+    """Put a snapshot back, whole or in part, over whatever is there now.
+
+    Takes a copy of the current state first, so restoring is itself reversible
+    and going back to the wrong point is not the end of it.
+    """
+    wanted = keys if keys is not None else (snap.keys or list(paths.DATA))
+    before(f"before restoring {snap.label}", *wanted)
     restored: list[str] = []
-    for key in (snap.keys or list(paths.DATA)):
+    for key in wanted:
         target = paths.resolve(key)
         directory_source = snap.path / key
         file_source = next((p for p in snap.path.glob(f"{key}.*") if p.is_file()), None)
