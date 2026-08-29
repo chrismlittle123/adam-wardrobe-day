@@ -270,6 +270,8 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 .meter { margin: 0 0 1.4rem; }
 .meter .track { height: 2px; background: rgba(240,230,219,.12); }
 .meter .fill { height: 2px; background: var(--brass); }
+/* Past the target is not a failure, just a different fact. */
+.meter .fill.over { background: var(--good); }
 .meter .read {
   font-family: var(--chrome); font-size: 0.74rem; letter-spacing: .14em;
   text-transform: uppercase; color: var(--muted); display: flex;
@@ -338,6 +340,16 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 
 .empty { border: 1px dashed var(--line); padding: 2.4rem 1.6rem; text-align: center;
          color: var(--muted); font-size: .88rem; }
+/* Standing in for a picture, not for a paragraph. A short dashed box where a
+   full-length plate should be left every gallery row ragged: the card beside a
+   real photograph sat a third of the way up its own column. */
+.no-plate {
+  border: 1px dashed var(--line); aspect-ratio: 3 / 4; width: 100%;
+  box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--muted);
+}
 /* Small text sits above things: an expander, a plate, a table. Without a bottom
    margin it presses against the box below and reads as part of it. */
 .look-cap { font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .1em;
@@ -454,12 +466,32 @@ def empty(text: str) -> None:
     st.markdown(f'<div class="empty">{text}</div>', unsafe_allow_html=True)
 
 
+def no_plate(text: str = "no photograph yet") -> None:
+    """A placeholder the shape of a picture, so a grid row stays level.
+
+    It sits inside the same frame a real plate uses, so the border, the padding
+    and the column width are identical and only the picture is missing.
+    """
+    st.markdown(f'<div class="plate"><div class="no-plate">{text}</div></div>',
+                unsafe_allow_html=True)
+
+
 def meter(done: int, total: int, label: str) -> None:
-    pct = round(100 * done / total) if total else 0
+    """A target, not a limit.
+
+    The bar used to be set to done/total with no ceiling, so fourteen principles
+    against a target of ten drew a fill 140% wide that ran off the right of the
+    page and read as a rendering fault. Past the target it fills and says so.
+    """
+    pct = min(100, round(100 * done / total)) if total else 0
+    reading = (f"<b>{done}</b> of {total}" if done <= total
+               else f"<b>{done}</b> &middot; past the {total} aimed for")
+    over = " over" if done > total else ""
     st.markdown(
         f'<div class="meter"><div class="read"><span>{label}</span>'
-        f'<span><b>{done}</b> of {total}</span></div>'
-        f'<div class="track"><div class="fill" style="width:{pct}%"></div></div></div>',
+        f'<span>{reading}</span></div>'
+        f'<div class="track"><div class="fill{over}" style="width:{pct}%"></div>'
+        '</div></div>',
         unsafe_allow_html=True,
     )
 

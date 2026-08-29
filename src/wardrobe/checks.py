@@ -1601,6 +1601,31 @@ def check_page_survives_a_rerun() -> str:
     return f"{len(slugs)} pages, the URL keeps the place through a rerun and a refresh"
 
 
+def check_meter_never_overflows() -> str:
+    """A target is not a limit, and the bar must not run off the page.
+
+    Fourteen principles against a target of ten drew a fill 140% wide, which
+    overshot the track and read as a rendering fault rather than as progress.
+    """
+    import re as _re
+    from unittest.mock import patch
+    from . import ui
+
+    drawn: list[str] = []
+    with patch.object(ui.st, "markdown", lambda html, **k: drawn.append(html)):
+        for done, total in ((0, 10), (3, 10), (10, 10), (14, 10), (1, 0)):
+            ui.meter(done, total, "Kept")
+    widths = [float(m) for html in drawn
+              for m in _re.findall(r"width:([\d.]+)%", html)]
+    assert len(widths) == 5, f"the meter stopped drawing a fill: {widths}"
+    assert max(widths) <= 100, f"the bar ran past the end of its track: {widths}"
+    assert widths[:3] == [0.0, 30.0, 100.0], f"the bar stopped tracking: {widths[:3]}"
+    assert "past the 10 aimed for" in drawn[3], "over target reads as 14 of 10"
+    assert "of 10" in drawn[1] and "past" not in drawn[1], "under target reads wrong"
+    assert widths[4] == 0.0, "a total of zero divided by zero"
+    return "bar caps at 100%, and past the target says so instead of overflowing"
+
+
 def check_no_shrugging_plurals() -> str:
     """No user-facing string may say "piece(s)".
 
@@ -2466,6 +2491,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
     (APP, "No text box prefills a suggestion", check_no_prefilled_hints),
     (APP, "No dead style hooks", check_no_dead_style_hooks),
+    (APP, "The meter never overflows", check_meter_never_overflows),
     (APP, "Nothing shrugs at a plural", check_no_shrugging_plurals),
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),

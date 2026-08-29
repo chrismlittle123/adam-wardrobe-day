@@ -1276,7 +1276,7 @@ def compare_view(pair: str) -> None:
             if cover:
                 ui.plate(Path(cover), outfit.name[:26])
             else:
-                ui.empty("No image")
+                ui.no_plate("no photograph yet")
             state = wearability(outfit, inventory)
             st.markdown(
                 f'<div class="look-cap">'
@@ -1798,13 +1798,21 @@ def retailer_catalogue_view() -> None:
 
 
 def colour_catalogue_view(palette: Palette) -> None:
-    """Every colour with a name, on its own page."""
+    """Every colour with a name, on its own page.
+
+    It used to print lightness, which was left over from the warmth verdict and
+    decided nothing once that went. What it prints instead is the only number
+    the app actually rules on: how far the colour sits from his skin, and
+    therefore whether he can wear it at the collar.
+    """
     st.markdown(ui.CSS, unsafe_allow_html=True)
+    skin = Profile.load().subject.skin_tone_hex
     mine = {c.hex.upper(): c for c in palette.colours}
     st.markdown(
         '<div class="masthead"><h1>Colour <em>catalogue</em></h1>'
         f'<div class="sub">{len(colour_names())} named colours &middot; '
-        f'{len(palette.colours)} in the palette</div></div>', unsafe_allow_html=True)
+        f'{len(palette.colours)} in the palette &middot; measured against his skin'
+        '</div></div>', unsafe_allow_html=True)
 
     extras = [c for c in palette.colours if c.name not in colour_names()]
     if extras:
@@ -1825,10 +1833,13 @@ def colour_catalogue_view(palette: Palette) -> None:
         ui.table([{
             "": f'<span class="chip" style="background:{h}"></span>',
             "Name": n, "Hex": h, "Reads as": pal_mod.hue_name(h),
-            "Lightness": f"{pal_mod.lightness(h):.2f}",
+            "From his skin": pal_mod.distance_line(h, skin),
+            "On top": ('<span class="badge ok">clears</span>'
+                       if pal_mod.clears_the_face(h, skin)
+                       else '<span class="badge no">too close</span>'),
             "In the palette": (f"yes &middot; {mine[h.upper()].role}"
                                if h.upper() in mine else "—"),
-        } for n, h in rows], numeric=("Lightness",))
+        } for n, h in rows], numeric=("From his skin",))
 
     st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
                 '</div>', unsafe_allow_html=True)
@@ -2047,7 +2058,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
     if cover:
         ui.plate(Path(cover), outfit.name[:22], width=420)
     else:
-        ui.empty("No image")
+        ui.no_plate("no photograph yet")
 
     w = wearability(outfit, inventory)
     if w.broken:
