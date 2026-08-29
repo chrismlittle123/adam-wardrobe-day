@@ -1,6 +1,6 @@
 [subject]
 name = "Adam"
-height_cm = 178
+height_cm = 180
 build = "very lean and athletic, narrow waist, defined shoulders"
 body_fat_pct = 8
 skin_tone_hex = "#A0583C"
@@ -10,7 +10,7 @@ facial_hair = "light moustache and short stubble along the jaw"
 eyes = "dark brown"
 details = "small gold stud earring, thin gold chain necklace"
 arms = "long"
-description = "Adam is 1.78 m and very lean, under 8% body fat by the tape, with the build of someone who climbs: defined shoulders, a narrow waist, no bulk anywhere. His skin is a warm medium-deep brown with a red-gold undertone. Short dark natural curls cropped close at the sides, a light moustache and short stubble along the jaw, dark brown eyes. He wears a small gold stud earring and a thin gold chain.\n\nHis arms are long for his height. Standing with his hands at his sides his fingertips come almost to mid-thigh, which is the single proportion that most often makes a garment look wrong on him: a sleeve cut to his height leaves his wrists out, and a jacket that fits the shoulder finishes short on the arm. Buy for the shoulder and have the sleeve let down."
+description = "Adam is 1.80 m and very lean, under 8% body fat by the tape, with the build of someone who climbs: defined shoulders, a narrow waist, no bulk anywhere. His skin is a warm medium-deep brown with a red-gold undertone. Short dark natural curls cropped close at the sides, a light moustache and short stubble along the jaw, dark brown eyes. He wears a small gold stud earring and a thin gold chain.\n\nHis arms are long for his height. Standing with his hands at his sides his fingertips come almost to mid-thigh, which is the single proportion that most often makes a garment look wrong on him: a sleeve cut to his height leaves his wrists out, and a jacket that fits the shoulder finishes short on the arm. Buy for the shoulder and have the sleeve let down."
 
 [photos]
 neutral = "reference/adam-neutral.png"

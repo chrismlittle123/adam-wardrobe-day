@@ -10,6 +10,7 @@ dependencies = [
     "streamlit>=1.62.0",
     "pillow>=12.3.0",
     "tomli-w>=1.2.0",
+    "pillow-heif>=1.5.0",
 ]
 
 [project.scripts]

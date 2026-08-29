@@ -20,7 +20,17 @@ from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 
 import tomli_w
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
+
+# Pillow cannot read HEIC on its own, and every photograph off an iPhone is one
+# unless somebody has gone into the settings. Registering the opener teaches
+# Image.open the format, so the rest of this file does not have to care.
+try:
+    from pillow_heif import register_heif_opener
+except ImportError:                                    # pragma: no cover
+    register_heif_opener = None
+else:
+    register_heif_opener()
 
 from . import paths
 
@@ -308,6 +318,11 @@ class Inventory:
 # Guards on uploads. The first is a decompression-bomb stop before anything is
 # decoded; the second is what actually keeps the repository small, since a phone
 # photograph is fifteen times larger than anything this app needs.
+# What the uploader will accept. HEIC is here because it is what an iPhone
+# actually produces; it is decoded and re-encoded to JPEG like everything else,
+# so nothing downstream ever meets one.
+UPLOAD_FORMATS: tuple[str, ...] = ("png", "jpg", "jpeg", "webp", "heic", "heif")
+
 MAX_UPLOAD_BYTES = 25 * 1024 * 1024
 MAX_EDGE_PX = 1600
 JPEG_QUALITY = 88
@@ -332,9 +347,17 @@ def save_photo(item_id: str, uploaded, photo_dir: Path | None = None) -> str:
     try:
         Image.open(io.BytesIO(data)).verify()      # verify() exhausts the reader,
         image = Image.open(io.BytesIO(data))       # so open it again to use it
+        # A phone writes the picture the way the sensor saw it and puts the
+        # rotation in EXIF. Without this, every photo taken in portrait arrives
+        # on its side, which on a hanging garment is not subtle.
+        image = ImageOps.exif_transpose(image)
         image = image.convert("RGB")
     except (UnidentifiedImageError, OSError, ValueError) as exc:
-        raise ValueError(f"That file is not a readable image ({exc}).") from exc
+        hint = ""
+        if not register_heif_opener and data[4:12] in (b"ftypheic", b"ftypheix",
+                                                       b"ftyphevc", b"ftypmif1"):
+            hint = " That looks like a HEIC; pillow-heif is not installed."
+        raise ValueError(f"That file is not a readable image ({exc}).{hint}") from exc
 
     image.thumbnail((MAX_EDGE_PX, MAX_EDGE_PX), Image.LANCZOS)
     for stale in photo_dir.glob(f"{item_id}.*"):

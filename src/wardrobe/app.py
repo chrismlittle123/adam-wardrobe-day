@@ -259,7 +259,7 @@ def subject_editor(profile: Profile) -> None:
     with st.expander("Edit subject"):
         with st.form("subject"):
             s.name = st.text_input("Name", s.name)
-            s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 178)
+            s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 180)
             derived = profile.measurements.body_fat(s.height_cm)
             if derived is None:
                 s.body_fat_pct = st.number_input(
@@ -674,7 +674,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
         garment, status, scheme = shape_row(Item(), "new")
         with st.form("add-item", clear_on_submit=True):
             draft = item_fields(Item(), "new", garment, status, scheme)
-            photo = st.file_uploader("Photo", type=["png", "jpg", "jpeg", "webp"], key="new-photo")
+            photo = st.file_uploader("Photo", type=list(inv_mod.UPLOAD_FORMATS), key="new-photo")
             if st.form_submit_button("Add to wardrobe"):
                 if not draft.name.strip():
                     st.warning("Give it a name.")
@@ -782,7 +782,7 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
         garment, status, scheme = shape_row(item, f"e-{item.id}")
         with st.form(f"edit-{item.id}"):
             edited = item_fields(item, f"e-{item.id}", garment, status, scheme)
-            new_photo = st.file_uploader("Replace photo", type=["png", "jpg", "jpeg", "webp"],
+            new_photo = st.file_uploader("Replace photo", type=list(inv_mod.UPLOAD_FORMATS),
                                          key=f"ph-{item.id}")
             c1, c2 = st.columns(2)
             save = c1.form_submit_button("Save")

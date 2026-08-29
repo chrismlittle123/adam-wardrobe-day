@@ -258,6 +258,70 @@ def check_body_measurement_set() -> str:
     return f"{len(wanted)} measured, {len(values) - len(wanted)} derived, hip not seat"
 
 
+def check_heic_uploads_are_accepted() -> str:
+    """A photograph off an iPhone is a HEIC, and it has to just work.
+
+    Pillow cannot read the format on its own, so an upload straight off a phone
+    came back as "not a readable image" with nothing to suggest why. It is
+    decoded and re-encoded to JPEG like every other upload, so nothing
+    downstream ever meets one.
+    """
+    import io as _io
+    from PIL import Image as _Image
+    from .inventory import MAX_EDGE_PX, UPLOAD_FORMATS, save_photo
+
+    for wanted in ("heic", "heif", "png", "jpg", "jpeg", "webp"):
+        assert wanted in UPLOAD_FORMATS, f"the uploader no longer accepts {wanted}"
+
+    class Upload:
+        def __init__(self, raw: bytes) -> None:
+            self._raw = raw
+
+        def getvalue(self) -> bytes:
+            return self._raw
+
+    picture = _Image.new("RGB", (1200, 1800), (180, 120, 60))
+
+    import pillow_heif
+    buf = _io.BytesIO()
+    pillow_heif.from_pillow(picture).save(buf, format="HEIF")
+    heic = buf.getvalue()
+    assert heic[4:12] == b"ftypheic", "the fixture is not actually a HEIC"
+
+    stored = Path(save_photo("phone-photo", Upload(heic)))
+    assert stored.suffix == ".jpg", f"a HEIC was stored as {stored.suffix}"
+    reopened = _Image.open(stored)
+    assert reopened.format == "JPEG", f"stored as {reopened.format}, not JPEG"
+    assert max(reopened.size) <= MAX_EDGE_PX, "a phone photo was not downscaled"
+
+    # The formats that already worked must go on working.
+    for fmt, ext in (("PNG", "png"), ("JPEG", "jpg"), ("WEBP", "webp")):
+        b = _io.BytesIO()
+        picture.save(b, fmt)
+        out = Path(save_photo(f"still-{ext}", Upload(b.getvalue())))
+        assert _Image.open(out).format == "JPEG", f"{fmt} stopped working"
+
+    # A portrait photo carries its rotation in EXIF. Without honouring it every
+    # picture taken on a phone arrives on its side.
+    sideways = _Image.new("RGB", (1800, 1200), (60, 90, 120))
+    b = _io.BytesIO()
+    exif = sideways.getexif()
+    exif[274] = 6                      # orientation: rotate 90 clockwise
+    sideways.save(b, "JPEG", exif=exif)
+    turned = _Image.open(Path(save_photo("sideways", Upload(b.getvalue()))))
+    assert turned.height > turned.width, \
+        f"the EXIF rotation was ignored; the photo is still {turned.size}"
+
+    # And nonsense is still refused rather than stored.
+    try:
+        save_photo("junk", Upload(b"definitely not an image"))
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("a non-image was accepted")
+    return f"HEIC, PNG, JPEG and WEBP all land as JPEG, and EXIF rotation is honoured"
+
+
 def check_body_fat_is_worked_out() -> str:
     """Body fat comes off the tape now, not off somebody's eye.
 
@@ -2628,6 +2692,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (DATA, "Suggestions are held apart from confirmed", check_suggestions_are_separate),
     (FIT, "Body is the ten takeable measurements", check_body_measurement_set),
     (FIT, "Body estimate is anatomically sane", check_body_estimate),
+    (INVENTORY, "Phone photos upload as HEIC", check_heic_uploads_are_accepted),
     (FIT, "Body fat is worked out, not guessed", check_body_fat_is_worked_out),
     (FIT, "Arm length moves the sleeve", check_arm_length_moves_the_sleeve),
     (FIT, "Trouser spec keeps its leg opening", check_trouser_spec_survives_derived),
