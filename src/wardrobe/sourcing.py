@@ -36,7 +36,7 @@ from pathlib import Path
 import tomli_w
 
 from . import paths
-from .retailers import BY_ID, Retailer
+from .retailers import Catalogue, Retailer
 
 VINTED_VG = "Very Good condition or above"
 VINTED_NWT = "New with tags only"
@@ -58,13 +58,22 @@ class Route:
     spec: str = ""                   # what to insist on in the product
     note: str = ""
 
+    def shops(self, catalogue: Catalogue) -> list[Retailer]:
+        """The shops this route names, in order, skipping any that were deleted
+        from the catalogue since the route was written."""
+        found = catalogue.lookup()
+        return [found[i] for i in self.stores if i in found]
+
     @property
     def retailers(self) -> list[Retailer]:
-        return [BY_ID[i] for i in self.stores if i in BY_ID]
+        return self.shops(Catalogue.load())
+
+    def where_in(self, catalogue: Catalogue) -> str:
+        return " or ".join(r.name for r in self.shops(catalogue)) or "unset"
 
     @property
     def where(self) -> str:
-        return " or ".join(r.name for r in self.retailers) or "unset"
+        return self.where_in(Catalogue.load())
 
     @property
     def constraints(self) -> dict[str, str]:

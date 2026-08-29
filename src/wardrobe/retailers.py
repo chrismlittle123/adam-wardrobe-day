@@ -22,8 +22,15 @@ waiting for it.
 
 from __future__ import annotations
 
+import re
+import tomllib
 import urllib.parse
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, fields
+from pathlib import Path
+
+import tomli_w
+
+from . import paths
 
 # Worn rarely, kept for years, so the secondhand market is full of them in
 # near-new condition. These go to the resale sites before anywhere else.
@@ -42,15 +49,15 @@ HIGH_STREET, ONLINE, TAILORING, SHOES, SECONDHAND, OFF_PRICE = (
 )
 
 
-@dataclass(frozen=True)
+@dataclass
 class Retailer:
-    id: str
-    name: str
-    kind: str
-    strengths: tuple[str, ...]
-    price_low: float          # what a middling piece there tends to cost
-    price_high: float
-    search: str               # URL template, {q} is the escaped query
+    id: str = ""
+    name: str = ""
+    kind: str = ""
+    strengths: list[str] = field(default_factory=list)
+    price_low: float = 0      # what a middling piece there tends to cost
+    price_high: float = 0
+    search: str = ""          # URL template, {q} is the escaped query
     note: str = ""
 
     def url(self, query: str) -> str:
@@ -66,7 +73,7 @@ FOOTWEAR = ("Loafers", "Derbies", "Boots", "Trainers", "Sandals")
 ACCESSORIES = ("Belt", "Bag", "Scarf", "Hat", "Socks", "Sunglasses", "Watch", "Jewellery")
 EVERYTHING = TOPS + BOTTOMS + OUTER + FOOTWEAR + ACCESSORIES
 
-RETAILERS: tuple[Retailer, ...] = (
+DEFAULT_RETAILERS: tuple[Retailer, ...] = (
     # Secondhand first, because that is the order the strategy uses.
     Retailer("vinted", "Vinted", SECONDHAND, EVERYTHING, 5, 400,
              "https://www.vinted.co.uk/catalog?search_text={q}",
@@ -206,8 +213,86 @@ SECONDHAND_ORDER: dict[str, int] = {
     "vinted": 12, "ebay": 8, "watchfinder": 6, "vestiaire": 3, "depop": 2,
 }
 
-BY_ID: dict[str, Retailer] = {r.id: r for r in RETAILERS}
 KINDS: tuple[str, ...] = (SECONDHAND, HIGH_STREET, ONLINE, TAILORING, SHOES, OFF_PRICE)
+
+
+@dataclass
+class Catalogue:
+    """The shops, as editable data.
+
+    Defaults ship with the app so nothing has to be typed before the plan works,
+    and the first edit persists the lot. A route pointing at a shop that has been
+    deleted simply drops it rather than breaking, which is why every lookup goes
+    through here rather than through a module-level dict.
+    """
+
+    retailers: list[Retailer] = field(default_factory=list)
+    path: Path = field(default_factory=paths.retailers)
+
+    @classmethod
+    def load(cls, path: Path | str | None = None) -> "Catalogue":
+        path = Path(path) if path else paths.retailers()
+        book = cls(retailers=[], path=path)
+        if not path.is_file():
+            source = [Retailer(**asdict(r)) for r in DEFAULT_RETAILERS]
+        else:
+            allowed = {f.name for f in fields(Retailer)}
+            source = [Retailer(**{k: v for k, v in row.items() if k in allowed})
+                      for row in tomllib.loads(path.read_text()).get("retailers", [])]
+        for retailer in source:
+            retailer.strengths = list(retailer.strengths)
+            book.add(retailer)
+        return book
+
+    def save(self) -> Path:
+        self.path.write_text(tomli_w.dumps(
+            {"retailers": [asdict(r) for r in self.retailers]}))
+        return self.path
+
+    def by_id(self, retailer_id: str) -> Retailer | None:
+        return next((r for r in self.retailers if r.id == retailer_id), None)
+
+    def add(self, retailer: Retailer) -> Retailer:
+        retailer.id = retailer.id or self.unique_id(retailer.name)
+        self.retailers.append(retailer)
+        return retailer
+
+    def remove(self, retailer_id: str) -> None:
+        self.retailers = [r for r in self.retailers if r.id != retailer_id]
+
+    def unique_id(self, name: str) -> str:
+        base = re.sub(r"[^a-z0-9]+", "", (name or "shop").lower())[:24] or "shop"
+        taken = {r.id for r in self.retailers}
+        if base not in taken:
+            return base
+        n = 2
+        while f"{base}{n}" in taken:
+            n += 1
+        return f"{base}{n}"
+
+    def ids(self) -> list[str]:
+        return [r.id for r in self.retailers]
+
+    def lookup(self) -> dict[str, Retailer]:
+        return {r.id: r for r in self.retailers}
+
+    def by_kind(self) -> dict[str, list[Retailer]]:
+        out: dict[str, list[Retailer]] = {}
+        for retailer in self.retailers:
+            out.setdefault(retailer.kind, []).append(retailer)
+        return {k: sorted(out[k], key=lambda r: r.name) for k in KINDS if k in out}
+
+    def sells(self, garment: str) -> list[Retailer]:
+        return [r for r in self.retailers if garment in r.strengths]
+
+    def restore_defaults(self) -> "Catalogue":
+        self.retailers = []
+        for retailer in DEFAULT_RETAILERS:
+            fresh = Retailer(**asdict(retailer))
+            fresh.strengths = list(fresh.strengths)
+            self.add(fresh)
+        self.save()
+        return self
 
 
 @dataclass
@@ -229,7 +314,7 @@ def query_for(item) -> str:
     return " ".join(dict.fromkeys(w for b in bits for w in b.split()))
 
 
-def suggest(item, *, limit: int = 8) -> list[Suggestion]:
+def suggest(item, *, limit: int = 8, catalogue: Catalogue | None = None) -> list[Suggestion]:
     """Rank the places worth looking, best first, each with its reason.
 
     This is the fallback for when the sourcing plan has no line for a garment.
@@ -239,8 +324,9 @@ def suggest(item, *, limit: int = 8) -> list[Suggestion]:
     consumable = item.garment in WORN_OUT
     query = query_for(item)
 
+    book = catalogue if catalogue is not None else Catalogue.load()
     out: list[Suggestion] = []
-    for retailer in RETAILERS:
+    for retailer in book.retailers:
         if item.garment not in retailer.strengths:
             continue
         score = 50

@@ -72,7 +72,9 @@ Six tabs, in the order the work happens.
    and a mirror, and the finished garment dimensions derived from them.
 8. **Where to Buy** — the sourcing plan, editable. Which shops each garment type
    comes from, what to match on, and on what terms. Add, edit and delete routes,
-   or restore the defaults.
+   or restore the defaults. The retailer catalogue opens in its own tab, where
+   shops can be added, edited or dropped; a route naming a shop that is later
+   deleted simply loses it rather than breaking.
 9. **Shopping Guide** — a shop. Each wanted piece is a product card with a
    generated catalogue photograph, its price and the size to look for. Open one
    and it fills a browser tab: the cloth, the cut, what to check before buying,

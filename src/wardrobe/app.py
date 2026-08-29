@@ -84,6 +84,10 @@ def render() -> None:
         colour_catalogue_view(Palette.load())
         return
 
+    if st.query_params.get("shops") is not None:
+        retailer_catalogue_view()
+        return
+
     inventory = Inventory.load()
     outfits = Outfits.load()
     principles = Principles.load()
@@ -885,6 +889,111 @@ def season_panel(palette: Palette) -> None:
                     ui.empty(f"Nothing for {season.lower()}")
 
 
+def retailer_catalogue_view() -> None:
+    """Every shop the plan can point at, on its own page, editable."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    catalogue = retailers.Catalogue.load()
+    plan = sourcing.Plan.load()
+    in_use = {store for route in plan.routes for store in route.stores}
+
+    st.markdown(
+        '<div class="masthead"><h1>Retailer <em>catalogue</em></h1>'
+        f'<div class="sub">{len(catalogue.retailers)} shops &middot; '
+        f'{len(in_use)} used by the plan</div></div>', unsafe_allow_html=True)
+    ui.blurb(
+        "Every shop a route can point at. Add the ones you actually use, drop the "
+        "ones you never will. A shop still named by a route cannot be removed here "
+        "without the route quietly losing it, so those say so."
+    )
+
+    with st.expander("Add a shop"):
+        with st.form("add-shop", clear_on_submit=True):
+            c1, c2 = st.columns([2, 1])
+            name = c1.text_input("Name", placeholder="Percival")
+            kind = c2.selectbox("Kind", retailers.KINDS, key="as-kind")
+            search = st.text_input(
+                "Search link", placeholder="https://example.com/search?q={q}",
+                help="Put {q} where the search term goes. The app escapes it for you.")
+            strengths = st.multiselect("Sells", GARMENTS, key="as-sells")
+            c3, c4 = st.columns(2)
+            low = c3.number_input("Typical from £", 0, 5000, 30, step=5, key="as-low")
+            high = c4.number_input("Typical to £", 0, 10000, 200, step=10, key="as-high")
+            note = st.text_area("Note", height=68, key="as-note",
+                                placeholder="What it is good for, and when to go.")
+            if st.form_submit_button("Add to the catalogue"):
+                if not name.strip():
+                    st.warning("Give it a name.")
+                elif "{q}" not in search:
+                    st.warning("The search link needs {q} where the search term goes.")
+                elif not strengths:
+                    st.warning("Say what it sells, or no route can use it.")
+                elif low >= high:
+                    st.warning("The price band runs the wrong way.")
+                else:
+                    catalogue.add(retailers.Retailer(
+                        name=name.strip(), kind=kind, strengths=list(strengths),
+                        price_low=float(low), price_high=float(high),
+                        search=search.strip(), note=note.strip()))
+                    catalogue.save()
+                    st.rerun()
+
+    for kind, shops in catalogue.by_kind().items():
+        ui.eyebrow(f"{kind} · {len(shops)}")
+        for shop in shops:
+            used_by = [r.label or r.garment for r in plan.routes if shop.id in r.stores]
+            badge = (f'<span class="badge want">{len(used_by)} route(s)</span>'
+                     if used_by else "")
+            st.markdown(
+                f'<div class="step"><div class="hd"><div class="pieces">{shop.name}'
+                f'</div>{badge}</div><div class="why">{shop.note or "no note"}<br>'
+                f'{len(shop.strengths)} garment types &middot; typically £{shop.price_low:,.0f}'
+                f' to £{shop.price_high:,.0f}'
+                f'{"<br>Used by: " + ", ".join(used_by) if used_by else ""}</div></div>',
+                unsafe_allow_html=True)
+            with st.expander(f"Edit {shop.name}"):
+                with st.form(f"shop-{shop.id}"):
+                    e1, e2 = st.columns([2, 1])
+                    shop.name = e1.text_input("Name", shop.name, key=f"sn-{shop.id}")
+                    shop.kind = e2.selectbox(
+                        "Kind", retailers.KINDS,
+                        index=retailers.KINDS.index(shop.kind)
+                        if shop.kind in retailers.KINDS else 0, key=f"sk-{shop.id}")
+                    shop.search = st.text_input("Search link", shop.search,
+                                                key=f"ss-{shop.id}")
+                    shop.strengths = st.multiselect(
+                        "Sells", GARMENTS,
+                        default=[g for g in shop.strengths if g in GARMENTS],
+                        key=f"sg-{shop.id}")
+                    e3, e4 = st.columns(2)
+                    shop.price_low = e3.number_input("Typical from £", 0, 5000,
+                                                     int(shop.price_low), step=5,
+                                                     key=f"sl-{shop.id}")
+                    shop.price_high = e4.number_input("Typical to £", 0, 10000,
+                                                      int(shop.price_high), step=10,
+                                                      key=f"sh-{shop.id}")
+                    shop.note = st.text_area("Note", shop.note, height=68,
+                                             key=f"sno-{shop.id}")
+                    b1, b2 = st.columns(2)
+                    if b1.form_submit_button("Save"):
+                        catalogue.save()
+                        st.rerun()
+                    if b2.form_submit_button("Remove from the catalogue"):
+                        catalogue.remove(shop.id)
+                        catalogue.save()
+                        if used_by:
+                            st.warning(f"{shop.name} was named by {len(used_by)} route(s); "
+                                       "they have lost it.")
+                        st.rerun()
+
+    with st.expander("Start again"):
+        if st.button("Restore the default catalogue", type="secondary"):
+            catalogue.restore_defaults()
+            st.rerun()
+
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
+
+
 def colour_catalogue_view(palette: Palette) -> None:
     """Every colour with a name, on its own page."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
@@ -1602,6 +1711,7 @@ def body_tab(profile: Profile) -> None:
 
 def where_to_buy_tab(inventory: Inventory) -> None:
     plan = sourcing.Plan.load()
+    shops = retailers.Catalogue.load()
     ui.blurb(
         "Which shops each kind of garment comes from, and on what terms. A route "
         "states only the constraints it cares about, on three optional axes: grade, "
@@ -1615,7 +1725,12 @@ def where_to_buy_tab(inventory: Inventory) -> None:
         ("Routes", str(len(plan.routes))),
         ("Types covered", f"{len(plan.covered())} of {len(garments)}"),
         ("Shops in use", str(len({s for r in plan.routes for s in r.stores}))),
+        ("In the catalogue", str(len(shops.retailers))),
     ], brass_first=True)
+    st.markdown(
+        '<div class="look-cap"><a href="?shops=all" target="_blank">'
+        'Open the retailer catalogue &#8599;</a> to add a shop, change what it '
+        'sells, or drop one you never use.</div>', unsafe_allow_html=True)
 
     unrouted = [i for i in inventory.items
                 if i.status == ASPIRATIONAL and not sourcing.route_for(i, plan)]
@@ -1628,13 +1743,13 @@ def where_to_buy_tab(inventory: Inventory) -> None:
               "existing one matches it."
         )
 
-    add_route_panel(plan)
+    add_route_panel(plan, shops)
 
     ui.eyebrow("The plan")
     for garment, routes in plan.by_garment().items():
         st.markdown(f'<div class="look-cap">{garment}</div>', unsafe_allow_html=True)
         for route in routes:
-            route_editor(plan, route)
+            route_editor(plan, route, shops)
 
     empty_types = plan.uncovered(garments)
     if empty_types:
@@ -1651,11 +1766,12 @@ def where_to_buy_tab(inventory: Inventory) -> None:
             st.rerun()
 
 
-def route_editor(plan: sourcing.Plan, route: sourcing.Route) -> None:
-    shops = " or ".join(r.name for r in route.retailers) or "no shop set"
+def route_editor(plan: sourcing.Plan, route: sourcing.Route,
+                 catalogue: retailers.Catalogue) -> None:
+    named = route.where_in(catalogue) if route.stores else "no shop set"
     matched = ", ".join(f"{k.lower()} {v}" for k, v in route.constraints.items()) or "any"
     terms = route.terms or "no conditions"
-    with st.expander(f"{route.label or route.garment}  ·  {shops}  ·  {matched}"):
+    with st.expander(f"{route.label or route.garment}  ·  {named}  ·  {matched}"):
         with st.form(f"route-{route.id or route.label}"):
             c1, c2 = st.columns([2, 1])
             route.label = c1.text_input("Name it", route.label, key=f"rl-{route.id}")
@@ -1664,10 +1780,11 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route) -> None:
                 index=GARMENTS.index(route.garment) if route.garment in GARMENTS else 0,
                 key=f"rg-{route.id}")
 
+            book = catalogue.lookup()
             route.stores = st.multiselect(
-                "Shops, in the order you would try them", list(retailers.BY_ID),
-                default=[s for s in route.stores if s in retailers.BY_ID],
-                format_func=lambda i: f"{retailers.BY_ID[i].name} · {retailers.BY_ID[i].kind}",
+                "Shops, in the order you would try them", catalogue.ids(),
+                default=[s for s in route.stores if s in book],
+                format_func=lambda i: f"{book[i].name} · {book[i].kind}",
                 key=f"rs-{route.id}")
 
             st.markdown('<div class="look-cap">Match on, all optional. Leave every one '
@@ -1717,19 +1834,20 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route) -> None:
                 plan.remove(route.id)
                 plan.save()
                 st.rerun()
-        st.markdown(f'<div class="look-cap">Currently: {shops} · {terms}</div>',
+        st.markdown(f'<div class="look-cap">Currently: {named} · {terms}</div>',
                     unsafe_allow_html=True)
 
 
-def add_route_panel(plan: sourcing.Plan) -> None:
+def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None:
     with st.expander("Add a route"):
         with st.form("add-route", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
             label = c1.text_input("Name it", placeholder="Loafers")
             garment = c2.selectbox("Garment", GARMENTS, key="ar-garment")
+            book = catalogue.lookup()
             stores = st.multiselect(
-                "Shops, in the order you would try them", list(retailers.BY_ID),
-                format_func=lambda i: f"{retailers.BY_ID[i].name} · {retailers.BY_ID[i].kind}",
+                "Shops, in the order you would try them", catalogue.ids(),
+                format_func=lambda i: f"{book[i].name} · {book[i].kind}",
                 key="ar-stores")
             m1, m2, m3, m4 = st.columns(4)
             grade = m1.selectbox("Grade", GRADES, key="ar-grade")
@@ -1863,6 +1981,15 @@ def product_card(profile: Profile, item: Item, inventory: Inventory,
         st.rerun()
 
 
+def _buy_row(suggestion) -> None:
+    st.markdown(
+        f'<div class="buy"><div class="hd"><div class="who">{suggestion.retailer.name}'
+        f' <span class="kind">{suggestion.retailer.kind}</span></div>'
+        f'<a href="{suggestion.url}" target="_blank" rel="noopener">Search &#8599;</a>'
+        f'</div><div class="why">{suggestion.reason}.<br>'
+        f'{suggestion.retailer.note}</div></div>', unsafe_allow_html=True)
+
+
 def item_view(profile: Profile, item_id: str) -> None:
     """One garment on its own page, in its own browser tab."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
@@ -1949,15 +2076,17 @@ def item_view(profile: Profile, item_id: str) -> None:
                         unsafe_allow_html=True)
 
     ui.eyebrow("Where to buy it")
+    catalogue = retailers.Catalogue.load()
     route = sourcing.route_for(item, sourcing.Plan.load())
     if route:
         terms = "".join(
             f'<div class="term"><b>{label}</b> {value}</div>'
             for label, value in (("Condition", route.condition), ("Timing", route.timing),
                                  ("Insist on", route.spec)) if value)
+        shops = route.shops(catalogue)
         links = " ".join(
             f'<a href="{shop.url(retailers.query_for(item))}" target="_blank" '
-            f'rel="noopener">{shop.name} &#8599;</a>' for shop in route.retailers)
+            f'rel="noopener">{shop.name} &#8599;</a>' for shop in shops)
         st.markdown(
             f'<div class="route-card"><div class="hd"><div class="who">{route.where}</div>'
             f'<div class="kind">your plan · {route.label}</div></div>'
@@ -1972,19 +2101,23 @@ def item_view(profile: Profile, item_id: str) -> None:
             "generic ranking below."
         )
 
-    ui.eyebrow("Other options" if route else "Ranked options")
-    ui.blurb(
-        "Ranked for this garment. The pieces worn least go to the resale sites first, "
-        "because those are the ones that turn up there barely worn; the ones worn "
-        "constantly are bought new, because a used one has little life left in it."
-    )
-    for suggestion in retailers.suggest(item, limit=8):
-        st.markdown(
-            f'<div class="buy"><div class="hd"><div class="who">{suggestion.retailer.name}'
-            f' <span class="kind">{suggestion.retailer.kind}</span></div>'
-            f'<a href="{suggestion.url}" target="_blank" rel="noopener">Search &#8599;</a></div>'
-            f'<div class="why">{suggestion.reason}.<br>{suggestion.retailer.note}</div></div>',
-            unsafe_allow_html=True)
+    if route:
+        with st.expander("Other shops that sell this"):
+            ui.blurb("Only if the plan's shops come up empty. Ranked by garment: "
+                     "the pieces worn least go to the resale sites first, the ones "
+                     "worn constantly are bought new.")
+            for suggestion in retailers.suggest(item, limit=6, catalogue=catalogue):
+                _buy_row(suggestion)
+    else:
+        ui.eyebrow("Ranked options")
+        ui.blurb(
+            "No route covers this one, so these are ranked by garment rather than "
+            "chosen. The pieces worn least go to the resale sites first, because "
+            "those are the ones that turn up there barely worn; the ones worn "
+            "constantly are bought new, because a used one has little life left."
+        )
+        for suggestion in retailers.suggest(item, limit=8, catalogue=catalogue):
+            _buy_row(suggestion)
 
     ui.eyebrow("How to get it cheaply")
     for tactic in retailers.tactics(item):

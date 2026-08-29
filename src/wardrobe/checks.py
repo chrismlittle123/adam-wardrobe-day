@@ -940,11 +940,53 @@ def check_secondhand_rule() -> str:
             f"{len(WORN_OUT)} are bought new; no prices involved")
 
 
+def check_catalogue_is_editable() -> str:
+    """The shops are data too, and a route survives one being deleted."""
+    from .inventory import Item
+    from .retailers import Catalogue, DEFAULT_RETAILERS, Retailer, suggest
+    from .sourcing import Plan
+
+    fresh = Catalogue.load()
+    assert not fresh.path.is_file(), "loading wrote a file it should not have"
+    assert len(fresh.retailers) == len(DEFAULT_RETAILERS), "defaults did not load"
+    assert all(r.id for r in fresh.retailers), "a shop loaded without an id"
+
+    fresh.add(Retailer(name="Percival", kind="Online", strengths=["Knitwear"],
+                       price_low=60, price_high=300, search="https://x/?q={q}"))
+    fresh.save()
+    again = Catalogue.load()
+    assert again.by_id("percival"), "the added shop was lost"
+    assert again.by_id("percival") in again.sells("Knitwear"), "it sells nothing"
+
+    # A route naming a deleted shop must drop it, not raise.
+    plan = Plan.load()
+    route = next(r for r in plan.routes if "vinted" in r.stores)
+    before = len(route.shops(again))
+    again.remove("vinted")
+    again.save()
+    after = Catalogue.load()
+    assert route.shops(after) != route.shops(again) or before > len(route.shops(after)) \
+        or "vinted" not in [s.id for s in route.shops(after)], \
+        "a deleted shop still resolves on the route"
+    assert all(s.id != "vinted" for s in route.shops(after)), "the deleted shop survived"
+    assert route.where_in(after) != "", "the route lost its label entirely"
+
+    assert not any(s.retailer.id == "vinted" for s in
+                   suggest(Item(name="x", garment="Overcoat"), limit=9, catalogue=after)), \
+        "a deleted shop is still being suggested"
+
+    restored = Catalogue.load().restore_defaults()
+    assert len(restored.retailers) == len(DEFAULT_RETAILERS), "restore did not"
+    assert restored.by_id("vinted"), "restoring did not bring Vinted back"
+    return f"{len(DEFAULT_RETAILERS)} defaults; add, edit, delete and restore all persist"
+
+
 def check_retailer_catalogue() -> str:
     """Every retailer is reachable, sane and buildable into a search link."""
     from .inventory import GARMENTS, Item
-    from .retailers import KINDS, RETAILERS, query_for
+    from .retailers import Catalogue, KINDS, query_for
 
+    RETAILERS = Catalogue.load().retailers
     ids = [r.id for r in RETAILERS]
     assert len(ids) == len(set(ids)), "duplicate retailer id"
     for r in RETAILERS:
@@ -993,15 +1035,17 @@ def check_sourcing_routes() -> str:
     every shirt goes to the same shop and the plan is decoration.
     """
     from .inventory import GARMENTS, GRADES, FITS, Item
-    from .retailers import BY_ID
+    from .retailers import Catalogue
     from .sourcing import Plan, route_for, uncovered, why
 
     plan = Plan.load()
+    catalogue = Catalogue.load()
+    known = catalogue.lookup()
     ROUTES = plan.routes
 
     for route in ROUTES:
         assert route.stores, f"{route.label} names no shop"
-        assert all(i in BY_ID for i in route.stores), \
+        assert all(i in known for i in route.stores), \
             f"{route.label} points at a retailer that does not exist"
         assert route.garment in GARMENTS, f"{route.label} is for an unknown garment"
         assert not route.grade or route.grade in GRADES, f"{route.label} has an unknown grade"
@@ -1402,6 +1446,29 @@ def check_unreadable_image_does_not_crash() -> str:
     return "corrupt image degraded to a placeholder, page still rendered"
 
 
+def check_shop_catalogue_opens() -> str:
+    """The retailer catalogue is a page of its own, and it can be edited there."""
+    from streamlit.testing.v1 import AppTest
+
+    from .retailers import Catalogue
+    catalogue = Catalogue.load()
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["shops"] = "all"
+    app = app.run()
+    assert not app.exception, f"the shop catalogue raised: {app.exception[0].value}"
+    assert not app.tabs, "the catalogue drew the whole app instead"
+    page = "\n".join(m.value for m in app.markdown)
+    for name in ("Vinted", "Uniqlo", "Clarks", "Mango"):
+        assert name in page, f"{name} is missing from the catalogue"
+    assert "route(s)" in page, "the catalogue does not say which shops the plan uses"
+    buttons = [b.label for b in app.button]
+    assert "Add to the catalogue" in buttons, "no way to add a shop"
+    assert any("Remove from the catalogue" in b for b in buttons), "no way to remove one"
+    assert "Restore the default catalogue" in buttons, "no way back"
+    return f"{len(catalogue.retailers)} shops, addable and removable, on their own page"
+
+
 def check_colour_catalogue_opens() -> str:
     """The catalogue is a page of its own, and every colour on it has a name."""
     from streamlit.testing.v1 import AppTest
@@ -1568,6 +1635,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (COLOUR, "Palette round trips", check_palette_round_trip),
     (SHOP, "The secondhand line is respected both ways", check_secondhand_rule),
     (SHOP, "Retailer catalogue is sound", check_retailer_catalogue),
+    (SHOP, "The catalogue is editable and persists", check_catalogue_is_editable),
     (SHOP, "Cheap-buying tactics are specific", check_tactics),
     (SHOP, "The sourcing plan routes each garment", check_sourcing_routes),
     (SHOP, "The plan is editable and persists", check_plan_is_editable),
@@ -1593,6 +1661,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
     (APP, "Guide edits keep what they replace", check_guide_edit_and_versions),
     (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
+    (APP, "The retailer catalogue opens and edits", check_shop_catalogue_opens),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),

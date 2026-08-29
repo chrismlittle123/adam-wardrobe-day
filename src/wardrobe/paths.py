@@ -53,6 +53,10 @@ def sourcing() -> Path:
     return home() / "sourcing.toml"
 
 
+def retailers() -> Path:
+    return home() / "retailers.toml"
+
+
 def guide_versions() -> Path:
     return home() / ".guide-versions"
 
@@ -82,6 +86,7 @@ DATA: dict[str, str] = {
     "principles": "Principles",
     "palette": "Colour palette",
     "sourcing": "Where to buy",
+    "retailers": "Retailer catalogue",
     "inventory": "Wardrobe inventory",
     "outfits": "Outfits",
     "photos": "Item photos",
