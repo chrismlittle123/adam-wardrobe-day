@@ -563,14 +563,34 @@ def shape_row(item: Item, key: str) -> tuple[str, str, str]:
              "the shopping plan spends money on.")
 
     applicable = schemes_for(garment)
+
+    # Changing the garment has to reset the scheme beneath it. A Streamlit widget
+    # keyed like this keeps its own value across a rerun, and most garments allow
+    # Alpha, so picking Trousers while the box said Alpha left it saying Alpha:
+    # the size boxes never changed and the form looked broken. Shoes only ever
+    # hid it because they allow one scheme and so draw no box at all.
+    was_key = f"{key}-garment-was"
+    switched = st.session_state.get(was_key, garment) != garment
+    st.session_state[was_key] = garment
+    if switched:
+        st.session_state.pop(f"{key}-scheme", None)
+        # The size boxes belong to the old garment too. Left behind, a collar
+        # size sits on a pair of trousers until something prunes it.
+        for stale in [k for k in st.session_state if k.startswith(f"{key}-s-")]:
+            st.session_state.pop(stale, None)
+
     scheme = applicable[0]
     if len(applicable) > 1:
+        # After a switch the garment's own first scheme wins, not whatever the
+        # last garment happened to be labelled with.
+        index = 0 if switched else (applicable.index(item.scheme)
+                                    if item.scheme in applicable else 0)
         scheme = st.selectbox(
-            "Sized as", applicable,
-            index=applicable.index(item.scheme) if item.scheme in applicable else 0,
-            key=f"{key}-scheme",
+            "Sized as", applicable, index=index, key=f"{key}-scheme",
             help="What this label uses. A trouser is 32/32 from one maker and M "
                  "from the next; both are true, so the garment allows both.")
+    if switched:
+        item.sizes = {}
     return garment, status, scheme
 
 

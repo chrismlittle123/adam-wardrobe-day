@@ -600,3 +600,27 @@ product_photo = "out/products/white-t-shirt.png"
 product_copy = ""
 
 [items.sizes]
+
+[[items]]
+id = "red-and-grey-jumper"
+name = "Red and grey jumper"
+category = "Top"
+garment = "Knitwear"
+colours = [
+    "Mid grey",
+]
+colour_hex = "#7A7A78"
+fabric = "Wool melton"
+grade = ""
+fit = "Relaxed"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/red-and-grey-jumper.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/red-and-grey-jumper.png"
+product_copy = ""
+
+[items.sizes]

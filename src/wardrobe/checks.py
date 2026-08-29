@@ -1884,6 +1884,71 @@ def _every_page():
     return {slug: "\n".join(m.value for m in _render(slug).markdown) for slug, _ in pages}
 
 
+def check_changing_garment_changes_the_form() -> str:
+    """Pick a different garment and the form beneath must follow it.
+
+    The sizing scheme is a keyed Streamlit widget, so it kept its own value
+    across a rerun. Almost every garment also allows Alpha, so changing a shirt
+    to a trouser left the box still saying Alpha and still asking for one alpha
+    size: the form looked frozen. Shoes hid it, because they allow a single
+    scheme and so draw no box at all.
+    """
+    from streamlit.testing.v1 import AppTest
+    inventory, _ = _seeded()
+    item = next(i for i in inventory.items if i.garment == "Shirt")
+    # The bug needs the scheme the two garments share. A shirt labelled by its
+    # collar switches to a trouser cleanly by accident, because "Collar and
+    # sleeve" is not a trouser scheme and the fallback picks the right one. It
+    # is a shirt labelled M that goes wrong, because M is a trouser size too.
+    item.scheme = "Alpha"
+    inventory.update(item)
+    inventory.save()
+    key = f"e-{item.id}"
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["page"] = "inventory"
+    app = app.run()
+    assert not app.exception, f"the inventory raised: {app.exception[0].value}"
+
+    def boxes(page) -> set[str]:
+        keys = [w.key for w in page.selectbox if w.key and w.key.startswith(key)]
+        keys += [w.key for w in page.text_input if w.key and w.key.startswith(key)]
+        return {k.split(f"{key}-s-")[1] for k in keys if k.startswith(f"{key}-s-")}
+
+    def choose(page, garment):
+        return next(w for w in page.selectbox if w.key == f"{key}-garment") \
+            .set_value(garment).run()
+
+    wanted = {
+        "Trousers": {"waist", "leg"},
+        "Blazer": {"chest", "length"},
+        "Derbies": {"uk", "width"},
+        "T-shirt": {"alpha"},
+        "Shirt": {"collar", "sleeve"},
+    }
+    for garment, expected in wanted.items():
+        app = choose(app, garment)
+        assert not app.exception, f"choosing {garment} raised: {app.exception[0].value}"
+        got = boxes(app)
+        assert got == expected, f"{garment} asks for {sorted(got)}, wanted {sorted(expected)}"
+
+    # The overlap that caused it: both allow Alpha, and the shirt's scheme must
+    # not survive into the trouser.
+    from .vocabulary import current
+    catalogue = current()
+    shirt = next(g for g in catalogue.garments if g.name == "Shirt")
+    trouser = next(g for g in catalogue.garments if g.name == "Trousers")
+    assert "Alpha" in shirt.schemes and "Alpha" in trouser.schemes, \
+        "the overlap this guards against has gone; the check needs rethinking"
+    assert shirt.schemes[0] != trouser.schemes[0], "the two now share a first scheme"
+
+    app = choose(app, "Trousers")
+    scheme = next(w for w in app.selectbox if w.key == f"{key}-scheme")
+    assert scheme.value == trouser.schemes[0], \
+        f"a trouser opened as {scheme.value!r}, not {trouser.schemes[0]!r}"
+    return "garment drives the scheme and the size boxes, across five garments"
+
+
 def check_no_page_is_a_dead_end() -> str:
     """Every page can be left without editing the URL.
 
@@ -2945,6 +3010,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),
+    (APP, "Choosing a garment reshapes the form", check_changing_garment_changes_the_form),
     (APP, "No page is a dead end", check_no_page_is_a_dead_end),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
     (APP, "Diagnostics panels render", check_diagnostics_renders),
