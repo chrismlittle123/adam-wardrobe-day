@@ -1,14 +1,18 @@
 """Where to actually buy each thing, and how not to pay retail for it.
 
-The strategy has one governing idea: **anything from about £50 new gets looked
-for secondhand first**. Not out of thrift for its own sake, but because the
-garments that cost that much are usually the ones worn least, and a blazer worn
-twenty times a year spends most of its life in a wardrobe whether it was bought
-new or not. Vinted is full of them, barely worn, at a third of the price.
+The strategy has one governing idea: **the garments worn least get looked for
+secondhand first**. A blazer worn twenty times a year spends most of its life in
+a wardrobe whether it was bought new or not, so the secondhand market is full of
+them barely worn, and paying retail for one is paying for the packaging.
 
-Below that line the calculation flips. A £20 t-shirt secondhand saves a few
-pounds and costs a week of waiting, so it is bought new from whoever cuts that
-garment well.
+This used to be a price threshold, and prices were the wrong handle. Almost
+everything worth buying comes off a listing where the price is unknown until the
+thing appears, so a rule keyed to money ranked on invented numbers. The property
+that actually predicts a good secondhand buy is how often the garment is worn,
+and that is knowable from the garment alone.
+
+The other direction still holds: a tee is worn twice a week and wears out, so it
+comes new from whoever cuts it well.
 
 Nothing here places an order. It ranks the sensible places to look, explains
 why, and builds the search link. The alerts are described but deliberately not
@@ -21,13 +25,16 @@ from __future__ import annotations
 import urllib.parse
 from dataclasses import dataclass, field
 
-# Above this, look secondhand before paying retail.
-SECONDHAND_THRESHOLD = 50.0
-
-# Garments that are expensive per wear: worn rarely, kept for years, and so the
-# secondhand market is full of them in near-new condition.
+# Worn rarely, kept for years, so the secondhand market is full of them in
+# near-new condition. These go to the resale sites before anywhere else.
 RARELY_WORN: frozenset[str] = frozenset({
-    "Blazer", "Overcoat", "Waistcoat", "Derbies", "Boots", "Jacket",
+    "Blazer", "Overcoat", "Waistcoat", "Derbies", "Boots", "Jacket", "Suit",
+    "Loafers", "Watch",
+})
+
+# Worn constantly and worn out, so a used one has little life left in it.
+WORN_OUT: frozenset[str] = frozenset({
+    "T-shirt", "Socks", "Jeans", "Sweatshirt", "Polo",
 })
 
 HIGH_STREET, ONLINE, TAILORING, SHOES, SECONDHAND, OFF_PRICE = (
@@ -49,8 +56,7 @@ class Retailer:
     def url(self, query: str) -> str:
         return self.search.format(q=urllib.parse.quote_plus(query))
 
-    def covers(self, price: float) -> bool:
-        return self.price_low <= price <= self.price_high if price else True
+
 
 
 TOPS = ("Shirt", "T-shirt", "Polo", "Knitwear", "Sweatshirt", "Overshirt")
@@ -224,10 +230,13 @@ def query_for(item) -> str:
 
 
 def suggest(item, *, limit: int = 8) -> list[Suggestion]:
-    """Rank the places worth looking, best first, each with its reason."""
-    price = float(item.price or 0)
-    dear = price >= SECONDHAND_THRESHOLD
+    """Rank the places worth looking, best first, each with its reason.
+
+    This is the fallback for when the sourcing plan has no line for a garment.
+    Where a plan exists it wins, because it is a decision and this is a guess.
+    """
     rare = item.garment in RARELY_WORN
+    consumable = item.garment in WORN_OUT
     query = query_for(item)
 
     out: list[Suggestion] = []
@@ -236,30 +245,27 @@ def suggest(item, *, limit: int = 8) -> list[Suggestion]:
             continue
         score = 50
         reasons: list[str] = []
+        garment = item.garment.lower()
 
         if retailer.kind == SECONDHAND:
-            if rare and dear:
-                score += 45
-                garment = item.garment.lower()
-                reasons.append(f"{_article(garment)} {garment} at {_money(price)} is worn rarely "
-                               "and kept for years, which is exactly what fills this site")
-            elif dear:
-                score += 30
-                reasons.append(f"£{SECONDHAND_THRESHOLD:.0f} or more new, so look here first")
+            if rare:
+                score += 40
+                reasons.append(f"{_article(garment)} {garment} is worn seldom and kept for "
+                               "years, which is exactly what fills this site")
+            elif consumable:
+                score -= 25
+                reasons.append(f"{_article(garment)} {garment} gets worn out, so a used "
+                               "one has little life left in it")
             else:
-                score -= 20
-                reasons.append("cheap enough new that the wait is not worth it")
+                score += 5
+                reasons.append("worth a look before paying retail")
         else:
-            if dear:
-                score -= 12
-                reasons.append("full price on something worn seldom")
-            if retailer.covers(price):
-                score += 18
-                reasons.append(f"sits in your {_money(price)} band")
-            else:
-                score -= 10
-                reasons.append(f"typically {_money(retailer.price_low)}"
-                               f" to {_money(retailer.price_high)}")
+            if rare:
+                score -= 15
+                reasons.append("retail, for something worn a handful of times a year")
+            elif consumable:
+                score += 15
+                reasons.append("bought new and replaced when it goes")
 
         score += SECONDHAND_ORDER.get(retailer.id, 0)
         if item.garment in retailer.strengths[:6]:
@@ -303,12 +309,11 @@ SEASON: dict[str, str] = {
 
 def tactics(item) -> list[Tactic]:
     """How to get this particular thing without paying retail."""
-    price = float(item.price or 0)
     query = query_for(item)
     sizes = item.size_line()
     out: list[Tactic] = []
 
-    if price >= SECONDHAND_THRESHOLD:
+    if item.garment in RARELY_WORN:
         out.append(Tactic(
             "Save the Vinted search",
             f"Search “{query}”, filter to your size"
@@ -333,11 +338,10 @@ def tactics(item) -> list[Tactic]:
             "constantly and gets muted within a week.",
             ""))
     out.append(Tactic(
-        "Set a walk-away price",
-        f"Decide now what this is worth to you. "
-        f"{_money(price * 0.6) if price else 'Roughly 60% of retail'} is a realistic "
-        "secondhand target, and having the number written down is what stops a sale "
-        "email turning into an impulse.",
+        "Decide what it is worth before you look",
+        "Write down what you would pay for this, now, while nothing is in front of "
+        "you. A number decided in advance is what stops a listing at midnight from "
+        "becoming a decision.",
         ""))
     return out
 
@@ -346,5 +350,4 @@ def _article(word: str) -> str:
     return "an" if word[:1].lower() in "aeiou" else "a"
 
 
-def _money(amount: float) -> str:
-    return f"£{amount:,.0f}" if amount == round(amount) else f"£{amount:,.2f}"
+

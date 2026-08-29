@@ -1,27 +1,24 @@
 """What to buy next, worked out rather than guessed.
 
-The question "which missing garment would do the most good" is weighted set
-cover. Each loved outfit is a set that needs covering; each unowned garment
-covers part of several sets; buying it costs money. Optimal weighted set cover
-is NP-hard, so this uses the standard greedy: repeatedly take the item with the
-best ratio of outfits-completed to price. Greedy is within a known factor of
-optimal on this problem and, more usefully here, its reasoning can be read line
-by line and argued with.
+The question "which missing garment would do the most good" is set cover. Each
+loved outfit is a set that needs covering, and each unowned garment covers part
+of several sets. Optimal set cover is NP-hard, so this uses the standard greedy:
+repeatedly take the bundle that completes the most outfits per garment bought.
+Greedy is within a known factor of optimal and, more usefully here, its reasoning
+can be read line by line and argued with.
+
+There is deliberately no money in this. Almost everything worth buying comes off
+a secondhand listing, so the price is unknown until the thing appears, and a plan
+built on invented prices would rank on fiction. What can be known is how many
+garments a plan asks him to find, and that is what it minimises.
 
 The unit matters. Scoring one garment at a time looks reasonable and behaves
 badly: an outfit missing two pieces is completed by neither alone, so both score
-zero and the plan stalls or wanders off after whatever single expensive item
-happens to finish something. So each candidate here is a *bundle*, the full set
-of pieces still missing from one blocked outfit, and the winner each round is
-the bundle with the best outfits-per-pound. Buying a bundle often completes
+zero and the plan stalls. So each candidate here is a *bundle*, the full set of
+pieces still missing from one blocked outfit, and the winner each round is the
+bundle completing the most outfits per garment. Buying a bundle often completes
 other outfits for free, whenever their missing pieces are a subset of it, and
 that is counted.
-
-A budget does not stop the plan, it filters it: unaffordable bundles are skipped
-and the next best affordable one is taken, so a small budget still returns the
-best thing it can actually buy. When the budget cannot reach any bundle at all,
-an empty plan would read as a crash, so the plan instead reports the cheapest
-bundle it could not afford and how far short the money fell.
 """
 
 from __future__ import annotations
@@ -41,14 +38,6 @@ class Leverage:
     solo_unlocks: int         # outfits where it is the ONLY thing missing
     outfit_names: list[str] = field(default_factory=list)
 
-    @property
-    def price(self) -> float:
-        return self.item.price
-
-    @property
-    def cost_per_solo_unlock(self) -> float | None:
-        return round(self.price / self.solo_unlocks, 2) if self.solo_unlocks else None
-
 
 @dataclass
 class Step:
@@ -57,23 +46,17 @@ class Step:
     items: list[Item] = field(default_factory=list)
     target: Outfit | None = None       # the outfit this bundle was chosen for
     unlocked: list[Outfit] = field(default_factory=list)
-    cumulative_cost: float = 0.0
+    cumulative_bought: int = 0
     cumulative_unlocked: int = 0
 
     @property
-    def price(self) -> float:
-        return round(sum(i.price for i in self.items), 2)
+    def size(self) -> int:
+        return len(self.items)
 
     @property
     def rule(self) -> str:
         n = len(self.unlocked)
-        per = f", £{round(self.price / n)} each" if n and self.price else ""
-        return f"{len(self.items)} piece(s) unlock {n} outfit(s){per}"
-
-    @property
-    def cost_per_outfit(self) -> float | None:
-        n = self.cumulative_unlocked
-        return round(self.cumulative_cost / n, 2) if n else None
+        return f"{self.size} piece(s) unlock {n} outfit(s)"
 
 
 @dataclass
@@ -83,25 +66,13 @@ class Plan:
     steps: list[Step] = field(default_factory=list)
     still_blocked: list[Outfit] = field(default_factory=list)
     leverage: list[Leverage] = field(default_factory=list)
-    # Outfits money cannot fix: a piece in them was deleted or retired.
+    # Outfits nothing can fix: a piece in them was deleted or retired.
     broken: list[Outfit] = field(default_factory=list)
-    budget: float | None = None
-    skipped_for_budget: list[Outfit] = field(default_factory=list)
-    # Set only when the budget could not reach a single bundle: the cheapest one
-    # available, so the answer is "you are £70 short of X" and not silence.
-    shortfall_items: list[Item] = field(default_factory=list)
-    shortfall_cost: float = 0.0
 
     @property
-    def shortfall(self) -> float:
-        """How much more money the cheapest reachable bundle needs."""
-        if not self.shortfall_items or self.budget is None:
-            return 0.0
-        return round(max(0.0, self.shortfall_cost - (self.budget - self.total_cost)), 2)
-
-    @property
-    def total_cost(self) -> float:
-        return round(sum(s.price for s in self.steps), 2)
+    def to_find(self) -> int:
+        """How many garments the whole plan asks him to track down."""
+        return sum(s.size for s in self.steps)
 
     @property
     def outfits_unlocked(self) -> int:
@@ -163,7 +134,7 @@ def item_leverage(
 
     return sorted(
         rows.values(),
-        key=lambda r: (-r.solo_unlocks, -r.appearances, r.price),
+        key=lambda r: (-r.solo_unlocks, -r.appearances, r.item.name or r.item.garment),
     )
 
 
@@ -172,10 +143,9 @@ def purchase_plan(
     inventory: Inventory,
     *,
     loved_only: bool = True,
-    budget: float | None = None,
     max_steps: int = 40,
 ) -> Plan:
-    """Greedy weighted set cover, one blocked outfit's missing pieces per round."""
+    """Greedy set cover, one blocked outfit's missing pieces per round."""
     considered = outfits.loved() if loved_only else outfits.outfits
     considered, broken = _usable(considered, inventory)
     wearable_now = [o for o in considered if not _missing_ids(o, inventory, set())]
@@ -186,53 +156,35 @@ def purchase_plan(
         wearable_now=wearable_now,
         blocked=blocked,
         leverage=item_leverage(outfits, inventory, loved_only=loved_only),
-        budget=budget,
     )
 
     acquired: set[str] = set()
     remaining = list(blocked)
-    spent = 0.0
+    bought = 0
 
     while remaining and len(plan.steps) < max_steps:
-        best: tuple[float, float, Outfit, set[str], list[Outfit]] | None = None
+        best: tuple[float, int, Outfit, set[str], list[Outfit]] | None = None
 
         for outfit in remaining:
             bundle = _missing_ids(outfit, inventory, acquired)
             if not bundle:
                 continue
-            cost = round(sum(_price(inventory, i) for i in bundle), 2)
-            if budget is not None and spent + cost > budget:
-                continue
             # Anything else whose remaining gap is covered by this bundle comes free.
             unlocked = [o for o in remaining if _missing_ids(o, inventory, acquired) <= bundle]
-            ratio = len(unlocked) / max(cost, 1.0)
-            key = (-ratio, cost)
+            ratio = len(unlocked) / len(bundle)
+            key = (-ratio, len(bundle))
             if best is None or key < (-best[0], best[1]):
-                best = (ratio, cost, outfit, bundle, unlocked)
+                best = (ratio, len(bundle), outfit, bundle, unlocked)
 
         if best is None:
-            # Everything left is out of budget. Say by how much, rather than
-            # returning an empty plan that reads as a failure.
-            plan.skipped_for_budget = list(remaining)
-            cheapest: tuple[float, list[Item]] | None = None
-            for outfit in remaining:
-                bundle = _missing_ids(outfit, inventory, acquired)
-                if not bundle:
-                    continue
-                cost = round(sum(_price(inventory, i) for i in bundle), 2)
-                if cheapest is None or cost < cheapest[0]:
-                    items = [i for i in (inventory.by_id(x) for x in bundle) if i]
-                    cheapest = (cost, sorted(items, key=lambda i: -i.price))
-            if cheapest:
-                plan.shortfall_cost, plan.shortfall_items = cheapest
             break
 
-        _, cost, target, bundle, unlocked = best
+        _, _, target, bundle, unlocked = best
         items = [i for i in (inventory.by_id(x) for x in bundle) if i]
-        items.sort(key=lambda i: -i.price)
+        items.sort(key=lambda i: i.name or i.garment)
 
         acquired |= bundle
-        spent = round(spent + cost, 2)
+        bought += len(bundle)
         unlocked_ids = {o.id for o in unlocked}
         remaining = [o for o in remaining if o.id not in unlocked_ids]
 
@@ -240,7 +192,7 @@ def purchase_plan(
             items=items,
             target=target,
             unlocked=unlocked,
-            cumulative_cost=spent,
+            cumulative_bought=bought,
             cumulative_unlocked=sum(len(s.unlocked) for s in plan.steps) + len(unlocked),
         ))
 
@@ -248,20 +200,10 @@ def purchase_plan(
     return plan
 
 
-def _price(inventory: Inventory, item_id: str) -> float:
-    item = inventory.by_id(item_id)
-    return item.price if item else 0.0
-
-
-def wardrobe_value(inventory: Inventory) -> dict[str, float]:
-    owned = [i for i in inventory.items if i.owned]
+def wardrobe_counts(inventory: Inventory) -> dict[str, int]:
     wanted = [i for i in inventory.items if i.status == "aspirational"]
-    starred = [i for i in wanted if i.starred]
     return {
-        "owned_value": round(sum(i.price for i in owned), 2),
-        "owned_count": len(owned),
-        "wanted_value": round(sum(i.price for i in wanted), 2),
-        "wanted_count": len(wanted),
-        "starred_value": round(sum(i.price for i in starred), 2),
-        "starred_count": len(starred),
+        "owned": sum(1 for i in inventory.items if i.owned),
+        "wanted": len(wanted),
+        "starred": sum(1 for i in wanted if i.starred),
     }

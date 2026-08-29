@@ -320,9 +320,6 @@ def table(rows: list[dict[str, str]], numeric: tuple[str, ...] = ()) -> None:
     st.markdown(f'<table class="tbl"><tr>{head}</tr>{body}</table>', unsafe_allow_html=True)
 
 
-def money(amount: float) -> str:
-    return f"£{amount:,.0f}" if amount == round(amount) else f"£{amount:,.2f}"
-
 
 # --- colour wheel -------------------------------------------------------------
 

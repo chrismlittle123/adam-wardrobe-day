@@ -69,6 +69,53 @@ HUE_BANDS: tuple[tuple[float, str], ...] = (
     (195, "teal"), (255, "blue"), (285, "indigo"), (320, "violet"), (345, "magenta"),
 )
 
+# The thirty colours a menswear wardrobe is actually built from, grouped the way
+# they are chosen. Typed free-hand this list became "chocolate", "Chocolate" and
+# "dark brown", which are one colour wearing three names.
+NAMED_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
+    "Whites and neutrals": (
+        ("White", "#F6F4EF"), ("Off-white", "#EFEAE0"), ("Cream", "#F2E9D8"),
+        ("Ecru", "#E8DFC8"), ("Sand", "#D9C9A8"), ("Stone", "#C9BCA4"),
+        ("Beige", "#C8B79A"), ("Taupe", "#A2917E"),
+    ),
+    "Greys": (
+        ("Light grey", "#C4C3BF"), ("Mid grey", "#7A7A78"), ("Charcoal", "#3C3B3A"),
+        ("Black", "#1B1918"),
+    ),
+    "Blues": (
+        ("Pale blue", "#BFD3E6"), ("Sky blue", "#8FB3D0"), ("Mid blue", "#4A6E96"),
+        ("Denim", "#3E5C79"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
+    ),
+    "Greens": (
+        ("Sage", "#A3AF97"), ("Khaki", "#8A8560"), ("Olive", "#5F6146"),
+        ("Forest", "#2F4032"),
+    ),
+    "Browns": (
+        ("Camel", "#C19A6B"), ("Tan", "#A9743F"), ("Chestnut", "#8B5A2B"),
+        ("Chocolate", "#6B4426"), ("Espresso", "#3E2A1E"),
+    ),
+    "Warm accents": (
+        ("Mustard", "#C08A2E"), ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
+    ),
+}
+
+COLOUR_NAMES: tuple[str, ...] = tuple(
+    name for group in NAMED_COLOURS.values() for name, _ in group
+)
+COLOUR_HEX: dict[str, str] = {
+    name: hex_code for group in NAMED_COLOURS.values() for name, hex_code in group
+}
+
+
+def hex_for(colour: str) -> str:
+    return COLOUR_HEX.get(colour, "#CCCCCC")
+
+
+def colour_group(colour: str) -> str:
+    return next((g for g, rows in NAMED_COLOURS.items()
+                 if any(n == colour for n, _ in rows)), "")
+
+
 PATTERNS: dict[str, tuple[str, ...]] = {
     "Plain": ("Solid", "Marl", "Slub", "Birdseye"),
     "Stripe": ("Bengal stripe", "Breton stripe", "Chalk stripe", "Hairline stripe",

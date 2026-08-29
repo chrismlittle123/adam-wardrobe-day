@@ -71,7 +71,6 @@ def copy_prompt(profile: Profile, item: Item, principles: str = "") -> str:
 Type: {item.garment}
 Colour: {item.colour or "unspecified"}
 Cloth: {item.fabric or "unspecified"}
-Expected price: £{item.price:,.0f}
 Size label he is after: {labels}
 His own note: {item.description or "none"}
 
@@ -144,9 +143,8 @@ def refresh(profile: Profile, item: Item, inventory: Inventory, *,
 
 
 def to_buy(inventory: Inventory, *, starred_only: bool = False) -> list[Item]:
-    """The shopping list: wanted pieces, dearest first, since those are the ones
-    worth thinking hardest about."""
+    """The shopping list: wanted pieces, starred first, then by name."""
     items = [i for i in inventory.items if i.status == "aspirational"]
     if starred_only:
         items = [i for i in items if i.starred]
-    return sorted(items, key=lambda i: (-i.price, i.name or i.garment))
+    return sorted(items, key=lambda i: (not i.starred, i.name or i.garment))

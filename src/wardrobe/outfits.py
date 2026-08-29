@@ -44,24 +44,18 @@ class Outfit:
 
 @dataclass
 class Wearability:
-    """What this outfit costs and what is stopping it.
+    """What is stopping this outfit being worn today.
 
     Three different things can stop it, and collapsing them loses information.
     `missing` is buyable. `retired` and `dangling` are not: they make the outfit
-    broken rather than expensive, and no amount of money fixes them.
+    broken rather than incomplete, and no shopping trip fixes them.
     """
 
     wearable: bool
     missing: list[Item]          # wanted, and buying it fixes this outfit
-    owned_value: float
-    to_buy: float
     retired: list[Item] = field(default_factory=list)
     dangling: list[str] = field(default_factory=list)   # ids of deleted garments
     empty: bool = False          # no garments in it at all
-
-    @property
-    def total(self) -> float:
-        return self.owned_value + self.to_buy
 
     @property
     def broken(self) -> bool:
@@ -178,14 +172,12 @@ def wearability(outfit: Outfit, inventory: Inventory) -> Wearability:
     dangling = [i for i in outfit.item_ids if i not in found]
     missing = [i for i in items if i.status == ASPIRATIONAL]
     retired = [i for i in items if i.status == RETIRED]
-    owned_value = sum(i.price for i in items if i.owned)
-    to_buy = sum(i.price for i in missing)
     return Wearability(
         # An outfit with nothing in it is not something he can wear, and counting
         # it as wearable quietly inflates the only number the plan reports.
         wearable=bool(items) and not (missing or retired or dangling),
-        missing=missing, owned_value=round(owned_value, 2), to_buy=round(to_buy, 2),
-        retired=retired, dangling=dangling, empty=not outfit.item_ids,
+        missing=missing, retired=retired, dangling=dangling,
+        empty=not outfit.item_ids,
     )
 
 

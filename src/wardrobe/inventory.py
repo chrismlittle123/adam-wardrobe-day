@@ -177,9 +177,6 @@ class Item:
     product_photo: str = ""
     product_copy: str = ""
     sizes: dict[str, str] = field(default_factory=dict)
-    # Only wanted pieces carry a price: it is what the shopping plan spends. What
-    # an owned garment once cost is sunk and changes no decision.
-    price: float = 0.0
 
     @property
     def owned(self) -> bool:

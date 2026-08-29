@@ -14,38 +14,38 @@ from .outfits import Outfit, Outfits
 from .philosophy import Answers
 from .principles import Principle, Principles
 
-# name, garment, colour, hex, fabric, sizes, price (0 = owned), grade, fit
-# name, garment, colour, hex, fabric, sizes, price (0 = owned), grade, fit
+# name, garment, colour, hex, fabric, sizes, wanted, grade, fit
+# name, garment, colour, hex, fabric, sizes, wanted, grade, fit
 ITEMS: tuple[tuple, ...] = (
     ("White cotton tee", "T-shirt", "white", "#F4F2ED", "Cotton jersey",
-     {"alpha": "M"}, 0, "Everyday", "Regular"),
+     {"alpha": "M"}, False, "Everyday", "Regular"),
     ("Cream camp-collar shirt", "Shirt", "cream", "#F2E9D8", "Cotton poplin",
-     {"collar": '15.5"', "alpha": "M"}, 0, "", "Regular"),
+     {"collar": '15.5"', "alpha": "M"}, False, "", "Regular"),
     ("Pale blue oxford", "Shirt", "pale blue", "#BFD3E6", "Oxford cotton",
-     {"collar": '15.5"', "alpha": "M"}, 0, "Dress", "Regular"),
+     {"collar": '15.5"', "alpha": "M"}, False, "Dress", "Regular"),
     ("Dark indigo jeans", "Jeans", "indigo", "#2B3A4F", "Selvedge denim",
-     {"waist": '31"', "leg": '32"'}, 0, "Everyday", "Slim"),
+     {"waist": '31"', "leg": '32"'}, False, "Everyday", "Slim"),
     ("Navy merino crewneck", "Knitwear", "navy", "#26303F", "Merino wool",
-     {"alpha": "M"}, 0, "Everyday", "Regular"),
+     {"alpha": "M"}, False, "Everyday", "Regular"),
     ("White leather trainers", "Trainers", "white", "#EDEAE3", "Calf leather",
-     {"uk": "9", "eu": "43", "width": "Standard"}, 0, "Smart", "Regular"),
+     {"uk": "9", "eu": "43", "width": "Standard"}, False, "Smart", "Regular"),
     ("Black Chelsea boots", "Boots", "black", "#1B1918", "Calf leather",
-     {"uk": "9", "eu": "43", "width": "Standard"}, 0, "Smart", "Regular"),
+     {"uk": "9", "eu": "43", "width": "Standard"}, False, "Smart", "Regular"),
     ("Navy hopsack blazer", "Blazer", "navy", "#232C3B", "Wool hopsack",
-     {"chest": '38"', "length": "Regular", "eu": "48"}, 0, "Smart", "Slim"),
-    ("Steel dive watch", "Watch", "steel", "#9AA0A6", "", {"case": "40mm"}, 0, "", ""),
+     {"chest": '38"', "length": "Regular", "eu": "48"}, False, "Smart", "Slim"),
+    ("Steel dive watch", "Watch", "steel", "#9AA0A6", "", {"case": "40mm"}, False, "", ""),
     ("Brown leather belt", "Belt", "chocolate", "#5A3A22", "Calf leather",
-     {"waist": '32"', "alpha": "M"}, 0, "", ""),
+     {"waist": '32"', "alpha": "M"}, False, "", ""),
     ("Grey flannel trousers", "Trousers", "mid grey", "#7A7A78", "Wool flannel",
-     {"waist": '31"', "leg": '32"'}, 150, "Smart", "Regular"),
+     {"waist": '31"', "leg": '32"'}, True, "Smart", "Regular"),
     ("Brown suede loafers", "Loafers", "chocolate", "#6B4426", "Suede",
-     {"uk": "9", "eu": "43", "width": "Standard"}, 220, "Smart", "Regular"),
+     {"uk": "9", "eu": "43", "width": "Standard"}, True, "Smart", "Regular"),
     ("Camel wool overcoat", "Overcoat", "camel", "#C19A6B", "Wool melton",
-     {"chest": '38"', "length": "Regular", "eu": "48"}, 420, "Smart", "Regular"),
+     {"chest": '38"', "length": "Regular", "eu": "48"}, True, "Smart", "Regular"),
     ("Olive linen overshirt", "Overshirt", "olive", "#6B6B47", "Linen",
-     {"alpha": "M"}, 110, "Everyday", "Relaxed"),
+     {"alpha": "M"}, True, "Everyday", "Relaxed"),
     ("Ecru knit polo", "Polo", "ecru", "#E8DFC8", "Merino wool",
-     {"alpha": "M"}, 95, "Knitted", "Regular"),
+     {"alpha": "M"}, True, "Knitted", "Regular"),
 )
 
 # name, item names, tags, loved
@@ -164,12 +164,11 @@ def seed_palette(palette=None):
 
 def seed_inventory(inventory: Inventory | None = None) -> Inventory:
     inventory = inventory if inventory is not None else Inventory.load()
-    for name, garment, colour, hex_code, fabric, sizes, price, grade, fit in ITEMS:
+    for name, garment, colour, hex_code, fabric, sizes, wanted, grade, fit in ITEMS:
         inventory.add(Item(
             name=name, garment=garment, category=category_for(garment),
             colour=colour, colour_hex=hex_code, fabric=fabric, sizes=dict(sizes),
-            status=ASPIRATIONAL if price else "owned", price=float(price),
-            grade=grade, fit=fit,
+            status=ASPIRATIONAL if wanted else "owned", grade=grade, fit=fit,
         ))
     inventory.save()
     return inventory

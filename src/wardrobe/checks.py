@@ -130,7 +130,7 @@ def check_inventory_round_trip() -> str:
     from .inventory import Inventory, Item
     inv = Inventory.load()
     item = inv.add(Item(name="Test blazer", garment="Blazer",
-                        sizes={"chest": '38"', "length": "Regular"}, price=0))
+                        sizes={"chest": '38"', "length": "Regular"}))
     inv.save()
     again = Inventory.load()
     back = again.by_id(item.id)
@@ -579,26 +579,26 @@ def check_plan_shape() -> str:
     assert first == {"Grey flannel trousers", "Brown suede loafers"}, \
         f"greedy picked the wrong opening bundle: {first}"
     assert len(plan.steps[0].unlocked) == 3, "opening bundle should unlock three outfits"
-    assert not plan.still_blocked, "plan left outfits blocked with no budget"
+    assert not plan.still_blocked, "the plan left outfits blocked"
     return (f"opens with 2 pieces unlocking 3 outfits, "
-            f"£{plan.total_cost:.0f} total for {plan.outfits_unlocked}")
+            f"{plan.to_find} garments for {plan.outfits_unlocked}")
 
 
 def check_plan_arithmetic() -> str:
+    """The running counts have to add up, or the plan is describing another plan."""
     from .shopping import purchase_plan
     inventory, outfits = _seeded()
     plan = purchase_plan(outfits, inventory)
-    running = 0.0
-    unlocked = 0
+    bought = unlocked = 0
     for step in plan.steps:
-        running = round(running + step.price, 2)
+        bought += step.size
         unlocked += len(step.unlocked)
-        assert _near(step.cumulative_cost, running), \
-            f"running total drifted: {step.cumulative_cost} vs {running}"
+        assert step.cumulative_bought == bought, \
+            f"garment count drifted: {step.cumulative_bought} vs {bought}"
         assert step.cumulative_unlocked == unlocked, "unlock count drifted"
-        assert _near(step.cost_per_outfit or 0, round(running / unlocked, 2)), "cost per outfit wrong"
-    assert _near(plan.total_cost, running), "plan total does not match its steps"
-    return f"every running total checks out, £{running:.0f} over {len(plan.steps)} steps"
+        assert step.size == len(step.items), "step size does not match its items"
+    assert plan.to_find == bought, "the plan total does not match its steps"
+    return f"{bought} garments over {len(plan.steps)} steps, every running count checks out"
 
 
 def check_plan_never_buys_owned() -> str:
@@ -612,33 +612,32 @@ def check_plan_never_buys_owned() -> str:
     return f"{len(ids)} pieces, none owned, none duplicated"
 
 
-def check_budget_filters_not_halts() -> str:
+def check_plan_prefers_fewer_garments() -> str:
+    """With no money in it, the greedy must minimise garments found, not pounds."""
     from .shopping import purchase_plan
     inventory, outfits = _seeded()
-    full = purchase_plan(outfits, inventory)
-    tight = purchase_plan(outfits, inventory, budget=300.0)
-    assert full.total_cost > 300, "the fixture is too cheap to test a budget"
-    assert tight.total_cost <= 300, f"budget exceeded: £{tight.total_cost}"
-    # The point of the rewrite: a budget below the best bundle must still buy the
-    # best affordable one rather than giving up.
-    assert tight.skipped_for_budget, "nothing reported as unaffordable"
-    # £300 cannot reach any bundle here, so the plan must say how far short it
-    # falls rather than returning an empty result that reads as a crash.
-    assert tight.shortfall_items, "no cheapest-bundle advice when nothing is affordable"
-    assert tight.shortfall > 0, "shortfall not quantified"
-    # A budget that can reach a bundle must actually buy it.
-    reachable = purchase_plan(outfits, inventory, budget=400.0)
-    assert reachable.steps, "an affordable budget still bought nothing"
-    assert reachable.total_cost <= 400, "affordable plan exceeded its budget"
-    assert reachable.outfits_unlocked >= 1, "affordable plan unlocked nothing"
-    return (f"£300 is £{tight.shortfall:.0f} short of the cheapest bundle; "
-            f"£400 buys £{reachable.total_cost:.0f} and unlocks {reachable.outfits_unlocked}")
+    plan = purchase_plan(outfits, inventory)
+
+    first = plan.steps[0]
+    ratios = [len(s.unlocked) / s.size for s in plan.steps]
+    assert ratios[0] == max(ratios), \
+        f"the best outfits-per-garment bundle was not taken first: {ratios}"
+    assert first.size == 2 and len(first.unlocked) == 3, \
+        f"expected 2 pieces unlocking 3, got {first.size} unlocking {len(first.unlocked)}"
+    assert plan.to_find == sum(s.size for s in plan.steps), "to_find disagrees with the steps"
+    assert plan.to_find < sum(len(w.missing) for w in
+                              (__import__("wardrobe.outfits", fromlist=["x"]).wearability(o, inventory)
+                               for o in plan.blocked)), \
+        "the plan buys as many garments as doing every outfit separately would"
+    assert not hasattr(plan, "total_cost"), "a cost figure survived on the plan"
+    return f"{plan.to_find} garments unlock {plan.outfits_unlocked} outfits, best ratio first"
 
 
 def check_leverage() -> str:
     from .shopping import item_leverage
     inventory, outfits = _seeded()
     rows = {r.item.name: r for r in item_leverage(outfits, inventory)}
+    assert not hasattr(next(iter(rows.values())), "price"), "leverage still carries a price"
     coat = rows["Camel wool overcoat"]
     assert coat.solo_unlocks == 1, "the coat is the only thing missing from the rain outfit"
     flannels = rows["Grey flannel trousers"]
@@ -719,8 +718,10 @@ def check_wearability() -> str:
     assert wearability(saturday, inventory).wearable, "Saturday should be wearable now"
     w = wearability(dinner, inventory)
     assert not w.wearable and len(w.missing) == 2, "Dinner should be blocked by two pieces"
-    assert _near(w.to_buy, sum(m.price for m in w.missing)), "to-buy total wrong"
-    return f"Saturday wearable; Dinner blocked by 2, £{w.to_buy:.0f} to fix"
+    assert not hasattr(w, "to_buy"), "a cost figure survived on wearability"
+    assert {m.garment for m in w.missing} == {"Trousers", "Loafers"}, \
+        f"the wrong pieces are missing: {[m.name for m in w.missing]}"
+    return f"Saturday wearable; Dinner blocked by {len(w.missing)}"
 
 
 # --- Prompts ------------------------------------------------------------------
@@ -768,42 +769,40 @@ def check_guide_prompt() -> str:
 # --- Shop ---------------------------------------------------------------------
 
 def check_secondhand_rule() -> str:
-    """At or over the threshold goes secondhand first; under it does not.
+    """Rarely-worn garments go secondhand first; things worn out do not.
 
-    Asserted from the constant rather than a literal, so moving the line moves
-    the test with it and only the two sides of it are ever hard-coded.
+    This used to be a price threshold. Prices were the wrong handle: almost
+    everything comes off a listing where the price is unknown until it appears,
+    so the rule now keys on how often the garment is worn, which is knowable.
     """
     from .inventory import Item
-    from .retailers import SECONDHAND, SECONDHAND_THRESHOLD, suggest
+    from .retailers import RARELY_WORN, SECONDHAND, WORN_OUT, suggest
 
-    coat = Item(name="Camel wool overcoat", garment="Overcoat", colour="camel",
-                fabric="Wool melton", price=420)
+    coat = Item(name="Camel wool overcoat", garment="Overcoat", colour="Camel",
+                fabric="Wool melton")
     top = suggest(coat, limit=3)
     assert top[0].retailer.name == "Vinted", f"Vinted did not lead: {top[0].retailer.name}"
     assert all(s.retailer.kind == SECONDHAND for s in top), \
-        "a £420 coat should put secondhand in every top slot"
-    assert "worn rarely" in top[0].reason, "the rarely-worn reason was not given"
+        "an overcoat should put secondhand in every top slot"
+    assert "worn seldom" in top[0].reason, "the rarely-worn reason was not given"
 
-    tee = Item(name="White tee", garment="T-shirt", colour="white",
-               fabric="Cotton jersey", price=25)
-    cheap = suggest(tee, limit=3)
-    assert all(s.retailer.kind != SECONDHAND for s in cheap), \
-        "a £25 tee should not send him secondhand"
+    for garment in ("Blazer", "Derbies", "Boots", "Suit", "Loafers"):
+        assert garment in RARELY_WORN, f"{garment} should go secondhand first"
+        assert suggest(Item(name="x", garment=garment), limit=1)[0].retailer.kind == SECONDHAND, \
+            f"{garment} did not lead with a resale site"
 
-    # The line moved to £50, so a mid-price knit now crosses it and a cheap one
-    # still does not. Both sides get asserted or the threshold is untested.
-    knit = Item(name="Merino crew", garment="Knitwear", colour="navy", price=55)
-    assert suggest(knit, limit=1)[0].retailer.kind == SECONDHAND, \
-        "£55 is over the line and should go secondhand first"
-    polo = Item(name="Piqué polo", garment="Polo", colour="ecru", price=40)
-    assert suggest(polo, limit=1)[0].retailer.kind != SECONDHAND, \
-        "£40 is under the line and should stay retail"
-
-    edge = Item(name="Knit", garment="Knitwear", colour="navy", price=SECONDHAND_THRESHOLD)
-    assert suggest(edge, limit=1)[0].retailer.kind == SECONDHAND, \
-        f"exactly £{SECONDHAND_THRESHOLD:.0f} should still go secondhand first"
-    return (f"line at £{SECONDHAND_THRESHOLD:.0f}: £420 coat and £55 knit go secondhand, "
-            f"£40 polo and £25 tee stay retail")
+    tee = suggest(Item(name="White tee", garment="T-shirt", colour="White"), limit=3)
+    assert all(s.retailer.kind != SECONDHAND for s in tee), \
+        "a tee is worn out, so it should be bought new"
+    every = suggest(Item(name="x", garment="T-shirt"), limit=99)
+    resale = [s for s in every if s.retailer.kind == SECONDHAND]
+    assert resale, "no resale site sells a t-shirt at all"
+    assert all(s.retailer.kind != SECONDHAND for s in every[:5]), \
+        "a resale site reached the top five for a consumable"
+    assert "little life left" in resale[0].reason, "the worn-out reason was never given"
+    assert "T-shirt" in WORN_OUT and "Jeans" in WORN_OUT, "the consumables set shrank"
+    return (f"{len(RARELY_WORN)} garments go secondhand first, "
+            f"{len(WORN_OUT)} are bought new; no prices involved")
 
 
 def check_retailer_catalogue() -> str:
@@ -836,19 +835,19 @@ def check_tactics() -> str:
     from .inventory import Item
     from .retailers import tactics
 
-    coat = Item(name="Camel overcoat", garment="Overcoat", colour="camel", price=420,
+    coat = Item(name="Camel overcoat", garment="Overcoat", colour="Camel",
                 sizes={"chest": '38"'})
     names = [t.name for t in tactics(coat)]
-    assert "Save the Vinted search" in names, "no saved search for an expensive coat"
+    assert "Save the Vinted search" in names, "no saved search for a rarely-worn coat"
     assert "Buy it out of season" in names, "no seasonal timing for a coat"
     detail = " ".join(t.detail for t in tactics(coat))
     assert "February" in detail, "the coat's cheap month is not named"
     assert '38"' in detail, "his size never reaches the alert advice"
-    assert "£252" in detail, "no walk-away price computed"
+    assert "£" not in detail, "a price crept back into the advice"
 
-    tee = Item(name="Tee", garment="T-shirt", price=25)
+    tee = Item(name="Tee", garment="T-shirt")
     assert "Save the Vinted search" not in [t.name for t in tactics(tee)], \
-        "a £25 tee should not be worth a saved search"
+        "a tee is worn out, so it is not worth a saved search"
     return f"{len(names)} tactics for the coat, size and season both specific"
 
 
@@ -970,15 +969,16 @@ def check_product_prompts() -> str:
     from .seed import seed_all
 
     item = Item(id="camel", name="Camel wool overcoat", garment="Overcoat",
-                colour="camel", fabric="Wool melton", price=420, status="aspirational")
+                colour="Camel", fabric="Wool melton", status="aspirational")
     shot = photo_prompt(item)
-    for phrase in ("camel", "Wool melton", "overcoat", "no person", "seamless pure white"):
+    for phrase in ("Camel", "Wool melton", "overcoat", "no person", "seamless pure white"):
         assert phrase in shot, f"{phrase!r} missing from the product shot prompt"
     assert "ghost mannequin" in shot.lower(), "no ghost mannequin instruction"
 
     profile = Profile.load()
     words = copy_prompt(profile, item)
-    assert "Wool melton" in words and "£420" in words, "the garment did not reach the copy"
+    assert "Wool melton" in words, "the garment did not reach the copy"
+    assert "£" not in words, "a price crept into the product copy"
     assert profile.subject.height_metric in words, "his proportions did not reach the copy"
     assert "Chest:" in words, "the size targets did not reach the copy"
     assert size_line(profile, item), "no size line for a coat"
@@ -987,7 +987,8 @@ def check_product_prompts() -> str:
     from .inventory import Inventory
     listed = to_buy(Inventory.load())
     assert listed and all(i.status == "aspirational" for i in listed), "the list is not wanted-only"
-    assert listed == sorted(listed, key=lambda i: (-i.price, i.name)), "list not dearest first"
+    assert listed == sorted(listed, key=lambda i: (not i.starred, i.name or i.garment)), \
+        "list not starred-first then alphabetical"
     return f"{len(listed)} on the list, prompts carry cloth, price and size"
 
 
@@ -1400,7 +1401,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),
     (MATHS, "Plan never buys what he owns", check_plan_never_buys_owned),
-    (MATHS, "A budget filters rather than halts", check_budget_filters_not_halts),
+    (MATHS, "The plan minimises garments to find", check_plan_prefers_fewer_garments),
     (MATHS, "Leverage counts appearances and solo unlocks", check_leverage),
     (MATHS, "Wearability splits owned from to-buy", check_wearability),
     (MATHS, "An empty outfit is not wearable", check_empty_outfit_not_wearable),

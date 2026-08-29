@@ -33,8 +33,8 @@ from wardrobe.inventory import (
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.palette import (
-    ACCENT, CATEGORIES as COLOUR_CATEGORIES, FIELD, GROUND, LEATHER, PATTERNS,
-    ROLES, Colour, Palette,
+    ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND, LEATHER,
+    NAMED_COLOURS, PATTERNS, ROLES, Colour, Palette, hex_for,
 )
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
@@ -476,8 +476,8 @@ def shape_row(item: Item, key: str) -> tuple[str, str]:
     """Garment and status, chosen outside the form.
 
     Both change the shape of the form beneath: the garment decides which size
-    boxes exist, the status decides whether a price is asked for. Inside a
-    Streamlit form neither would take effect until submit, so they sit above it.
+    boxes exist. Inside a Streamlit form that would not take effect until submit,
+    so they sit above it.
     """
     c1, c2 = st.columns(2)
     garment = c1.selectbox(
@@ -500,9 +500,20 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
                               placeholder="Cream camp-collar shirt")
     c1, c2, c3 = st.columns([2, 1, 2])
-    item.colour = c1.text_input("Colour", item.colour, key=f"{key}-colour",
-                                placeholder="chocolate brown")
-    item.colour_hex = c2.color_picker("Swatch", item.colour_hex, key=f"{key}-hex")
+    options = ["", *COLOUR_NAMES]
+    item.colour = c1.selectbox(
+        "Colour", options,
+        index=options.index(item.colour) if item.colour in options else 0,
+        key=f"{key}-colour",
+        help="Thirty colours a wardrobe is actually built from. Typed free-hand "
+             "this became chocolate, Chocolate and dark brown, which is one colour "
+             "wearing three names.")
+    item.colour_hex = hex_for(item.colour) if item.colour else item.colour_hex
+    c2.markdown(
+        f'<div class="look-cap">Swatch</div>'
+        f'<div style="height:2.1rem;background:{item.colour_hex};'
+        f'border:1px solid var(--line)"></div>'
+        f'<div class="look-cap">{item.colour_hex}</div>', unsafe_allow_html=True)
     item.fabric = c3.selectbox(
         "Fabric", FABRIC_OPTIONS,
         index=FABRIC_OPTIONS.index(item.fabric) if item.fabric in FABRIC_OPTIONS else 0,
@@ -523,14 +534,6 @@ def item_fields(item: Item, key: str, garment: str, status: str) -> Item:
     item.fit = g2.selectbox(
         "Fit", FITS, index=FITS.index(item.fit) if item.fit in FITS else 0,
         key=f"{key}-fit", help="How it is cut.")
-    if status == ASPIRATIONAL:
-        item.price = st.number_input(
-            "Estimated price £", 0.0, 100000.0, float(item.price), step=10.0,
-            key=f"{key}-price",
-            help="What you expect to pay. The shopping plan spends this number.")
-    else:
-        item.price = 0.0
-
     scheme = size_scheme(garment)
     if scheme:
         st.markdown(f'<div class="look-cap">Sizes, as {garment.lower()} are actually '
@@ -560,6 +563,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
         ("Owned", str(counts[OWNED])),
         ("Wanted", str(counts[ASPIRATIONAL])),
         ("Retired", str(counts[RETIRED])),
+        ("Without a picture", str(sum(1 for i in inventory.items if not i.shop_photo))),
     ])
     ui.blurb(
         "Every piece, owned or merely wanted, lives here. Photograph anything words "
@@ -613,24 +617,38 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
 
 
 def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
-    if item.has_photo:
-        ui.plate(Path(item.photo), width=420)
-    else:
-        st.markdown(f'<div class="swatch" style="background:{item.colour_hex}"></div>',
-                    unsafe_allow_html=True)
-
-    badge = {OWNED: "", ASPIRATIONAL: '<span class="badge want">wanted</span>',
-             RETIRED: '<span class="badge">retired</span>'}[item.status]
-    detail = " · ".join(b for b in [item.garment, item.colour, item.fabric] if b)
+    """One garment in the grid: its picture, its spec, and a way into its page."""
+    st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
+    badge = {OWNED: "", ASPIRATIONAL: "wanted", RETIRED: "retired"}[item.status]
+    shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, badge)
+    detail = " · ".join(b for b in (item.garment, item.colour, item.fabric) if b)
+    spec = " · ".join(b for b in (item.grade, item.fit) if b)
     sizes = item.size_line()
-    price = (f'<br><span class="price">{ui.money(item.price)}</span> estimated'
-             if item.status == ASPIRATIONAL and item.price else "")
     st.markdown(
-        f'<div class="item"><div class="top"><div class="nm">{item.name or item.garment}</div>'
-        f'{badge}</div><div class="meta">{detail}'
-        f'{"<br>" + sizes if sizes else ""}{price}</div></div>',
-        unsafe_allow_html=True,
-    )
+        f'<div class="product">{shot}<div class="body">'
+        f'<div class="nm">{item.name or item.garment}</div>'
+        f'<div class="kind">{detail}</div>'
+        f'{f"<div class=size>{spec}</div>" if spec else ""}'
+        f'<div class="size">{sizes or "no size recorded"}</div>'
+        f'<a class="view" href="?item={item.id}" target="_blank">Open &#8599;</a>'
+        f'</div></div>', unsafe_allow_html=True)
+
+    if not item.shop_photo:
+        if st.button("Draw it from the description", key=f"draw-{item.id}",
+                     type="secondary", use_container_width=True,
+                     help="Generates a catalogue photograph from the colour, cloth and "
+                          "description. Upload a real photo instead if you have one."):
+            with st.spinner("Drawing…"):
+                try:
+                    written = shop_mod.generate_photo(item)
+                except GEMINI_ERRORS as exc:
+                    st.error(str(exc))
+                    return
+            if written:
+                item.product_photo = str(written[0])
+                inventory.update(item)
+                inventory.save()
+            st.rerun()
 
     with st.expander("Edit"):
         used = outfits.using(item.id)
@@ -1000,21 +1018,21 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             c1, c2, c3 = st.columns([3, 2, 1])
             name = c1.text_input("Name", placeholder="Camel wool overcoat")
             garment = c2.selectbox("Garment", GARMENTS, key="asp-garment")
-            price = c3.number_input("Estimated price £", 0.0, 100000.0, 0.0, step=10.0,
-                                    key="asp-price")
+            grade = c3.selectbox("Grade", GRADES, key="asp-grade")
             c4, c5, c6 = st.columns([2, 1, 2])
-            colour = c4.text_input("Colour", placeholder="camel")
-            colour_hex = c5.color_picker("Swatch", "#C19A6B", key="asp-hex")
+            colour = c4.selectbox("Colour", ["", *COLOUR_NAMES], key="asp-colour")
+            colour_hex = hex_for(colour) if colour else "#CCCCCC"
+            c5.markdown(f'<div class="look-cap">Swatch</div><div style="height:2.1rem;'
+                        f'background:{colour_hex};border:1px solid var(--line)"></div>',
+                        unsafe_allow_html=True)
             fabric = c6.selectbox("Fabric", FABRIC_OPTIONS, key="asp-fabric")
-            c7, c8 = st.columns(2)
-            grade = c7.selectbox("Grade", GRADES, key="asp-grade")
-            fit = c8.selectbox("Fit", FITS, key="asp-fit")
+            fit = st.selectbox("Fit", FITS, key="asp-fit")
             if st.form_submit_button("Add as wanted") and name.strip():
                 inventory.add(Item(
                     name=name.strip(), garment=garment, category=inv_mod.category_for(garment),
                     colour=colour, colour_hex=colour_hex, grade=grade, fit=fit,
                     fabric="" if fabric == NONE else fabric,
-                    status=ASPIRATIONAL, price=price,
+                    status=ASPIRATIONAL,
                 ))
                 inventory.save()
                 st.rerun()
@@ -1042,8 +1060,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
 
     photos = [Path(i.photo) for i in items if i.has_photo]
     missing_now = [i for i in items if not i.owned]
-    cost_note = (f"{len(missing_now)} piece(s) not owned, "
-                 f"{ui.money(sum(i.price for i in missing_now))} to buy"
+    cost_note = (f"{len(missing_now)} piece(s) still to find"
                  if missing_now else "every piece already owned")
     st.markdown(
         f'<div class="look-cap">{len(items)} pieces &middot; {len(photos)} with photos '
@@ -1156,9 +1173,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
     tag_line = " ".join(f'<span class="badge">{t}</span>' for t in outfit.tags)
     st.markdown(
         f'<div class="item"><div class="top"><div class="nm">{outfit.name}</div>{badge}</div>'
-        f'<div class="meta">{pieces}<br>'
-        f'<span class="price">{ui.money(w.total)}</span> total &middot; '
-        f'owned {ui.money(w.owned_value)} &middot; to buy {ui.money(w.to_buy)}</div>'
+        f'<div class="meta">{pieces}</div>'
         f'<div style="margin-top:.5rem">{tag_line}</div></div>',
         unsafe_allow_html=True,
     )
@@ -1198,7 +1213,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
     if w.missing:
         st.markdown(
             '<div class="look-cap">Missing: ' +
-            ", ".join(f"{m.name} {ui.money(m.price)}" for m in w.missing) + "</div>",
+            ", ".join(m.name or m.garment for m in w.missing) + "</div>",
             unsafe_allow_html=True)
 
 
@@ -1289,13 +1304,13 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
         ui.empty("No loved outfits yet. Love a few in the gallery and the plan will "
                  "build itself from them.")
 
-    c1, c2, c3 = st.columns([1, 1, 2])
+    c1, c2 = st.columns([1, 3])
     loved_only = c1.toggle("Loved outfits only", value=True, key="sh-loved")
-    use_budget = c2.toggle("Cap the budget", key="sh-usebudget")
-    budget = c3.number_input("Budget £", 0.0, 100000.0, 1000.0, step=50.0,
-                             key="sh-budget") if use_budget else None
+    c2.markdown('<div class="look-cap">Built from the outfits you loved, in the order '
+                'that unlocks the most of them per garment found.</div>',
+                unsafe_allow_html=True)
 
-    plan = shopping.purchase_plan(outfits, inventory, loved_only=loved_only, budget=budget)
+    plan = shopping.purchase_plan(outfits, inventory, loved_only=loved_only)
     if plan.broken:
         st.warning(
             f"{len(plan.broken)} outfit(s) left out of the plan because money cannot fix "
@@ -1311,9 +1326,7 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
         ("Wearable now", str(len(plan.wearable_now))),
         ("Blocked", str(len(plan.blocked))),
         ("Plan unlocks", str(plan.outfits_unlocked)),
-        ("Total", ui.money(plan.total_cost)),
-        ("Per outfit", ui.money(plan.total_cost / plan.outfits_unlocked)
-         if plan.outfits_unlocked else "—"),
+        ("Garments to find", str(plan.to_find)),
     ], brass_first=True)
 
     for n, step in enumerate(plan.steps, 1):
@@ -1322,30 +1335,25 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
         st.markdown(
             f'<div class="step"><div class="hd"><div><span class="n">{n}</span> '
             f'<span class="pieces">{pieces}</span></div>'
-            f'<div class="cost">{ui.money(step.price)}</div></div>'
+            f'<div class="cost">{step.size} piece(s)</div></div>'
             f'<div class="why">Unlocks: {unlocked}<br>'
-            f'Running total {ui.money(step.cumulative_cost)} for '
-            f'{step.cumulative_unlocked} outfit(s), {ui.money(step.cost_per_outfit or 0)} each'
-            f'</div></div>', unsafe_allow_html=True)
+            f'{step.cumulative_bought} garment(s) found so far, '
+            f'{step.cumulative_unlocked} outfit(s) unlocked</div></div>',
+            unsafe_allow_html=True)
 
-    if plan.shortfall_items:
-        pieces = " + ".join(i.name or i.garment for i in plan.shortfall_items)
-        st.info(
-            f"Nothing completes an outfit within this budget. The cheapest that would is "
-            f"**{pieces}** at {ui.money(plan.shortfall_cost)}, so you are "
-            f"{ui.money(plan.shortfall)} short."
-        )
-    elif plan.skipped_for_budget:
-        st.info(f"Out of budget: {', '.join(o.name for o in plan.skipped_for_budget)}.")
-    elif plan.still_blocked:
+    if plan.still_blocked:
         st.info(f"Still blocked: {', '.join(o.name for o in plan.still_blocked)}.")
 
     with st.expander("How this is worked out"):
         st.markdown(
             "Each blocked outfit gives a *bundle*: the pieces still missing from it. "
-            "Each round takes the bundle with the best outfits-per-pound, and any other "
-            "outfit whose gap is a subset of that bundle unlocks for free. Repeat until "
-            "nothing is blocked.\n\n"
+            "Each round takes the bundle completing the most outfits per garment, and "
+            "any other outfit whose gap is a subset of that bundle unlocks for free. "
+            "Repeat until nothing is blocked.\n\n"
+            "There is no money in this on purpose. Almost everything comes off a "
+            "secondhand listing where the price is unknown until the thing appears, so "
+            "a plan ranked on invented prices would rank on fiction. What can be known "
+            "is how many garments it asks you to find.\n\n"
             "Scoring one garment at a time looks reasonable and behaves badly: an outfit "
             "missing two pieces is completed by neither alone, so both score zero and the "
             "plan stalls. Bundles avoid that.\n\n"
@@ -1359,20 +1367,17 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
              "in, and how many it finishes single-handedly.")
     rows = [{
         "Piece": l.item.name or l.item.garment,
-        "Price": ui.money(l.price) if l.price else "—",
         "In blocked outfits": str(l.appearances),
         "Finishes alone": str(l.solo_unlocks),
         "Outfits": ", ".join(l.outfit_names[:4]),
     } for l in plan.leverage]
-    ui.table(rows, numeric=("Price", "In blocked outfits", "Finishes alone"))
+    ui.table(rows, numeric=("In blocked outfits", "Finishes alone"))
 
     ui.eyebrow("Star what you will actually buy")
-    starred_total = 0.0
     for l in plan.leverage:
         c1, c2 = st.columns([5, 1])
         c1.markdown(
             f'<div class="look-cap">{l.item.name or l.item.garment} &middot; '
-            f'{ui.money(l.price) if l.price else "no price"} &middot; '
             f'in {l.appearances} blocked outfit(s)</div>', unsafe_allow_html=True)
         label = "★ Starred" if l.item.starred else "☆ Star"
         if c2.button(label, key=f"star-{l.item.id}",
@@ -1381,11 +1386,10 @@ def plan_panel(inventory: Inventory, outfits: Outfits) -> None:
             inventory.update(l.item)
             inventory.save()
             st.rerun()
-        if l.item.starred:
-            starred_total += l.price
-    if starred_total:
-        st.markdown(f'<div class="look-cap">Starred total: '
-                    f'<b>{ui.money(starred_total)}</b></div>', unsafe_allow_html=True)
+    starred = sum(1 for l in plan.leverage if l.item.starred)
+    if starred:
+        st.markdown(f'<div class="look-cap"><b>{starred}</b> starred</div>',
+                    unsafe_allow_html=True)
 
 
 # --- diagnostics --------------------------------------------------------------
@@ -1709,20 +1713,19 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         return
 
     starred = [i for i in wanted if i.starred]
-    dear = [i for i in wanted if i.price >= retailers.SECONDHAND_THRESHOLD]
+    rare = [i for i in wanted if i.garment in retailers.RARELY_WORN]
     ui.stats([
-        ("To buy", str(len(wanted))),
+        ("To find", str(len(wanted))),
         ("Starred", str(len(starred))),
-        ("At retail", ui.money(sum(i.price for i in wanted))),
-        ("Look secondhand first", str(len(dear))),
+        ("Look secondhand first", str(len(rare))),
     ], brass_first=True)
     ui.blurb(
-        f"Anything at £{retailers.SECONDHAND_THRESHOLD:.0f} or over is looked for "
-        "secondhand before retail. Not out of thrift, but because the garments that "
-        "cost that much are the ones worn least: a blazer worn twenty times a year "
-        "spends most of its life in a wardrobe whether it was bought new or not, and "
-        "Vinted is full of them barely worn. Open any piece for the cloth, the size to "
-        "look for, and where to find it."
+        "The garments worn least are looked for secondhand first. A blazer worn "
+        "twenty times a year spends most of its life in a wardrobe whether it was "
+        "bought new or not, so the resale sites are full of them barely worn. There "
+        "are no prices here: almost everything comes off a listing where the price is "
+        "unknown until it appears. Open any piece for the cloth, the size to look for, "
+        "and where to find it."
     )
 
     routeless = [i for i in wanted if not sourcing.route_for(i, plan)]
@@ -1771,7 +1774,7 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
 
 def product_card(profile: Profile, item: Item, inventory: Inventory,
                  principles: Principles, plan: "sourcing.Plan") -> None:
-    flag = "look secondhand" if item.price >= retailers.SECONDHAND_THRESHOLD else ""
+    flag = "look secondhand" if item.garment in retailers.RARELY_WORN else ""
     shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, flag)
     sizes = shop_mod.size_line(profile, item)
     detail = " · ".join(b for b in (item.fabric, item.colour) if b)
@@ -1779,7 +1782,6 @@ def product_card(profile: Profile, item: Item, inventory: Inventory,
         f'<div class="product">{shot}<div class="body">'
         f'<div class="nm">{item.name or item.garment}</div>'
         f'<div class="kind">{item.garment}{" · " + detail if detail else ""}</div>'
-        f'<div class="price">{ui.money(item.price) if item.price else "no price yet"}</div>'
         f'<div class="size">{sizes or "no size target for this garment"}</div>'
         f'<a class="view" href="?item={item.id}" target="_blank">View &#8599;</a>'
         f'</div></div>', unsafe_allow_html=True)
@@ -1830,7 +1832,7 @@ def item_view(profile: Profile, item_id: str) -> None:
     left, right = st.columns([1, 1], gap="large")
 
     with left:
-        flag = "look secondhand" if item.price >= retailers.SECONDHAND_THRESHOLD else ""
+        flag = "look secondhand" if item.garment in retailers.RARELY_WORN else ""
         st.markdown(f'<div class="product">'
                     f'{ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, flag)}'
                     f'</div>', unsafe_allow_html=True)
@@ -1867,8 +1869,8 @@ def item_view(profile: Profile, item_id: str) -> None:
 
     with right:
         ui.stats([
-            ("Expected", ui.money(item.price) if item.price else "—"),
             ("Status", "starred" if item.starred else item.status),
+            ("Garment", item.garment),
         ], brass_first=True)
         if item.product_copy:
             st.markdown(f'<div class="guide-body">\n\n{item.product_copy}\n\n</div>',
@@ -1916,9 +1918,9 @@ def item_view(profile: Profile, item_id: str) -> None:
 
     ui.eyebrow("Other options" if route else "Ranked options")
     ui.blurb(
-        f"Ranked for this garment at this price. Anything from "
-        f"£{retailers.SECONDHAND_THRESHOLD:.0f} goes to the secondhand sites first, "
-        "and the more rarely a thing is worn the harder that rule bites."
+        "Ranked for this garment. The pieces worn least go to the resale sites first, "
+        "because those are the ones that turn up there barely worn; the ones worn "
+        "constantly are bought new, because a used one has little life left in it."
     )
     for suggestion in retailers.suggest(item, limit=8):
         st.markdown(
