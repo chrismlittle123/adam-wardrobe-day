@@ -66,7 +66,9 @@ Six tabs, in the order the work happens.
 5. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
    you do not own yet. Item photos ride along as references so the generated
    image shows *that* jacket.
-6. **Outfit Gallery** — tag, search, love. Each outfit shows its cost split
+6. **Outfit Gallery** — tag, search, love. Any outfit opens on its own page,
+   where it can be varied from the settings it was generated with and put
+   side by side against a rival, with the difference between them named. Each outfit shows its cost split
    between what is already owned and what is still to buy.
 7. **Body Measurements** — ten measurements, all takeable on yourself with a tape
    and a mirror, and the finished garment dimensions derived from them.

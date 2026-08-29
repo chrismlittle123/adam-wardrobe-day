@@ -37,9 +37,20 @@ class Outfit:
     loved: bool = False
     created: str = ""
     prompt: str = ""
+    # The settings it was generated with, kept so a variation can start from them
+    # rather than from a blank form. Storing only the finished prompt meant the
+    # options had to be guessed back out of it, or retyped.
+    shot: str = ""
+    background: str = ""
+    extra: str = ""
+    parent: str = ""            # the outfit this was varied from
 
     def cover(self) -> str | None:
         return next((p for p in self.images if Path(p).is_file()), None)
+
+    @property
+    def shots(self) -> list[Path]:
+        return [Path(p) for p in self.images if Path(p).is_file()]
 
 
 @dataclass
@@ -140,6 +151,31 @@ class Outfits:
         used = {t for o in self.outfits for t in o.tags}
         return sorted(used | set(SEED_TAGS))
 
+    def variations_of(self, outfit_id: str) -> list[Outfit]:
+        return [o for o in self.outfits if o.parent == outfit_id]
+
+    def family(self, outfit: Outfit) -> list[Outfit]:
+        """The original and every variation of it, oldest first.
+
+        A variation of a variation belongs to the same conversation, so the
+        family is walked back to its root rather than one step up.
+        """
+        root = outfit
+        seen = {root.id}
+        while root.parent:
+            parent = self.by_id(root.parent)
+            if not parent or parent.id in seen:
+                break
+            root, _ = parent, seen.add(parent.id)
+        out = [root]
+        queue = [root.id]
+        while queue:
+            for child in self.variations_of(queue.pop()):
+                if child.id not in {o.id for o in out}:
+                    out.append(child)
+                    queue.append(child.id)
+        return sorted(out, key=lambda o: o.created)
+
     def loved(self) -> list["Outfit"]:
         return [o for o in self.outfits if o.loved]
 
@@ -197,6 +233,49 @@ def reference_photos(outfit: Outfit, inventory: Inventory, limit: int = 4) -> li
     items = [i for i in inventory.resolve(outfit.item_ids) if i.has_photo]
     items.sort(key=lambda i: order.get(i.category, 9))
     return [Path(i.photo) for i in items[:limit]]
+
+
+@dataclass
+class Difference:
+    """What changed between two outfits, so a comparison says something."""
+
+    added: list[Item] = field(default_factory=list)
+    removed: list[Item] = field(default_factory=list)
+    kept: list[Item] = field(default_factory=list)
+    settings: list[tuple[str, str, str]] = field(default_factory=list)
+
+    @property
+    def identical(self) -> bool:
+        return not (self.added or self.removed or self.settings)
+
+    @property
+    def summary(self) -> str:
+        bits = []
+        if self.added:
+            bits.append(f"+{len(self.added)}")
+        if self.removed:
+            bits.append(f"-{len(self.removed)}")
+        if self.settings:
+            bits.append(f"{len(self.settings)} setting(s)")
+        return ", ".join(bits) or "no difference"
+
+
+def compare(left: Outfit, right: Outfit, inventory: Inventory) -> Difference:
+    """What the right one changed relative to the left."""
+    before = {i.id: i for i in inventory.resolve(left.item_ids)}
+    after = {i.id: i for i in inventory.resolve(right.item_ids)}
+    settings = [
+        (label, getattr(left, key) or "—", getattr(right, key) or "—")
+        for label, key in (("Framing", "shot"), ("Background", "background"),
+                           ("Extra direction", "extra"))
+        if getattr(left, key, "") != getattr(right, key, "")
+    ]
+    return Difference(
+        added=[i for k, i in after.items() if k not in before],
+        removed=[i for k, i in before.items() if k not in after],
+        kept=[i for k, i in after.items() if k in before],
+        settings=settings,
+    )
 
 
 def aspirational_in(outfit: Outfit, inventory: Inventory) -> list[Item]:

@@ -1549,6 +1549,81 @@ def check_colour_catalogue_opens() -> str:
     return f"{len(COLOUR_NAMES)} named colours plus the hand-named ones, on their own page"
 
 
+def check_outfit_page_and_comparison() -> str:
+    """An outfit opens on its own page, varies from its own settings, and two
+    can be put side by side with the difference named."""
+    from streamlit.testing.v1 import AppTest
+
+    from PIL import Image
+
+    from .inventory import Inventory
+    from .outfits import Outfit, Outfits, compare
+    inventory, outfits = _seeded()
+
+    def shot(name):
+        target = paths.looks() / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        Image.new("RGB", (64, 96), (190, 160, 130)).save(target, "PNG")
+        return str(target)
+
+    base = outfits.outfits[0]
+    base.shot, base.background, base.extra = "Full length", "White studio", "sleeves rolled"
+    base.images = [shot("base.png")]
+    outfits.update(base)
+    polo = next(i for i in inventory.items if i.name == "Ecru knit polo")
+    child = outfits.add(Outfit(
+        name=f"{base.name}, again", item_ids=[*base.item_ids[:-1], polo.id],
+        images=[shot("child.png")], parent=base.id, shot="Three quarter",
+        background="White studio", extra="sleeves rolled"))
+    outfits.save()
+
+    change = compare(base, child, inventory)
+    assert not change.identical, "the comparison found no difference"
+    assert polo.id in {i.id for i in change.added}, "the added piece was not spotted"
+    assert change.removed, "the dropped piece was not spotted"
+    assert any(s[0] == "Framing" for s in change.settings), "the changed framing was missed"
+    assert not any(s[0] == "Background" for s in change.settings), \
+        "an unchanged setting was reported as changed"
+    assert {o.id for o in outfits.family(child)} == {base.id, child.id}, \
+        "the family did not gather both"
+
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["outfit"] = base.id
+    page = page.run()
+    assert not page.exception, f"the outfit page raised: {page.exception[0].value}"
+    assert not page.tabs, "the outfit page drew the whole app"
+    body = "\n".join(m.value for m in page.markdown)
+    assert base.name in body, "the outfit name is missing"
+    assert "Make a variation" in body, "there is no way to vary it"
+    assert "The family" in body, "the family is not shown"
+    assert "Full length" in body, "the settings it was generated with are not shown"
+    labels = [w.label for w in page.selectbox]
+    assert "Framing" in labels and "Compare this one with" in labels, \
+        "the variation form did not preload"
+    framing = next(w for w in page.selectbox if w.label == "Framing")
+    assert framing.value == "Full length", \
+        f"the variation started from the wrong framing: {framing.value}"
+
+    side = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    side.query_params["compare"] = f"{base.id},{child.id}"
+    side = side.run()
+    assert not side.exception, f"the comparison raised: {side.exception[0].value}"
+    assert not side.tabs, "the comparison drew the whole app"
+    both = "\n".join(m.value for m in side.markdown)
+    assert "What changed" in both, "the comparison does not say what changed"
+    assert "Ecru knit polo" in both, "the added piece is not named"
+    assert "Three quarter" in both, "the changed setting is not named"
+    assert both.count("badge ok") or "new" in both, "the new piece is not marked"
+
+    missing = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    missing.query_params["compare"] = base.id
+    missing = missing.run()
+    assert not missing.exception, "one id crashed the comparison"
+    assert "Needs two outfits" in "\n".join(m.value for m in missing.markdown), \
+        "a half comparison did not explain itself"
+    return f"page, variation form preloaded, and a side by side saying: {change.summary}"
+
+
 def check_answer_view_opens() -> str:
     """A saved answer must render as its own page, reached by ?answer=<id>."""
     from streamlit.testing.v1 import AppTest
@@ -1719,6 +1794,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Guide edits keep what they replace", check_guide_edit_and_versions),
     (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
     (APP, "The retailer catalogue opens and edits", check_shop_catalogue_opens),
+    (APP, "An outfit opens, varies and compares", check_outfit_page_and_comparison),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),

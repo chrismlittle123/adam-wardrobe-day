@@ -31,7 +31,9 @@ from wardrobe.inventory import (
     ASPIRATIONAL, CATEGORIES, FABRIC_OPTIONS, FABRICS, FITS, GARMENTS, GRADES,
     NONE, OWNED, RETIRED, STATUSES, Inventory, Item, size_scheme,
 )
-from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
+from wardrobe.outfits import (
+    Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
+)
 from wardrobe.palette import (
     ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND,
     NAMED_COLOURS, ROLES, SEASONS, Colour, Palette, hex_for,
@@ -86,6 +88,16 @@ def render() -> None:
 
     if st.query_params.get("shops") is not None:
         retailer_catalogue_view()
+        return
+
+    looking = st.query_params.get("outfit")
+    if looking is not None:
+        outfit_view(profile, looking)
+        return
+
+    pair = st.query_params.get("compare")
+    if pair is not None:
+        compare_view(pair)
         return
 
     inventory = Inventory.load()
@@ -889,6 +901,277 @@ def season_panel(palette: Palette) -> None:
                     ui.empty(f"Nothing for {season.lower()}")
 
 
+def outfit_view(profile: Profile, outfit_id: str) -> None:
+    """One outfit on its own page, with a way to vary it and a way to compare."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    st.markdown(ui.SHOP_CSS, unsafe_allow_html=True)
+    inventory, outfits = Inventory.load(), Outfits.load()
+    principles = Principles.load()
+    outfit = outfits.by_id(outfit_id)
+    if not outfit:
+        st.markdown('<div class="masthead"><h1>Not <em>found</em></h1></div>',
+                    unsafe_allow_html=True)
+        ui.empty(f"No outfit with the id {outfit_id}.")
+        st.markdown('<div class="answer-nav"><a href="./" target="_self">'
+                    'Back to the app</a></div>', unsafe_allow_html=True)
+        return
+
+    state = wearability(outfit, inventory)
+    pieces = inventory.resolve(outfit.item_ids)
+    family = outfits.family(outfit)
+    st.markdown(
+        f'<div class="masthead"><h1>{outfit.name}</h1>'
+        f'<div class="sub">{", ".join(outfit.tags) or "no tags"}'
+        f'{f" &middot; one of {len(family)} in this family" if len(family) > 1 else ""}'
+        f'</div></div>', unsafe_allow_html=True)
+
+    left, right = st.columns([3, 2], gap="large")
+    with left:
+        shots = outfit.shots
+        if shots:
+            ui.plate(shots[0], outfit.name[:26])
+            for row in (shots[1:][i:i + 2] for i in range(0, len(shots) - 1, 2)):
+                for column, shot in zip(st.columns(2), row):
+                    with column:
+                        ui.plate(shot, width=380)
+        else:
+            ui.empty("No image on this one.")
+    with right:
+        badge = ('<span class="badge no">broken</span>' if state.broken
+                 else '<span class="badge ok">wearable now</span>' if state.wearable
+                 else f'<span class="badge want">{len(state.missing)} to find</span>')
+        st.markdown(f'<div class="look-cap">{badge}</div>', unsafe_allow_html=True)
+        ui.eyebrow("What is in it")
+        for piece in pieces:
+            st.markdown(
+                f'<div class="look-cap"><span class="chip" '
+                f'style="background:{piece.colour_hex}"></span>'
+                f'<a href="?item={piece.id}" target="_blank">{piece.name or piece.garment}'
+                f'</a> &middot; {piece.garment}'
+                f'{" &middot; wanted" if not piece.owned else ""}</div>',
+                unsafe_allow_html=True)
+        if state.broken:
+            st.warning(f"Cannot be worn: {state.fault}.")
+        settings = [(k, v) for k, v in (("Framing", outfit.shot),
+                                        ("Background", outfit.background),
+                                        ("Extra direction", outfit.extra)) if v]
+        if settings:
+            ui.eyebrow("Generated with")
+            ui.table([{"Setting": k, "Value": v} for k, v in settings])
+        if outfit.notes:
+            st.markdown(f'<div class="look-cap">{outfit.notes}</div>',
+                        unsafe_allow_html=True)
+
+    if len(family) > 1:
+        ui.eyebrow("The family")
+        ui.blurb("Every version of this outfit, oldest first. Pick any two to put "
+                 "side by side.")
+        for chunk in (family[i:i + 3] for i in range(0, len(family), 3)):
+            for column, sibling in zip(st.columns(3, gap="medium"), chunk):
+                with column:
+                    cover = sibling.cover()
+                    if cover:
+                        ui.plate(Path(cover), width=320)
+                    here = " · this one" if sibling.id == outfit.id else ""
+                    st.markdown(
+                        f'<div class="look-cap"><a href="?outfit={sibling.id}" '
+                        f'target="_self">{sibling.name}</a>{here}</div>',
+                        unsafe_allow_html=True)
+        others = [o for o in family if o.id != outfit.id]
+        if others:
+            c1, c2 = st.columns([3, 1])
+            against = c1.selectbox("Compare this one with", [o.id for o in others],
+                                   format_func=lambda i: outfits.by_id(i).name,
+                                   key="ov-compare")
+            c2.markdown(
+                f'<div class="look-cap"><a class="view" '
+                f'href="?compare={outfit.id},{against}" target="_blank" '
+                f'style="display:block;text-align:center;padding:.7rem;'
+                f'background:var(--brass);color:#17110E;text-decoration:none">'
+                f'Side by side &#8599;</a></div>', unsafe_allow_html=True)
+
+    variation_panel(profile, outfit, inventory, outfits, principles)
+
+    with st.expander("The prompt it was generated from"):
+        st.code(outfit.prompt or "(not recorded)", language=None)
+
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
+
+
+def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
+                    outfits: Outfits, principles: Principles) -> None:
+    """Start from this outfit's settings, change one thing, generate the rival."""
+    ui.eyebrow("Make a variation")
+    ui.blurb(
+        "Everything below starts where this outfit left off. Swap a piece, change "
+        "the framing, add a note, and generate. The new one keeps this one as its "
+        "parent so the two can be put side by side afterwards."
+    )
+    wearable_items = [i for i in inventory.items if i.status != RETIRED]
+    current = {i.category: i for i in inventory.resolve(outfit.item_ids)}
+
+    picked: list[str] = []
+    cols = st.columns(4, gap="medium")
+    for col, category in zip(cols, ("Outerwear", "Top", "Bottom", "Shoes")):
+        with col:
+            options = [i for i in wearable_items if i.category == category]
+            if not options:
+                continue
+            ids = [i.id for i in options]
+            here = current.get(category)
+            index = ids.index(here.id) + 1 if here and here.id in ids else 0
+            labels = {i.id: i.label for i in options}
+            chosen = st.selectbox(category, [None, *ids], index=index,
+                                  format_func=lambda i: labels.get(i, "—"),
+                                  key=f"var-{category}")
+            if chosen:
+                picked.append(chosen)
+    accessories = [i for i in wearable_items if i.category == "Accessory"]
+    if accessories:
+        ids = [i.id for i in accessories]
+        labels = {i.id: i.label for i in accessories}
+        picked += st.multiselect("Accessories", ids,
+                                 default=[i for i in outfit.item_ids if i in ids],
+                                 format_func=lambda i: labels[i], key="var-acc")
+
+    items = inventory.resolve(picked)
+    c1, c2, c3 = st.columns([2, 2, 1])
+    shots = list(SHOTS)
+    backgrounds = list(BACKGROUNDS)
+    shot = c1.selectbox("Framing", shots,
+                        index=shots.index(outfit.shot) if outfit.shot in shots else 0,
+                        key="var-shot")
+    background = c2.selectbox(
+        "Background", backgrounds,
+        index=backgrounds.index(outfit.background) if outfit.background in backgrounds else 0,
+        key="var-bg")
+    count = c3.number_input("Variations", 1, 4, 1, key="var-count")
+    name = st.text_input("Name it", f"{outfit.name}, again", key="var-name")
+    extra = st.text_input("Extra direction", outfit.extra, key="var-extra",
+                          placeholder="Sleeves rolled twice. Overcast daylight.")
+    use_principles = st.toggle("Apply the principles", value=bool(principles.principles),
+                               key="var-prin")
+
+    if not items:
+        ui.empty("Pick at least one piece.")
+        return
+
+    photos = [Path(i.photo) for i in items if i.has_photo]
+    prompt = build_outfit_prompt(
+        profile, [i.describe() for i in items], shot=shot, background=background,
+        principles=principles.as_prompt_block() if use_principles else "",
+        photo_count=len(photos), extra=extra)
+    with st.expander("The prompt this would send"):
+        st.code(prompt, language=None)
+
+    portrait = profile.photo("neutral")
+    if not portrait:
+        st.warning("No reference portrait, so nothing to dress.")
+        return
+
+    if st.button("Generate the variation", type="primary"):
+        stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
+        title = name.strip() or f"{outfit.name}, again"
+        with st.spinner(f"Dressing {profile.subject.name}…"):
+            try:
+                written = generate_images(
+                    prompt,
+                    out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
+                    reference_images=[portrait, *photos[:4]],
+                    count=int(count),
+                    settings=Settings.from_env())
+            except GEMINI_ERRORS as exc:
+                st.error(str(exc))
+                return
+        made = outfits.add(Outfit(
+            name=title, item_ids=[i.id for i in items], tags=list(outfit.tags),
+            images=[str(w) for w in written], notes=outfit.notes, prompt=prompt,
+            shot=shot, background=background, extra=extra, parent=outfit.id))
+        outfits.save()
+        st.success(f"Made “{title}”.")
+        st.markdown(
+            f'<div class="look-cap"><a href="?compare={outfit.id},{made.id}" '
+            f'target="_self">Put them side by side &#8599;</a></div>',
+            unsafe_allow_html=True)
+
+
+def compare_view(pair: str) -> None:
+    """Two outfits, side by side, with what changed named underneath."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    inventory, outfits = Inventory.load(), Outfits.load()
+    ids = [i.strip() for i in pair.split(",") if i.strip()][:2]
+    chosen = [outfits.by_id(i) for i in ids]
+    chosen = [o for o in chosen if o]
+
+    if len(chosen) < 2:
+        st.markdown('<div class="masthead"><h1>Nothing to <em>compare</em></h1></div>',
+                    unsafe_allow_html=True)
+        ui.empty("Needs two outfits, as ?compare=one,two.")
+        st.markdown('<div class="answer-nav"><a href="./" target="_self">'
+                    'Back to the app</a></div>', unsafe_allow_html=True)
+        return
+
+    left, right = chosen
+    change = compare(left, right, inventory)
+    st.markdown(
+        f'<div class="masthead"><h1>{left.name} <em>or</em> {right.name}</h1>'
+        f'<div class="sub">{change.summary}</div></div>', unsafe_allow_html=True)
+
+    columns = st.columns(2, gap="large")
+    for column, outfit in zip(columns, chosen):
+        with column:
+            cover = outfit.cover()
+            if cover:
+                ui.plate(Path(cover), outfit.name[:26])
+            else:
+                ui.empty("No image")
+            state = wearability(outfit, inventory)
+            st.markdown(
+                f'<div class="look-cap">'
+                f'{"wearable now" if state.wearable else f"{len(state.missing)} to find"}'
+                f' &middot; <a href="?outfit={outfit.id}" target="_self">open it</a>'
+                f'</div>', unsafe_allow_html=True)
+            for piece in inventory.resolve(outfit.item_ids):
+                mark = ""
+                if piece in change.added:
+                    mark = ' <span class="badge ok">new</span>'
+                elif piece in change.removed:
+                    mark = ' <span class="badge no">dropped</span>'
+                st.markdown(
+                    f'<div class="look-cap"><span class="chip" '
+                    f'style="background:{piece.colour_hex}"></span>'
+                    f'{piece.name or piece.garment}{mark}</div>', unsafe_allow_html=True)
+
+    ui.eyebrow("What changed")
+    if change.identical:
+        ui.empty("Nothing. Same pieces, same settings, so any difference is the "
+                 "model's alone.")
+    else:
+        rows = [{"Change": "Added", "Detail": i.name or i.garment} for i in change.added]
+        rows += [{"Change": "Dropped", "Detail": i.name or i.garment}
+                 for i in change.removed]
+        rows += [{"Change": setting, "Detail": f"{was} → {now}"}
+                 for setting, was, now in change.settings]
+        ui.table(rows)
+        st.markdown(f'<div class="look-cap">{len(change.kept)} piece(s) unchanged</div>',
+                    unsafe_allow_html=True)
+
+    ui.eyebrow("Keep one")
+    c1, c2 = st.columns(2)
+    for column, outfit in zip((c1, c2), chosen):
+        if column.button(f"♥ Love {outfit.name}", key=f"cmp-{outfit.id}",
+                         use_container_width=True,
+                         type="primary" if outfit.loved else "secondary"):
+            outfit.loved = not outfit.loved
+            outfits.update(outfit)
+            outfits.save()
+            st.rerun()
+
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
+
+
 def retailer_catalogue_view() -> None:
     """Every shop the plan can point at, on its own page, editable."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
@@ -1268,12 +1551,16 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             except GEMINI_ERRORS as exc:
                 st.error(str(exc))
                 return
-        outfits.add(Outfit(
+        made = outfits.add(Outfit(
             name=title, item_ids=[i.id for i in items], tags=list(tag_choice),
             images=[str(w) for w in written], notes=extra, prompt=prompt,
+            shot=shot, background=background, extra=extra,
         ))
         outfits.save()
-        st.success(f"Saved as “{title}”. It is in the Outfit Gallery.")
+        st.success(f"Saved as “{title}”.")
+        st.markdown(f'<div class="look-cap"><a href="?outfit={made.id}" target="_blank">'
+                    f'Open it, vary it, compare it &#8599;</a></div>',
+                    unsafe_allow_html=True)
 
 
 # --- 6. outfit gallery --------------------------------------------------------
