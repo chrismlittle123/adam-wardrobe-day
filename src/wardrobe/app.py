@@ -119,29 +119,32 @@ def render() -> None:
     )
 
     tabs = st.tabs([
-        "1 · Style Guide", "2 · Wardrobe Inventory", "3 · Principles", "4 · Colour",
-        "5 · Outfit Generator", "6 · Outfit Gallery", "7 · Body Measurements",
-        "8 · Where to Buy", "9 · Shopping Guide", "⚙ Diagnostics",
+        "1 · Style Guide", "2 · Garment Catalogue", "3 · Wardrobe Inventory",
+        "4 · Principles", "5 · Colour", "6 · Outfit Generator", "7 · Outfit Gallery",
+        "8 · Body Measurements", "9 · Where to Buy", "10 · Shopping Guide",
+        "⚙ Diagnostics",
     ])
     with tabs[0]:
         style_guide_tab(profile, answers)
     with tabs[1]:
-        inventory_tab(profile, inventory, outfits)
+        garment_catalogue_panel()
     with tabs[2]:
-        principles_tab(profile, answers, principles)
+        inventory_tab(profile, inventory, outfits)
     with tabs[3]:
-        colour_tab(profile, Palette.load())
+        principles_tab(profile, answers, principles)
     with tabs[4]:
-        generator_tab(profile, inventory, outfits, principles)
+        colour_tab(profile, Palette.load())
     with tabs[5]:
-        gallery_tab(inventory, outfits)
+        generator_tab(profile, inventory, outfits, principles)
     with tabs[6]:
-        body_tab(profile)
+        gallery_tab(inventory, outfits)
     with tabs[7]:
-        where_to_buy_tab(inventory)
+        body_tab(profile)
     with tabs[8]:
-        shop_tab(profile, inventory, outfits, principles)
+        where_to_buy_tab(inventory)
     with tabs[9]:
+        shop_tab(profile, inventory, outfits, principles)
+    with tabs[10]:
         diagnostics_tab()
 
 
@@ -444,7 +447,7 @@ def points_warning(question: Question, answer: str) -> str:
             "weighting only means something if the total is fixed.")
 
 
-# --- 2. inventory -------------------------------------------------------------
+# --- 3. inventory -------------------------------------------------------------
 
 def shape_row(item: Item, key: str) -> tuple[str, str]:
     """Garment and status, chosen outside the form.
@@ -545,9 +548,9 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
         "time, the photograph gives it that one."
     )
     st.markdown(
-        '<div class="look-cap"><a href="?garments=all" target="_blank">'
-        'Open the garment catalogue &#8599;</a> to add a garment, a fabric, a fit or '
-        'a grade. Every dropdown on this page is built from it.</div>',
+        '<div class="look-cap">Every dropdown here is filled from the Garment '
+        'Catalogue. <a href="?garments=all" target="_blank">Open it in its own tab '
+        '&#8599;</a> to keep the dictionary beside the wardrobe.</div>',
         unsafe_allow_html=True)
 
     with st.expander("Add an item", expanded=not inventory.items):
@@ -691,7 +694,7 @@ def item_card(item: Item, inventory: Inventory, outfits: Outfits) -> None:
                 st.rerun()
 
 
-# --- 3. principles ------------------------------------------------------------
+# --- 4. principles ------------------------------------------------------------
 
 def principles_tab(profile: Profile, answers: Answers, principles: Principles) -> None:
     ui.blurb(
@@ -779,7 +782,7 @@ def handwrite_panel(principles: Principles) -> None:
                 st.rerun()
 
 
-# --- 4. colour ----------------------------------------------------------------
+# --- 5. colour ----------------------------------------------------------------
 
 VERDICT_BADGE = {"harmonious": "ok", "flattering": "ok", "careful": "no"}
 
@@ -1183,18 +1186,38 @@ def compare_view(pair: str) -> None:
 
 
 def garment_catalogue_view() -> None:
-    """The vocabularies the rest of the app is built from, editable."""
+    """The same dictionary, on a page of its own, for a second monitor."""
     st.markdown(ui.CSS, unsafe_allow_html=True)
     vocab = vocabulary.Vocabulary.load()
-    inventory = Inventory.load()
-    used_garments = {i.garment for i in inventory.items}
-    used_fabrics = {i.fabric for i in inventory.items if i.fabric}
-
     st.markdown(
         '<div class="masthead"><h1>Garment <em>catalogue</em></h1>'
         f'<div class="sub">{len(vocab.garments)} garments &middot; '
         f'{len(vocab.fabrics)} fabrics &middot; {len(vocab.fits) - 1} fits &middot; '
         f'{len(vocab.grades) - 1} grades</div></div>', unsafe_allow_html=True)
+    garment_catalogue_panel()
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
+
+
+# --- 2. garment catalogue -----------------------------------------------------
+
+def garment_catalogue_panel() -> None:
+    """The vocabularies the rest of the app is built from, editable.
+
+    Every dropdown in the app is filled from this, which is why it sits second:
+    the dictionary comes before the things written in it.
+    """
+    vocab = vocabulary.Vocabulary.load()
+    inventory = Inventory.load()
+    used_garments = {i.garment for i in inventory.items}
+    used_fabrics = {i.fabric for i in inventory.items if i.fabric}
+
+    ui.stats([
+        ("Garments", str(len(vocab.garments))),
+        ("Fabrics", str(len(vocab.fabrics))),
+        ("Fits", str(len(vocab.fits) - 1)),
+        ("Grades", str(len(vocab.grades) - 1)),
+    ], brass_first=True)
     ui.blurb(
         "Every list the rest of the app is built from. Add a garment nobody thought "
         "of, retire a fabric you will never own, rename a grade so it means what you "
@@ -1318,9 +1341,6 @@ def garment_catalogue_view() -> None:
         if st.button("Restore the default catalogue", type="secondary"):
             vocab.restore_defaults()
             st.rerun()
-
-    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
-                '</div>', unsafe_allow_html=True)
 
 
 def retailer_catalogue_view() -> None:
@@ -1586,7 +1606,7 @@ def combination_panel(palette: Palette, skin: str) -> None:
             unsafe_allow_html=True)
 
 
-# --- 5. outfit generator ------------------------------------------------------
+# --- 6. outfit generator ------------------------------------------------------
 
 def item_picker(label: str, options: list[Item], key: str, multi: bool = False):
     """A searchable box over inventory. Streamlit's select boxes filter as you type."""
@@ -1714,7 +1734,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                     unsafe_allow_html=True)
 
 
-# --- 6. outfit gallery --------------------------------------------------------
+# --- 7. outfit gallery --------------------------------------------------------
 
 def gallery_tab(inventory: Inventory, outfits: Outfits) -> None:
     if not outfits.outfits:
@@ -2127,7 +2147,7 @@ def snapshots_panel() -> None:
             st.rerun()
 
 
-# --- 7. body measurements -----------------------------------------------------
+# --- 8. body measurements -----------------------------------------------------
 
 def body_tab(profile: Profile) -> None:
     ui.blurb(
@@ -2145,7 +2165,7 @@ def body_tab(profile: Profile) -> None:
     size_targets_panel(profile)
 
 
-# --- 8. where to buy ----------------------------------------------------------
+# --- 9. where to buy ----------------------------------------------------------
 
 def where_to_buy_tab(inventory: Inventory) -> None:
     plan = sourcing.Plan.load()
@@ -2313,7 +2333,7 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
                     st.rerun()
 
 
-# --- 9. shopping guide --------------------------------------------------------
+# --- 10. shopping guide --------------------------------------------------------
 
 def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
              principles: Principles) -> None:

@@ -1335,12 +1335,16 @@ def check_app_renders_empty() -> str:
     app = _render()
     labels = [t.label for t in app.tabs]
     numbered = [l for l in labels if l[0].isdigit()]
-    assert len(numbered) == 9, f"expected 9 numbered tabs, got {numbered}"
-    assert [l[0] for l in numbered] == list("123456789"), f"tabs out of order: {numbered}"
-    assert "Colour" in numbered[3], f"Colour is not the fourth tab: {numbered[3]}"
-    assert "Body Measurements" in numbered[6], "body measurements did not get its own tab"
-    assert "Where to Buy" in numbered[7], "Where to Buy is not before the shop"
-    assert "Shopping" in numbered[8], "shopping guide is not last"
+    assert len(numbered) == 10, f"expected 10 numbered tabs, got {numbered}"
+    assert [l.split(" ")[0] for l in numbered] == [str(n) for n in range(1, 11)], \
+        f"tabs out of order: {numbered}"
+    assert "Garment Catalogue" in numbered[1], \
+        f"the dictionary is not second: {numbered[1]}"
+    assert "Wardrobe Inventory" in numbered[2], "inventory does not follow the dictionary"
+    assert "Colour" in numbered[4], f"Colour is not the fifth tab: {numbered[4]}"
+    assert "Body Measurements" in numbered[7], "body measurements did not get its own tab"
+    assert "Where to Buy" in numbered[8], "Where to Buy is not before the shop"
+    assert "Shopping" in numbered[9], "shopping guide is not last"
     assert any("Diagnostics" in l for l in labels), "the diagnostics tab is missing"
     return f"{len(labels)} tabs: " + " · ".join(labels)
 
@@ -1541,11 +1545,17 @@ def check_garment_catalogue() -> str:
     assert "Cardigan" not in garments(), "restoring defaults did not undo the edit"
     assert len(garments()) == before, "the count did not come back"
 
+    # It is a tab now, and also a page of its own for a second monitor.
+    inside = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
+    assert not inside.exception, f"the app raised: {inside.exception[0].value}"
+    assert any("Garment Catalogue" in t.label for t in inside.tabs), \
+        "the dictionary is not a tab"
+
     page = AppTest.from_file(str(APP_FILE), default_timeout=180)
     page.query_params["garments"] = "all"
     page = page.run()
     assert not page.exception, f"the garment catalogue raised: {page.exception[0].value}"
-    assert not page.tabs, "the catalogue drew the whole app"
+    assert not page.tabs, "the standalone catalogue drew the whole app"
     # Garment names sit in expander labels, not markdown, so both are read.
     body = "\n".join(
         [m.value for m in page.markdown]
@@ -1557,7 +1567,8 @@ def check_garment_catalogue() -> str:
     buttons = [b.label for b in page.button]
     assert "Add garment" in buttons and "Add fabric" in buttons, "no way to add"
     assert "Save fits and grades" in buttons, "no way to edit fits or grades"
-    return f"{before} garments, {len(vocab.fabrics)} fabrics; edits visible at once"
+    return (f"{before} garments, {len(vocab.fabrics)} fabrics; tab 2 and a page "
+            f"of its own, edits visible at once")
 
 
 def check_shop_catalogue_opens() -> str:

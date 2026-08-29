@@ -43,22 +43,23 @@ Six tabs, in the order the work happens.
    The guide is a draft, not a delivery. **Read** renders it and **Edit** gives
    you the raw markdown. Every save keeps the version it replaced, and any of
    them can be restored, so nothing here can lose an afternoon.
-2. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
+2. **Garment Catalogue** — the dictionary. Garments with their category and
+   size scheme, fabrics with their family, the fits and the grades. Every
+   dropdown in the app is filled from this, and editing it takes effect at once.
+   It sits second because the dictionary comes before the things written in it.
+3. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
    restaged onto white the moment they are uploaded, so a wardrobe photographed
    on a bedroom floor still reads as a wardrobe worth browsing
    and sizes in whatever scheme that garment actually uses: a collar for a
    shirt, chest and a length letter for a jacket, waist and leg for trousers,
    three disagreeing national systems for a shoe. Only wanted pieces carry a
    price, since what an owned garment cost is sunk. Photograph anything words
-   cannot pin down: "green jacket" gives a different jacket every time. The
-   **garment catalogue** opens in its own tab: garments and their categories and
-   size schemes, fabrics and their families, the fits and the grades. Every
-   dropdown in the app is built from it, and editing it takes effect at once.
-3. **Principles** — short checkable rules, about ten of them. The model offers
+   cannot pin down: "green jacket" gives a different jacket every time.
+4. **Principles** — short checkable rules, about ten of them. The model offers
    five suggestions at a time and you keep the ones that ring true; each round
    is told what you already kept so it goes somewhere new. Hand-written ones
    sit alongside. All of them are fed into every generated look.
-4. **Colour** — the palette as a set of roles rather than a list. Ground, Field
+5. **Colour** — the palette as a set of roles rather than a list. Ground, Field
    and Accent, each with the garments it is allowed on and the seasons it is worn
    in, which gives four palettes out of one. Every colour carries a name, taken
    from a catalogue of fifty or given by hand, and the catalogue opens in its own
@@ -66,21 +67,21 @@ Six tabs, in the order the work happens.
    colour goes on which garment. Then every
    recipe the grid permits is enumerated and scored, best first, filterable by
    season, with its reasoning printed next to it.
-5. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
+6. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
    you do not own yet. Item photos ride along as references so the generated
    image shows *that* jacket.
-6. **Outfit Gallery** — tag, search, love. Any outfit opens on its own page,
+7. **Outfit Gallery** — tag, search, love. Any outfit opens on its own page,
    where it can be varied from the settings it was generated with and put
    side by side against a rival, with the difference between them named. Each outfit shows its cost split
    between what is already owned and what is still to buy.
-7. **Body Measurements** — nine measurements, all takeable on yourself with a tape
+8. **Body Measurements** — nine measurements, all takeable on yourself with a tape
    and a mirror, and the finished garment dimensions derived from them.
-8. **Where to Buy** — the sourcing plan, editable. Which shops each garment type
+9. **Where to Buy** — the sourcing plan, editable. Which shops each garment type
    comes from, what to match on, and on what terms. Add, edit and delete routes,
    or restore the defaults. The retailer catalogue opens in its own tab, where
    shops can be added, edited or dropped; a route naming a shop that is later
    deleted simply loses it rather than breaking.
-9. **Shopping Guide** — a shop. Each wanted piece is a product card with a
+10. **Shopping Guide** — a shop. Each wanted piece is a product card with a
    generated catalogue photograph, its price and the size to look for. Open one
    and it fills a browser tab: the cloth, the cut, what to check before buying,
    how that garment usually goes wrong, the finished measurements on his body,
