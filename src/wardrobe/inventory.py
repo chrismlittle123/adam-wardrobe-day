@@ -44,9 +44,17 @@ SINGLE_SLOT: tuple[str, ...] = ("Top", "Bottom", "Outerwear", "Shoes")
 # --- sizing -------------------------------------------------------------------
 
 # A shirt is sized by the collar, a jacket by the chest and a length letter, a
-# trouser by waist and leg, a shoe by three competing national systems that do
-# not agree with each other. One shared set of boxes would be wrong for all of
-# them, so each garment declares its own.
+# trouser by waist and leg, a shoe by a number that means something different in
+# every country. One shared set of boxes would be wrong for all of them, so each
+# garment declares its own.
+#
+# Everything here is a UK SIZE: the number printed on the label, in whatever unit
+# the shop chose to print it. That is not a measurement, and the two get confused
+# constantly. A jacket labelled 38 is not 38 of anything you could put a tape
+# across; it is a size that happens to have started life as a chest in inches.
+# Every actual measurement in this app, body and garment alike, is centimetres,
+# and lives in the Body Measurements tab. EU sizes are kept alongside the UK ones
+# only because half of Vinted is listed in them.
 
 @dataclass(frozen=True)
 class SizeField:
@@ -80,25 +88,30 @@ GRADES: tuple[str, ...] = (
 FITS: tuple[str, ...] = ("", "Slim", "Regular", "Relaxed", "Oversized")
 
 _alpha = SizeField("alpha", "Size", ALPHA)
-_collar = SizeField("collar", "Collar", (NONE, *_range(13.5, 18.5, 0.5, '"')),
-                    "Neck measurement on the label. The number that matters on a shirt.")
-_sleeve = SizeField("sleeve", "Sleeve", (NONE, *_range(31, 37, 1, '"')),
-                    "Dress shirts only. Casual shirts rarely quote it.")
-_chest = SizeField("chest", "Chest", (NONE, *_range(34, 48, 2, '"')),
-                   "UK and US jackets are sized by chest in inches.")
+_collar = SizeField("collar", "Collar (UK)", (NONE, *_range(13.5, 18.5, 0.5, '"')),
+                    "UK shirts are labelled by collar in inches. 15\" is about 38 cm, "
+                    "15.5\" about 39 cm, 16\" about 41 cm.")
+_sleeve = SizeField("sleeve", "Sleeve (UK)", (NONE, *_range(31, 37, 1, '"')),
+                    "Dress shirts only, in inches on the label. Casual shirts rarely "
+                    "quote it.")
+_chest = SizeField("chest", "UK size", (NONE, *_range(34, 48, 2)),
+                   "The number on a UK jacket label. It is a size, not a chest "
+                   "measurement: the finished garment measures rather more.")
 _jkt_len = SizeField("length", "Length", (NONE, "Short", "Regular", "Long"),
                      "38S, 38R and 38L share a chest and differ in body and sleeve length.")
-_eu_jkt = SizeField("eu", "EU", (NONE, *_range(42, 62, 2)),
-                    "Italian and French jackets. Roughly the chest in inches plus 10.")
-_waist = SizeField("waist", "Waist", (NONE, *_range(26, 44, 1, '"')))
-_leg = SizeField("leg", "Leg", (NONE, *_range(28, 38, 1, '"')),
-                 "Inside leg. The half of trouser sizing shops most often ignore.")
+_eu_jkt = SizeField("eu", "EU size", (NONE, *_range(42, 62, 2)),
+                    "Half of Vinted is listed in these. Roughly the UK size plus 10.")
+_waist = SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"')),
+                   "Inches on the label. Rarely the same as your actual waist.")
+_leg = SizeField("leg", "Leg (UK)", (NONE, *_range(28, 38, 1, '"')),
+                 "Inside leg in inches, the half of trouser sizing shops most often "
+                 "ignore. 30\" is about 76 cm, 32\" about 81 cm.")
 _uk_shoe = SizeField("uk", "UK", (NONE, *_range(5, 14, 0.5)))
-_eu_shoe = SizeField("eu", "EU", (NONE, *_range(38, 49, 0.5)))
-_us_shoe = SizeField("us", "US", (NONE, *_range(6, 15, 0.5)))
+_eu_shoe = SizeField("eu", "EU", (NONE, *_range(38, 49, 0.5)),
+                     "For listings from the continent. Roughly UK plus 33.")
 _width = SizeField("width", "Width", (NONE, "Narrow", "Standard", "Wide", "D", "E", "F", "G"))
 
-SHOE_SCHEME = (_uk_shoe, _eu_shoe, _us_shoe, _width)
+SHOE_SCHEME = (_uk_shoe, _eu_shoe, _width)
 JACKET_SCHEME = (_chest, _jkt_len, _eu_jkt)
 TROUSER_SCHEME = (_waist, _leg)
 TOP_SCHEME = (_alpha,)
@@ -107,9 +120,9 @@ DEFAULT_SCHEME = (SizeField("size", "Size", (), "However this one happens to be 
 SIZE_SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Bag": (), "Jewellery": (), "Scarf": (), "Sunglasses": (),
     "Watch": (SizeField("case", "Case", (NONE, *_range(34, 46, 1, "mm"))),),
-    "Belt": (SizeField("waist", "Waist", (NONE, *_range(26, 44, 1, '"'))), _alpha),
+    "Belt": (SizeField("waist", "Waist (UK)", (NONE, *_range(26, 44, 1, '"'))), _alpha),
     "Hat": (SizeField("hat", "Size", (NONE, "S/M", "L/XL", *_range(54, 62, 1, "cm"))),),
-    "Socks": (SizeField("socks", "Size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
+    "Socks": (SizeField("socks", "UK size", (NONE, "UK 6-8", "UK 8-11", "UK 11-14")),),
     "Blazer": JACKET_SCHEME, "Overcoat": JACKET_SCHEME, "Suit": JACKET_SCHEME,
     "Jacket": (_alpha, _chest), "Overshirt": TOP_SCHEME, "Gilet": (_alpha,),
     "Waistcoat": (_chest, _alpha),
@@ -235,14 +248,23 @@ class Item:
         )
 
     def prune_sizes(self) -> None:
-        """Drop size keys that do not belong to this garment.
+        """Drop size keys and values that no longer belong to this garment.
 
-        Re-classify a shirt as a trouser and the collar measurement would
-        otherwise sit in the file forever, invisible but not gone.
+        Two ways stale data gets in. Re-classify a shirt as a trouser and the
+        collar would otherwise sit in the file forever, invisible but not gone.
+        And when a scheme's options change, an old value survives as something
+        the dropdown cannot select and nobody can correct. Both go.
         """
-        allowed = {f.key for f in size_scheme(self.garment)}
-        self.sizes = {k: v for k, v in self.sizes.items()
-                      if k in allowed and v and v != NONE}
+        scheme = {f.key: f for f in size_scheme(self.garment)}
+        kept: dict[str, str] = {}
+        for key, value in self.sizes.items():
+            spec = scheme.get(key)
+            if not spec or not value or value == NONE:
+                continue
+            if spec.options and value not in spec.options:
+                continue
+            kept[key] = value
+        self.sizes = kept
 
     def searchable(self) -> str:
         return " ".join(

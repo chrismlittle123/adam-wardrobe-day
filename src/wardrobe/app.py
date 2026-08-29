@@ -1533,10 +1533,15 @@ def snapshots_panel() -> None:
 
 def body_tab(profile: Profile) -> None:
     ui.blurb(
-        "Ten measurements, all takeable on yourself with a tape and a mirror, and the "
-        "finished garment dimensions that follow from them. A size label means nothing "
-        "across two brands; a blazer measuring 106 cm round the chest means the same "
-        "thing everywhere, which is why these numbers travel to every product page."
+        "Two different kinds of number, and confusing them is most of why clothes do "
+        "not fit. A **UK size** is what a shop prints on a label: a jacket marked 38, "
+        "a shirt with a 15.5 inch collar, a shoe marked 9. It is a name, not a length, "
+        "and it means something different in every shop. A **measurement** is what a "
+        "tape reads, and in here every one of them is in centimetres, on this tab and "
+        "on every product page.\n\nSo: sizes stay in whatever the label says, "
+        "measurements are always cm, and the tables below turn the second into the "
+        "first. A blazer measuring 106 cm round the chest means the same thing "
+        "everywhere; a jacket labelled 38 does not."
     )
     measurements_panel(profile)
     size_targets_panel(profile)

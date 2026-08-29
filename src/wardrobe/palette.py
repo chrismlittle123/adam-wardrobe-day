@@ -69,33 +69,41 @@ HUE_BANDS: tuple[tuple[float, str], ...] = (
     (195, "teal"), (255, "blue"), (285, "indigo"), (320, "violet"), (345, "magenta"),
 )
 
-# The thirty colours a menswear wardrobe is actually built from, grouped the way
+# The fifty colours a menswear wardrobe is actually built from, grouped the way
 # they are chosen. Typed free-hand this list became "chocolate", "Chocolate" and
 # "dark brown", which are one colour wearing three names.
 NAMED_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
     "Whites and neutrals": (
-        ("White", "#F6F4EF"), ("Off-white", "#EFEAE0"), ("Cream", "#F2E9D8"),
-        ("Ecru", "#E8DFC8"), ("Sand", "#D9C9A8"), ("Stone", "#C9BCA4"),
-        ("Beige", "#C8B79A"), ("Taupe", "#A2917E"),
+        ("White", "#F6F4EF"), ("Off-white", "#EFEAE0"), ("Bone", "#E7E0D4"),
+        ("Cream", "#F2E9D8"), ("Ecru", "#E8DFC8"), ("Oatmeal", "#DDD3C0"),
+        ("Sand", "#D9C9A8"), ("Stone", "#C9BCA4"), ("Beige", "#C8B79A"),
+        ("Putty", "#B9AC96"), ("Taupe", "#A2917E"), ("Mushroom", "#9C9184"),
     ),
     "Greys": (
-        ("Light grey", "#C4C3BF"), ("Mid grey", "#7A7A78"), ("Charcoal", "#3C3B3A"),
+        ("Silver", "#D8D8D6"), ("Light grey", "#C4C3BF"), ("Mid grey", "#7A7A78"),
+        ("Slate", "#5A6270"), ("Charcoal", "#3C3B3A"), ("Graphite", "#2B2B2E"),
         ("Black", "#1B1918"),
     ),
     "Blues": (
-        ("Pale blue", "#BFD3E6"), ("Sky blue", "#8FB3D0"), ("Mid blue", "#4A6E96"),
-        ("Denim", "#3E5C79"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
+        ("Powder blue", "#D3E0EC"), ("Pale blue", "#BFD3E6"), ("Sky blue", "#8FB3D0"),
+        ("Air force", "#5C7B95"), ("Mid blue", "#4A6E96"), ("Denim", "#3E5C79"),
+        ("Petrol", "#2E5561"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
+        ("Midnight", "#171E2B"),
     ),
     "Greens": (
-        ("Sage", "#A3AF97"), ("Khaki", "#8A8560"), ("Olive", "#5F6146"),
-        ("Forest", "#2F4032"),
+        ("Mint", "#BFD6C4"), ("Sage", "#A3AF97"), ("Khaki", "#8A8560"),
+        ("Moss", "#6F7A4E"), ("Olive", "#5F6146"), ("Forest", "#2F4032"),
+        ("Bottle", "#1F3A2C"),
     ),
     "Browns": (
-        ("Camel", "#C19A6B"), ("Tan", "#A9743F"), ("Chestnut", "#8B5A2B"),
+        ("Biscuit", "#D2B48C"), ("Camel", "#C19A6B"), ("Cognac", "#9C5A2D"),
+        ("Tan", "#A9743F"), ("Chestnut", "#8B5A2B"), ("Tobacco", "#7E5835"),
         ("Chocolate", "#6B4426"), ("Espresso", "#3E2A1E"),
     ),
     "Warm accents": (
+        ("Dusty pink", "#C9A29B"), ("Terracotta", "#B5613F"),
         ("Mustard", "#C08A2E"), ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
+        ("Oxblood", "#4A1F23"),
     ),
 }
 

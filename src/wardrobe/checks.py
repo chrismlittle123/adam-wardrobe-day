@@ -130,11 +130,11 @@ def check_inventory_round_trip() -> str:
     from .inventory import Inventory, Item
     inv = Inventory.load()
     item = inv.add(Item(name="Test blazer", garment="Blazer",
-                        sizes={"chest": '38"', "length": "Regular"}))
+                        sizes={"chest": "38", "length": "Regular"}))
     inv.save()
     again = Inventory.load()
     back = again.by_id(item.id)
-    assert back and back.sizes == {"chest": '38"', "length": "Regular"}, "sizes lost"
+    assert back and back.sizes == {"chest": "38", "length": "Regular"}, "sizes lost"
     assert again.unique_id("Test blazer") == "test-blazer-2", "id collision not handled"
     return f"sizes survived, id {back.id}"
 
@@ -266,6 +266,44 @@ def check_pattern_removed() -> str:
     return f"no pattern field; describe() gives {described!r}"
 
 
+def check_uk_sizing() -> str:
+    """UK sizes on labels, centimetres for every measurement, and no US shoes.
+
+    The two get confused constantly: a jacket labelled 38 is not 38 of anything a
+    tape can find. Everything the fit engine produces is centimetres, everything
+    a shop prints is a UK size, and the labels have to say which is which.
+    """
+    from .fitspec import Body, HOW_TO_MEASURE, LABELS, spec_table, target_spec
+    from .inventory import GARMENTS, size_scheme
+
+    for garment in GARMENTS:
+        for field in size_scheme(garment):
+            assert field.key != "us", f"{garment} still offers a US size"
+            assert "cm" not in field.label.lower(), \
+                f"{garment}'s {field.label} mixes a measurement into a size label"
+    labelled = {f.label for g in GARMENTS for f in size_scheme(g)}
+    assert any("UK" in l for l in labelled), "no size is marked as a UK size"
+
+    # Every measurement the engine produces is centimetres, with no inches in sight.
+    rows = spec_table(target_spec("Blazer", Body(chest=96, waist=78, hip=94), 176))
+    assert rows, "the blazer spec came back empty"
+    for row in rows:
+        assert row["Target"].endswith("cm") or "cm" in row["Target"], \
+            f"a target is not in centimetres: {row}"
+        assert '"' not in row["Target"], f"inches leaked into a measurement: {row}"
+    assert all("cm" not in LABELS.get(k, "") for k in HOW_TO_MEASURE), \
+        "a body measurement label carries its unit twice"
+
+    # The two numbers for a chest must not be confusable.
+    scheme_chest = next(f for f in size_scheme("Blazer") if f.key == "chest")
+    target_chest = next(t for t in target_spec("Blazer", Body(chest=96), 176)
+                        if t.key == "chest")
+    assert scheme_chest.label == "UK size", "the jacket label is not marked as a size"
+    assert target_chest.value > 96, "the finished garment does not exceed the body"
+    return (f"labels are UK sizes, measurements are cm; a UK {scheme_chest.options[3]} "
+            f"jacket wants {target_chest.value:g} cm round the chest")
+
+
 def check_fabric_list() -> str:
     """Fabric is a fixed list, and the sample data uses names from it."""
     from .inventory import FABRICS, FABRIC_OPTIONS, NONE, fabric_family
@@ -301,7 +339,8 @@ def check_size_schemes() -> str:
     assert "collar" in keyed["Shirt"], "a shirt is sized by its collar"
     assert "chest" in keyed["Blazer"] and "length" in keyed["Blazer"], "blazer needs chest and length"
     assert {"waist", "leg"} <= set(keyed["Trousers"]), "trousers need waist and leg"
-    assert {"uk", "eu", "us"} <= set(keyed["Loafers"]), "shoes need all three systems"
+    assert {"uk", "eu"} <= set(keyed["Loafers"]), "shoes need UK and EU"
+    assert "us" not in keyed["Loafers"], "US sizing does not belong in a UK wardrobe"
     assert keyed["Bag"] == [], "a bag has no size"
     return "shirt/blazer/trouser/shoe schemes all distinct"
 
@@ -334,7 +373,17 @@ def check_size_pruning() -> str:
     after = Inventory.load().by_id(item.id)
     assert "collar" not in after.sizes, f"stale shirt sizes survived: {after.sizes}"
     assert after.sizes.get("waist") == '31"', "the new size was lost"
-    return f"collar dropped on re-classification, left with {after.sizes}"
+
+    # A value the dropdown can no longer offer is stale too, and nobody can
+    # correct it through the form because it is not on the list.
+    stale = inventory.add(Item(name="Old blazer", garment="Blazer",
+                               sizes={"chest": '38"', "length": "Regular"}))
+    inventory.save()
+    back = Inventory.load().by_id(stale.id)
+    assert "chest" not in back.sizes, f"an unselectable value survived: {back.sizes}"
+    assert back.sizes.get("length") == "Regular", "a valid value was dropped with it"
+    return (f"collar dropped on re-classification; unselectable values dropped too, "
+            f"left with {after.sizes}")
 
 
 def check_photo_limits() -> str:
@@ -379,10 +428,10 @@ def check_photo_limits() -> str:
 
 def check_size_line_and_category() -> str:
     from .inventory import Item, category_for
-    item = Item(garment="Blazer", sizes={"chest": '38"', "length": "Regular", "cut": "—",
+    item = Item(garment="Blazer", sizes={"chest": "38", "length": "Regular", "cut": "—",
                                           "bogus": "x"})
     line = item.size_line()
-    assert "Chest 38" in line and "Regular" in line, "size line missing real values"
+    assert "UK size 38" in line and "Regular" in line, "size line missing real values"
     assert "—" not in line and "bogus" not in line, "size line shows placeholders or junk"
     assert category_for("Blazer") == "Outerwear" and category_for("Loafers") == "Shoes"
     return line
@@ -443,6 +492,25 @@ def _palette():
     ):
         palette.add(Colour(name=name, hex=hex_code, role=role))
     return palette
+
+
+def check_named_colours() -> str:
+    """Fifty colours, each named once and each a distinct swatch."""
+    from .palette import COLOUR_HEX, COLOUR_NAMES, NAMED_COLOURS, colour_group, hex_for
+    assert len(COLOUR_NAMES) == 50, f"expected 50 colours, got {len(COLOUR_NAMES)}"
+    assert len(set(COLOUR_NAMES)) == 50, "a colour name appears twice"
+    swatches = list(COLOUR_HEX.values())
+    assert len(set(swatches)) == 50, "two colours share a hex code"
+    for name, code in COLOUR_HEX.items():
+        assert len(code) == 7 and code.startswith("#"), f"{name} has a malformed hex"
+        assert code == code.upper(), f"{name} is not upper case"
+        assert colour_group(name), f"{name} belongs to no group"
+    assert hex_for("Navy") == "#26303F", "a known colour moved"
+    assert hex_for("nonsense") == "#CCCCCC", "an unknown colour has no fallback"
+    for essential in ("White", "Cream", "Navy", "Charcoal", "Olive", "Camel",
+                      "Chocolate", "Black", "Burgundy", "Oxblood"):
+        assert essential in COLOUR_HEX, f"{essential} is missing"
+    return f"{len(COLOUR_NAMES)} colours across {len(NAMED_COLOURS)} groups, all distinct"
 
 
 def check_colour_arithmetic() -> str:
@@ -836,13 +904,13 @@ def check_tactics() -> str:
     from .retailers import tactics
 
     coat = Item(name="Camel overcoat", garment="Overcoat", colour="Camel",
-                sizes={"chest": '38"'})
+                sizes={"chest": "38"})
     names = [t.name for t in tactics(coat)]
     assert "Save the Vinted search" in names, "no saved search for a rarely-worn coat"
     assert "Buy it out of season" in names, "no seasonal timing for a coat"
     detail = " ".join(t.detail for t in tactics(coat))
     assert "February" in detail, "the coat's cheap month is not named"
-    assert '38"' in detail, "his size never reaches the alert advice"
+    assert "38" in detail, "his size never reaches the alert advice"
     assert "£" not in detail, "a price crept back into the advice"
 
     tee = Item(name="Tee", garment="T-shirt")
@@ -1378,6 +1446,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (FIT, "Lean and athletic is not read as lean", check_build_matching),
     (INVENTORY, "Pattern is gone from items", check_pattern_removed),
     (INVENTORY, "Fabric comes from a fixed list", check_fabric_list),
+    (INVENTORY, "UK sizes on labels, centimetres for measurements", check_uk_sizing),
     (INVENTORY, "Garments and categories alphabetical", check_alphabetical),
     (INVENTORY, "Each garment has its own size scheme", check_size_schemes),
     (INVENTORY, "Size line hides blanks and junk", check_size_line_and_category),
@@ -1386,6 +1455,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (QUESTIONS, "Principles come in batches of five", check_principles_batching),
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
+    (COLOUR, "Fifty named colours, all distinct", check_named_colours),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
     (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
     (COLOUR, "Harmonies come back wearable", check_harmonies_are_wearable),

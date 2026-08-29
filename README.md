@@ -150,7 +150,19 @@ budget filters rather than halts, so a small budget still returns the best
 thing it can actually buy. It is greedy, so it approximates; every step shows
 its arithmetic.
 
-### Sizing
+### Sizing, UK
+
+Two different kinds of number, and confusing them is most of why clothes do not
+fit. A **UK size** is what a shop prints on a label: a jacket marked 38, a shirt
+with a 15.5 inch collar, a shoe marked 9. It is a name, not a length, and it
+means something different in every shop. A **measurement** is what a tape reads,
+and every one of them in this app is centimetres.
+
+So sizes stay in whatever unit the label uses, measurements are always cm, and
+the Body Measurements tab turns the second into the first. EU sizes sit alongside
+the UK ones only because half of Vinted is listed in them; US sizes are gone.
+
+### The fit engine
 
 `fitspec.py` separates body measurements from garment measurements and keeps
 ease tabulated per garment and per fit. A size label means nothing across two
