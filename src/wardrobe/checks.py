@@ -268,7 +268,7 @@ def check_garment_colour_comes_from_the_catalogue() -> str:
     """
     from streamlit.testing.v1 import AppTest
 
-    from .palette import COLOUR_NAMES, hex_for
+    from .palette import colour_names, hex_for
     from .inventory import Item
 
     app = AppTest.from_file(str(APP_FILE), default_timeout=180).run()
@@ -277,7 +277,7 @@ def check_garment_colour_comes_from_the_catalogue() -> str:
     boxes = [w for w in app.selectbox if w.label == "Colour"]
     assert boxes, "no colour picker on the inventory form"
     for box in boxes:
-        assert list(box.options) == ["", *COLOUR_NAMES], \
+        assert list(box.options) == ["", *colour_names()], \
             f"the colour list is not the catalogue: {list(box.options)[:4]}"
 
     page = "\n".join(m.value for m in app.markdown)
@@ -288,7 +288,7 @@ def check_garment_colour_comes_from_the_catalogue() -> str:
     item = Item(name="x", colour="Navy")
     item.colour_hex = hex_for(item.colour)
     assert item.colour_hex == "#26303F", "the hex no longer follows the name"
-    return f"colour picked from {len(COLOUR_NAMES)} catalogue names, no hex on the form"
+    return f"colour picked from {len(colour_names())} catalogue names, no hex on the form"
 
 
 def check_pattern_removed() -> str:
@@ -550,13 +550,14 @@ def _palette():
 
 
 def check_named_colours() -> str:
-    """Fifty colours, each named once and each a distinct swatch."""
-    from .palette import COLOUR_HEX, COLOUR_NAMES, NAMED_COLOURS, colour_group, hex_for
-    assert len(COLOUR_NAMES) == 50, f"expected 50 colours, got {len(COLOUR_NAMES)}"
-    assert len(set(COLOUR_NAMES)) == 50, "a colour name appears twice"
-    swatches = list(COLOUR_HEX.values())
+    """The colours live in the catalogue with the other vocabularies, and can be
+    added to like any of them."""
+    from .palette import colour_group, colour_hex, colour_names, hex_for, named_colours
+    assert len(colour_names()) == 50, f"expected 50 colours, got {len(colour_names())}"
+    assert len(set(colour_names())) == 50, "a colour name appears twice"
+    swatches = list(colour_hex().values())
     assert len(set(swatches)) == 50, "two colours share a hex code"
-    for name, code in COLOUR_HEX.items():
+    for name, code in colour_hex().items():
         assert len(code) == 7 and code.startswith("#"), f"{name} has a malformed hex"
         assert code == code.upper(), f"{name} is not upper case"
         assert colour_group(name), f"{name} belongs to no group"
@@ -564,8 +565,22 @@ def check_named_colours() -> str:
     assert hex_for("nonsense") == "#CCCCCC", "an unknown colour has no fallback"
     for essential in ("White", "Cream", "Navy", "Charcoal", "Olive", "Camel",
                       "Chocolate", "Black", "Burgundy", "Oxblood"):
-        assert essential in COLOUR_HEX, f"{essential} is missing"
-    return f"{len(COLOUR_NAMES)} colours across {len(NAMED_COLOURS)} groups, all distinct"
+        assert essential in colour_hex(), f"{essential} is missing"
+
+    # The list is data now, so an addition has to show up everywhere at once.
+    from .vocabulary import NamedColour, Vocabulary
+    vocab = Vocabulary.load()
+    vocab.add_colour(NamedColour(name="Adam green", hex="#3F5E3A", group="Greens"))
+    vocab.save()
+    assert "Adam green" in colour_names(), "an added colour is not visible"
+    assert hex_for("Adam green") == "#3F5E3A", "the added colour has no swatch"
+    assert colour_group("Adam green") == "Greens", "it landed in no group"
+    assert "Adam green" in [n for n, _ in named_colours()["Greens"]], \
+        "it is not in its group's list"
+    Vocabulary.load().restore_defaults()
+    assert "Adam green" not in colour_names(), "restoring did not undo it"
+    return (f"{len(colour_names())} colours across {len(named_colours())} groups, "
+            "all distinct, and addable")
 
 
 def check_seasons() -> str:
@@ -1873,9 +1888,9 @@ def check_garment_catalogue() -> str:
         + [getattr(e, "label", "") for e in page.get("expander") or []]
         + [t.label for t in page.tabs]
     )
-    for word in ("Blazer", "Grade", "Fit", "Garments", "Fabrics"):
+    for word in ("Blazer", "Grade", "Fit", "Garments", "Fabrics", "Colours"):
         assert word in body, f"{word} is missing from the catalogue"
-    assert len(page.tabs) >= 3, "the catalogue is not split into sections"
+    assert len(page.tabs) >= 4, "the catalogue is not split into sections"
     # Editing sits behind a toggle, so browsing is compact: the add forms are
     # not on the page until asked for.
     toggles = [t.label for t in page.toggle]
@@ -1926,7 +1941,7 @@ def check_colour_catalogue_opens() -> str:
     """The catalogue is a page of its own, and every colour on it has a name."""
     from streamlit.testing.v1 import AppTest
 
-    from .palette import COLOUR_NAMES, Colour, Palette
+    from .palette import Colour, Palette, colour_names
     from .seed import seed_palette
     palette = seed_palette()
     palette.add(Colour(name="Adam's green", hex="#3F5E3A", role="Accent"))
@@ -1941,9 +1956,9 @@ def check_colour_catalogue_opens() -> str:
     for name in ("Oxblood", "Petrol", "Cognac", "Navy"):
         assert name in page, f"{name} is missing from the catalogue"
     assert "Adam's green" in page, "a hand-named colour is missing"
-    assert page.count("#") > len(COLOUR_NAMES), "hex codes are not being shown"
+    assert page.count("#") > len(colour_names()), "hex codes are not being shown"
     assert "In the palette" in page, "the catalogue does not say what is already used"
-    return f"{len(COLOUR_NAMES)} named colours plus the hand-named ones, on their own page"
+    return f"{len(colour_names())} named colours plus the hand-named ones, on their own page"
 
 
 def check_outfit_page_and_comparison() -> str:

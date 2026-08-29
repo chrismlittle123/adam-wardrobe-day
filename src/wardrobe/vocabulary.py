@@ -158,6 +158,45 @@ DEFAULT_FABRICS: dict[str, tuple[str, ...]] = {
 # reading; the dropdown is for finding.
 
 
+# The colours a menswear wardrobe is built from, grouped the way they are
+# chosen. Fifty to start with, and addable like everything else here. Typed free-hand this list became "chocolate", "Chocolate" and
+# "dark brown", which are one colour wearing three names.
+DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
+    "Whites and neutrals": (
+        ("White", "#F6F4EF"), ("Off-white", "#EFEAE0"), ("Bone", "#E7E0D4"),
+        ("Cream", "#F2E9D8"), ("Ecru", "#E8DFC8"), ("Oatmeal", "#DDD3C0"),
+        ("Sand", "#D9C9A8"), ("Stone", "#C9BCA4"), ("Beige", "#C8B79A"),
+        ("Putty", "#B9AC96"), ("Taupe", "#A2917E"), ("Mushroom", "#9C9184"),
+    ),
+    "Greys": (
+        ("Silver", "#D8D8D6"), ("Light grey", "#C4C3BF"), ("Mid grey", "#7A7A78"),
+        ("Slate", "#5A6270"), ("Charcoal", "#3C3B3A"), ("Graphite", "#2B2B2E"),
+        ("Black", "#1B1918"),
+    ),
+    "Blues": (
+        ("Powder blue", "#D3E0EC"), ("Pale blue", "#BFD3E6"), ("Sky blue", "#8FB3D0"),
+        ("Air force", "#5C7B95"), ("Mid blue", "#4A6E96"), ("Denim", "#3E5C79"),
+        ("Petrol", "#2E5561"), ("Navy", "#26303F"), ("Ink", "#1D2430"),
+        ("Midnight", "#171E2B"),
+    ),
+    "Greens": (
+        ("Mint", "#BFD6C4"), ("Sage", "#A3AF97"), ("Khaki", "#8A8560"),
+        ("Moss", "#6F7A4E"), ("Olive", "#5F6146"), ("Forest", "#2F4032"),
+        ("Bottle", "#1F3A2C"),
+    ),
+    "Browns": (
+        ("Biscuit", "#D2B48C"), ("Camel", "#C19A6B"), ("Cognac", "#9C5A2D"),
+        ("Tan", "#A9743F"), ("Chestnut", "#8B5A2B"), ("Tobacco", "#7E5835"),
+        ("Chocolate", "#6B4426"), ("Espresso", "#3E2A1E"),
+    ),
+    "Warm accents": (
+        ("Dusty pink", "#C9A29B"), ("Terracotta", "#B5613F"),
+        ("Mustard", "#C08A2E"), ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
+        ("Oxblood", "#4A1F23"),
+    ),
+}
+
+
 # Which schemes can apply to each garment, most specific first. The first is
 # what a new item defaults to; the rest are there because the next label will
 # disagree with the last one. A trouser is 32/32 from one maker and M from the
@@ -203,9 +242,17 @@ class Fabric:
 
 
 @dataclass
+class NamedColour:
+    name: str = ""
+    hex: str = "#CCCCCC"
+    group: str = ""
+
+
+@dataclass
 class Vocabulary:
     garments: list[Garment] = field(default_factory=list)
     fabrics: list[Fabric] = field(default_factory=list)
+    colours: list[NamedColour] = field(default_factory=list)
     fits: list[str] = field(default_factory=list)
     grades: list[str] = field(default_factory=list)
     path: Path = field(default_factory=lambda: paths.vocabulary())
@@ -219,8 +266,10 @@ class Vocabulary:
         ]
         fabrics = [Fabric(name=name, family=family)
                    for family, names in DEFAULT_FABRICS.items() for name in names]
+        colours = [NamedColour(name=name, hex=code, group=group)
+                   for group, rows in DEFAULT_COLOURS.items() for name, code in rows]
         return cls(garments=sorted(garments, key=lambda g: g.name),
-                   fabrics=sorted(fabrics, key=lambda f: f.name),
+                   fabrics=sorted(fabrics, key=lambda f: f.name), colours=colours,
                    fits=list(DEFAULT_FITS), grades=list(DEFAULT_GRADES),
                    path=path or paths.vocabulary()).tidy()
 
@@ -232,11 +281,16 @@ class Vocabulary:
         raw = tomllib.loads(path.read_text())
         allowed_g = {f.name for f in fields(Garment)}
         allowed_f = {f.name for f in fields(Fabric)}
+        allowed_c = {f.name for f in fields(NamedColour)}
         return cls(
             garments=sorted((Garment(**{k: v for k, v in row.items() if k in allowed_g})
                              for row in raw.get("garments", [])), key=lambda g: g.name),
             fabrics=sorted((Fabric(**{k: v for k, v in row.items() if k in allowed_f})
                             for row in raw.get("fabrics", [])), key=lambda f: f.name),
+            colours=[NamedColour(**{k: v for k, v in row.items() if k in allowed_c})
+                     for row in raw.get("colours", [])] or [
+                NamedColour(name=n, hex=c, group=g)
+                for g, rows in DEFAULT_COLOURS.items() for n, c in rows],
             fits=list(raw.get("fits", DEFAULT_FITS)),
             grades=list(raw.get("grades", DEFAULT_GRADES)),
             path=path,
@@ -248,6 +302,7 @@ class Vocabulary:
         self.path.write_text(tomli_w.dumps({
             "garments": [asdict(g) for g in self.garments],
             "fabrics": [asdict(f) for f in self.fabrics],
+            "colours": [asdict(c) for c in self.colours],
             "fits": self.fits,
             "grades": self.grades,
         }))
@@ -256,6 +311,7 @@ class Vocabulary:
     def restore_defaults(self) -> "Vocabulary":
         fresh = Vocabulary.defaults(self.path)
         self.garments, self.fabrics = fresh.garments, fresh.fabrics
+        self.colours = fresh.colours
         self.fits, self.grades = fresh.fits, fresh.grades
         self.save()
         return self
@@ -328,6 +384,29 @@ class Vocabulary:
 
     def remove_garment(self, name: str) -> None:
         self.garments = [g for g in self.garments if g.name != name]
+
+    def colour_names(self) -> tuple[str, ...]:
+        return tuple(c.name for c in self.colours)
+
+    def colour_hex(self) -> dict[str, str]:
+        return {c.name: c.hex for c in self.colours}
+
+    def colour_group(self, name: str) -> str:
+        found = next((c for c in self.colours if c.name == name), None)
+        return found.group if found else ""
+
+    def colour_groups(self) -> dict[str, tuple[tuple[str, str], ...]]:
+        out: dict[str, list[tuple[str, str]]] = {}
+        for colour in self.colours:
+            out.setdefault(colour.group or "Unfiled", []).append((colour.name, colour.hex))
+        return {k: tuple(v) for k, v in out.items()}
+
+    def add_colour(self, colour: NamedColour) -> NamedColour:
+        self.colours.append(colour)
+        return colour
+
+    def remove_colour(self, name: str) -> None:
+        self.colours = [c for c in self.colours if c.name != name]
 
     def add_fabric(self, fabric: Fabric) -> Fabric:
         self.fabrics.append(fabric)

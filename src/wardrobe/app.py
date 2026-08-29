@@ -36,8 +36,8 @@ from wardrobe.outfits import (
     Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
 )
 from wardrobe.palette import (
-    ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND,
-    NAMED_COLOURS, ROLES, SEASONS, Colour, Palette, hex_for,
+    ACCENT, CATEGORIES as COLOUR_CATEGORIES, FIELD, GROUND, ROLES, SEASONS,
+    Colour, Palette, colour_names, hex_for, named_colours,
 )
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
@@ -488,7 +488,7 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
                               )
     c1, c3 = st.columns(2)
-    options = ["", *COLOUR_NAMES]
+    options = ["", *colour_names()]
     item.colour = c1.selectbox(
         "Colour", options,
         index=options.index(item.colour) if item.colour in options else 0,
@@ -843,7 +843,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
     # The catalogue picker sits outside the form: choosing from it fills the name
     # and the swatch, which inside a form would not happen until submit.
     picked = st.selectbox(
-        "Start from the catalogue", ["Pick a colour of your own", *COLOUR_NAMES],
+        "Start from the catalogue", ["Pick a colour of your own", *colour_names()],
         key="pal-pick",
         help="Fifty colours a wardrobe is built from. Or name your own and set "
              "the hex yourself.")
@@ -1246,6 +1246,7 @@ def garment_catalogue_panel() -> None:
     ui.stats([
         ("Garments", str(len(vocab.garments))),
         ("Fabrics", str(len(vocab.fabrics))),
+        ("Colours", str(len(vocab.colours))),
         ("Grades", str(len([g for g in vocab.grades if g]))),
         ("Fits", str(len([f for f in vocab.fits if f]))),
     ], brass_first=True)
@@ -1257,12 +1258,14 @@ def garment_catalogue_panel() -> None:
         "app no longer knows."
     )
 
-    garments_tab, fabrics_tab, words_tab = st.tabs(
-        ["Garments", "Fabrics", "Grades and fits"])
+    garments_tab, fabrics_tab, colours_tab, words_tab = st.tabs(
+        ["Garments", "Fabrics", "Colours", "Grades and fits"])
     with garments_tab:
         garment_section(vocab, inventory)
     with fabrics_tab:
         fabric_section(vocab, inventory)
+    with colours_tab:
+        colour_section(vocab, inventory)
     with words_tab:
         words_section(vocab, inventory)
 
@@ -1411,6 +1414,84 @@ def fabric_section(vocab, inventory: Inventory) -> None:
                 st.warning("Give it a family, or a route can never match it.")
             else:
                 vocab.add_fabric(vocabulary.Fabric(name=name.strip(), family=picked))
+                vocab.save()
+                st.rerun()
+
+
+def colour_section(vocab, inventory: Inventory) -> None:
+    """The colour names every garment and every palette entry is drawn from."""
+    counts = {c.name: sum(1 for i in inventory.items if i.colour == c.name)
+              for c in vocab.colours}
+    st.markdown('<div class="look-cap">The names a garment\'s colour is picked '
+                'from, and the swatches the palette is built out of. '
+                '<a href="?colours=all" target="_blank">Open in its own tab '
+                '&#8599;</a></div>', unsafe_allow_html=True)
+
+    for group, rows in vocab.colour_groups().items():
+        st.markdown(f'<div class="dict-h">{group}<span>{len(rows)}</span></div>',
+                    unsafe_allow_html=True)
+        st.markdown(
+            '<div style="display:flex;border:1px solid var(--line)">'
+            + "".join(f'<div style="flex:1;background:{h};height:2.6rem" '
+                      f'title="{n} {h}"></div>' for n, h in rows) + "</div>",
+            unsafe_allow_html=True)
+        for chunk in (rows[i:i + 3] for i in range(0, len(rows), 3)):
+            for column, (name, code) in zip(st.columns(3), chunk):
+                n = counts.get(name, 0)
+                column.markdown(
+                    f'<div class="dict-row">'
+                    f'<span class="chip" style="background:{code}"></span>{name}'
+                    f'<span class="meta"> · {code}{f" · on {n}" if n else ""}</span>'
+                    f'</div>', unsafe_allow_html=True)
+
+    if not st.toggle("Change the colours", key="cat-edit-c",
+                     help="Add one, move one to a different group, or remove one "
+                          "nothing is using."):
+        return
+
+    ui.eyebrow("Change one")
+    names = list(vocab.colour_names())
+    chosen = st.selectbox("Which colour", names, key="cat-pick-c")
+    colour = next(c for c in vocab.colours if c.name == chosen)
+    in_use = counts.get(chosen, 0)
+    with st.form(f"c-{chosen}"):
+        c1, c2 = st.columns([1, 2])
+        colour.hex = c1.color_picker("Swatch", colour.hex, key=f"ch-{chosen}")
+        groups = list(vocab.colour_groups())
+        colour.group = c2.selectbox(
+            "Group", groups,
+            index=groups.index(colour.group) if colour.group in groups else 0,
+            key=f"cg-{chosen}")
+        b1, b2 = st.columns(2)
+        if b1.form_submit_button("Save"):
+            vocab.save()
+            st.rerun()
+        if b2.form_submit_button("Remove from the catalogue"):
+            if in_use:
+                st.warning(f"{in_use} piece(s) are {chosen}.")
+            else:
+                reset_mod.before(f"before removing the colour {chosen}", "vocabulary")
+                vocab.remove_colour(chosen)
+                vocab.save()
+                st.rerun()
+
+    ui.eyebrow("Add one")
+    with st.form("add-colour-name", clear_on_submit=True):
+        c1, c2, c3 = st.columns([1, 2, 2])
+        code = c1.color_picker("Swatch", "#7A7A78", key="ac-hex")
+        name = c2.text_input("Name")
+        group = c3.selectbox("Group", [*vocab.colour_groups(), "New group…"],
+                             key="ac-group")
+        fresh = st.text_input("New group name", key="ac-new")
+        if st.form_submit_button("Add colour"):
+            picked = fresh.strip() if group == "New group…" else group
+            if not name.strip():
+                st.warning("Give it a name. That is the point of the list.")
+            elif name.strip() in names:
+                st.warning(f"{name.strip()} is already in the catalogue.")
+            else:
+                vocab.add_colour(vocabulary.NamedColour(
+                    name=name.strip(), hex=code, group=picked or "Unfiled"))
                 vocab.save()
                 st.rerun()
 
@@ -1603,10 +1684,10 @@ def colour_catalogue_view(palette: Palette) -> None:
     mine = {c.hex.upper(): c for c in palette.colours}
     st.markdown(
         '<div class="masthead"><h1>Colour <em>catalogue</em></h1>'
-        f'<div class="sub">{len(COLOUR_NAMES)} named colours &middot; '
+        f'<div class="sub">{len(colour_names())} named colours &middot; '
         f'{len(palette.colours)} in the palette</div></div>', unsafe_allow_html=True)
 
-    extras = [c for c in palette.colours if c.name not in COLOUR_NAMES]
+    extras = [c for c in palette.colours if c.name not in colour_names()]
     if extras:
         ui.eyebrow("Yours, named by you")
         ui.table([{
@@ -1615,7 +1696,7 @@ def colour_catalogue_view(palette: Palette) -> None:
             "Role": c.role, "Seasons": c.season_line,
         } for c in extras])
 
-    for group, rows in NAMED_COLOURS.items():
+    for group, rows in named_colours().items():
         ui.eyebrow(group)
         st.markdown(
             '<div style="display:flex;border:1px solid var(--line)">'
@@ -1783,7 +1864,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
             garment = c2.selectbox("Garment", garments(), key="asp-garment")
             grade = c3.selectbox("Grade", grades(), key="asp-grade")
             c4, c6 = st.columns(2)
-            colour = c4.selectbox("Colour", ["", *COLOUR_NAMES], key="asp-colour")
+            colour = c4.selectbox("Colour", ["", *colour_names()], key="asp-colour")
             colour_hex = hex_for(colour) if colour else "#CCCCCC"
             fabric = c6.selectbox("Fabric", fabric_options(), key="asp-fabric")
             fit = st.selectbox("Fit", fits(), key="asp-fit")

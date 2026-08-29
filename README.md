@@ -44,9 +44,10 @@ Six tabs, in the order the work happens.
    you the raw markdown. Every save keeps the version it replaced, and any of
    them can be restored, so nothing here can lose an afternoon.
 2. **Garment Catalogue** — the dictionary. Garments with their category and
-   size scheme, fabrics with their family, the fits and the grades. Every
-   dropdown in the app is filled from this, and editing it takes effect at once.
-   It sits second because the dictionary comes before the things written in it.
+   size schemes, fabrics with their family, the colours with their group, the
+   fits and the grades. Every dropdown in the app is filled from this, and
+   editing it takes effect at once. It sits second because the dictionary comes
+   before the things written in it.
 3. **Wardrobe Inventory** — every piece, owned or merely wanted, with photos
    restaged onto white the moment they are uploaded, so a wardrobe photographed
    on a bedroom floor still reads as a wardrobe worth browsing
