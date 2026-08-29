@@ -53,6 +53,14 @@ def sourcing() -> Path:
     return home() / "sourcing.toml"
 
 
+def guide_chat() -> Path:
+    return home() / "guide-chat.toml"
+
+
+def guide_versions() -> Path:
+    return home() / ".guide-versions"
+
+
 def photos() -> Path:
     return home() / "inventory" / "photos"
 
@@ -75,6 +83,7 @@ def backups() -> Path:
 DATA: dict[str, str] = {
     "answers": "Questionnaire answers",
     "guide": "Style guide",
+    "guide_chat": "Style guide conversation",
     "principles": "Principles",
     "palette": "Colour palette",
     "sourcing": "Where to buy",

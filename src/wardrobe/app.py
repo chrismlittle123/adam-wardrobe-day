@@ -17,6 +17,7 @@ from pathlib import Path
 import streamlit as st
 
 from wardrobe import (
+    conversation,
     palette as pal_mod,
     retailers,
     shop as shop_mod,
@@ -287,37 +288,140 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
                     if not off:
                         st.rerun()
 
+    guide_panel(profile, answers)
+
+
+def guide_panel(profile: Profile, answers: Answers) -> None:
+    """The guide, three ways: read it, edit it by hand, or argue with it."""
     ui.eyebrow("The guide")
-    total_done, total_all = answers.progress()
-    left, right = st.columns([3, 1], gap="large")
-    with left:
-        if total_done == 0:
-            ui.empty("Nothing to build from yet. Answer a few questions above.")
-        elif total_done < 8:
-            st.warning(f"Only {total_done} answers. The guide will be thin and mostly gaps.")
-    with right:
-        build = st.button("Build style guide", type="primary", disabled=total_done == 0)
+    done, total = answers.progress()
+    exists = paths.guide().is_file()
 
-    with st.expander("Prompt sent to Gemini"):
-        st.code(build_guide_prompt(profile, answers), language=None)
+    if not exists:
+        left, right = st.columns([3, 1], gap="large")
+        with left:
+            if done == 0:
+                ui.empty("Nothing to build from yet. Answer a few questions above.")
+            elif done < 8:
+                st.warning(f"Only {done} answers. The guide will be thin and mostly gaps.")
+        with right:
+            build = st.button("Build style guide", type="primary", disabled=done == 0)
+        with st.expander("Prompt sent to Gemini"):
+            st.code(build_guide_prompt(profile, answers), language=None)
+        if build:
+            with st.spinner("Writing the guide…"):
+                try:
+                    synthesise_guide(profile, answers)
+                except GEMINI_ERRORS as exc:
+                    st.error(str(exc))
+                    return
+            st.rerun()
+        return
 
-    if build:
-        with st.spinner("Writing the guide…"):
-            try:
-                synthesise_guide(profile, answers)
-            except GEMINI_ERRORS as exc:
-                st.error(str(exc))
-                return
-        st.rerun()
+    markdown = paths.guide().read_text()
+    when = dt.datetime.fromtimestamp(paths.guide().stat().st_mtime)
+    st.markdown(
+        f'<div class="look-cap">{paths.guide()} &middot; {when:%d %b %H:%M} &middot; '
+        f'{len(markdown.split()):,} words &middot; built from {done} of {total} answers'
+        f'</div>', unsafe_allow_html=True)
 
-    if paths.guide().is_file():
-        markdown = paths.guide().read_text()
-        when = dt.datetime.fromtimestamp(paths.guide().stat().st_mtime)
-        st.markdown(
-            f'<div class="look-cap">{paths.guide()} &middot; {when:%d %b %H:%M} '
-            f'&middot; {len(markdown.split())} words</div>', unsafe_allow_html=True)
+    read, edit, discuss = st.tabs(["Read", "Edit", "Discuss"])
+    with read:
         st.download_button("Download markdown", markdown, paths.guide().name, "text/markdown")
-        st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="guide-body">\n\n{markdown}\n\n</div>',
+                    unsafe_allow_html=True)
+    with edit:
+        edit_guide_panel(markdown)
+    with discuss:
+        discuss_guide_panel(profile, answers, markdown)
+
+    version_panel()
+
+
+def edit_guide_panel(markdown: str) -> None:
+    ui.blurb(
+        "The raw markdown. Change a word, delete a section, reorder the shopping "
+        "list. Saving keeps what it replaced, so nothing here is final."
+    )
+    with st.form("edit-guide"):
+        draft = st.text_area("Style guide", markdown, height=560, key="guide-raw",
+                             label_visibility="collapsed")
+        c1, c2 = st.columns([1, 3])
+        saved = c1.form_submit_button("Save the guide")
+        c2.markdown(f'<div class="look-cap">{len(draft.split()):,} words</div>',
+                    unsafe_allow_html=True)
+        if saved:
+            if not draft.strip():
+                st.warning("That would leave the guide empty. Delete the file if you "
+                           "mean to start again.")
+            else:
+                conversation.save_edit(draft)
+                st.rerun()
+
+
+def discuss_guide_panel(profile: Profile, answers: Answers, markdown: str) -> None:
+    chat = conversation.Conversation.load()
+    ui.blurb(
+        "Argue with it. Ask why it chose something, or tell it what to change. A "
+        "question is answered and nothing moves; an instruction rewrites the guide "
+        "and keeps the previous version. It only knows what you told the "
+        "questionnaire, so it will not invent a life for you."
+    )
+
+    if not chat.messages:
+        st.markdown(
+            '<div class="look-cap">Try: “the palette is too safe, give me one colour '
+            'that frightens me” &middot; “why navy and not charcoal?” &middot; “cut the '
+            'uniforms down to five” &middot; “rewrite the thesis in half the words”</div>',
+            unsafe_allow_html=True)
+
+    for message in chat.messages:
+        with st.chat_message("user" if message.role == "user" else "assistant"):
+            st.markdown(message.text)
+            tail = " · rewrote the guide" if message.revised else ""
+            if message.when:
+                st.markdown(f'<div class="look-cap">{message.when}{tail}</div>',
+                            unsafe_allow_html=True)
+
+    with st.form("guide-chat", clear_on_submit=True):
+        said = st.text_area("Say something", height=90, key="guide-say",
+                            placeholder="Cut the shopping list to the three things "
+                                        "that matter most.")
+        c1, c2 = st.columns([1, 3])
+        sent = c1.form_submit_button("Send", type="primary")
+        if c2.form_submit_button("Clear the conversation"):
+            chat.clear()
+            chat.save()
+            st.rerun()
+        if sent:
+            if not said.strip():
+                st.warning("Say something first.")
+            else:
+                with st.spinner("Thinking…"):
+                    try:
+                        _, changed = conversation.talk(profile, answers, said.strip(), chat)
+                    except GEMINI_ERRORS as exc:
+                        st.error(str(exc))
+                        return
+                if changed:
+                    st.success("The guide was rewritten. The previous version is kept below.")
+                st.rerun()
+
+
+def version_panel() -> None:
+    history = conversation.versions()
+    if not history:
+        return
+    with st.expander(f"Earlier versions · {len(history)}"):
+        ui.blurb("Every edit and every rewrite keeps what it replaced. Restoring one "
+                 "also keeps the current version, so this only ever adds.")
+        for version in history[:12]:
+            c1, c2 = st.columns([4, 1])
+            c1.markdown(f'<div class="look-cap">{version.label} &middot; '
+                        f'{version.words:,} words</div>', unsafe_allow_html=True)
+            if c2.button("Restore", key=f"gv-{version.path.name}", type="secondary"):
+                conversation.restore(version)
+                st.rerun()
 
 
 def points_input(question: Question, stored: str) -> str:
