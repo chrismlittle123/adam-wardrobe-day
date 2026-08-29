@@ -1601,6 +1601,30 @@ def check_page_survives_a_rerun() -> str:
     return f"{len(slugs)} pages, the URL keeps the place through a rerun and a refresh"
 
 
+def check_no_shrugging_plurals() -> str:
+    """No user-facing string may say "piece(s)".
+
+    It appeared in nineteen places. The code always knew the count and still
+    would not commit to a word, which is the written equivalent of a shrug.
+    """
+    import re as _re
+    offences: list[str] = []
+    for source in sorted(Path(__file__).parent.glob("*.py")):
+        if source.name in ("checks.py", "text.py"):
+            continue   # these two talk about the hack rather than commit it
+        for n, line in enumerate(source.read_text().splitlines(), 1):
+            if _re.search(r"\w\(s\)", line):
+                offences.append(f"{source.name}:{n}: {line.strip()[:60]}")
+    assert not offences, "strings that shrug at the plural: " + "; ".join(offences)
+
+    from .text import count_of, plural
+    assert plural(1, "piece") == "1 piece" and plural(2, "piece") == "2 pieces"
+    assert plural(0, "piece") == "0 pieces", "zero takes the plural"
+    assert plural(1, "foot", "feet") == "1 foot" and plural(3, "foot", "feet") == "3 feet"
+    assert count_of(1, "outfit") == "outfit" and count_of(4, "outfit") == "outfits"
+    return "no string shrugs at a plural; 1 piece, 2 pieces, 3 feet"
+
+
 def check_no_dead_style_hooks() -> str:
     """Every selector in the stylesheet must hook onto something Streamlit emits.
 
@@ -2442,6 +2466,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
     (APP, "No text box prefills a suggestion", check_no_prefilled_hints),
     (APP, "No dead style hooks", check_no_dead_style_hooks),
+    (APP, "Nothing shrugs at a plural", check_no_shrugging_plurals),
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),

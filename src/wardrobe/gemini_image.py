@@ -194,7 +194,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="gemini-image",
         description="Generate or edit images with Gemini on Vertex AI.",
     )
-    parser.add_argument("prompt", help="What to draw, or how to change the input image(s).")
+    parser.add_argument("prompt", help="What to draw, or how to change the input images.")
     parser.add_argument(
         "-o",
         "--out",

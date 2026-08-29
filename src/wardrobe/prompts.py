@@ -9,6 +9,8 @@ not just as description.
 
 from __future__ import annotations
 
+from .text import count_of, plural
+
 from .fitspec import LABELS
 from .profile import Profile
 
@@ -128,10 +130,13 @@ def build_outfit_prompt(
     notes: list[str] = []
     if photo_count:
         notes.append(
-            f"Reference image 1 is the man. The next {photo_count} reference image(s) are "
-            "the actual garments. Reproduce those garments faithfully: their exact colour, "
-            "cloth, pattern and cut. Take only the clothing from them, never the background, "
-            "the lighting or any person in them."
+            f"Reference image 1 is the man. The next "
+            f"{plural(photo_count, 'reference image')} "
+            f"{'is' if photo_count == 1 else 'are'} the actual "
+            f"{count_of(photo_count, 'garment')}. Reproduce "
+            f"{'it' if photo_count == 1 else 'them'} faithfully: the exact colour, "
+            "cloth, pattern and cut. Take only the clothing, never the background, "
+            "the lighting or any person in the picture."
         )
     if principles.strip():
         notes.append("Follow these wardrobe principles:\n" + principles.strip())

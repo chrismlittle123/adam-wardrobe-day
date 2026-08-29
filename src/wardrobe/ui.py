@@ -32,17 +32,7 @@ from pathlib import Path
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
 
-def plural(count: int, singular: str, many: str = "") -> str:
-    """One piece, two pieces. It used to print "1 piece(s)" everywhere, which
-    reads as a shrug."""
-    word = singular if abs(count) == 1 else (many or f"{singular}s")
-    return f"{count} {word}"
-
-
-def count_of(count: int, singular: str, many: str = "") -> str:
-    """The word alone, no number, for when the count is already on the page."""
-    return singular if abs(count) == 1 else (many or f"{singular}s")
-
+from .text import count_of, plural  # noqa: F401  (re-exported for the tabs)
 
 CSS = """
 <style>

@@ -16,6 +16,7 @@ from pathlib import Path
 import tomli_w
 
 from . import paths
+from .text import plural
 
 from .inventory import ASPIRATIONAL, RETIRED, Inventory, Item
 
@@ -79,7 +80,7 @@ class Wearability:
         if self.empty:
             bits.append("no garments in it")
         if self.dangling:
-            bits.append(f"{len(self.dangling)} deleted piece(s)")
+            bits.append(f"{plural(len(self.dangling), 'deleted piece')}")
         if self.retired:
             bits.append(", ".join(i.name or i.garment for i in self.retired) + " retired")
         return "; ".join(bits)
@@ -256,7 +257,7 @@ class Difference:
         if self.removed:
             bits.append(f"-{len(self.removed)}")
         if self.settings:
-            bits.append(f"{len(self.settings)} setting(s)")
+            bits.append(f"{plural(len(self.settings), 'setting')}")
         return ", ".join(bits) or "no difference"
 
 

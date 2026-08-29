@@ -23,6 +23,8 @@ that is counted.
 
 from __future__ import annotations
 
+from .text import plural
+
 from dataclasses import dataclass, field
 
 from .inventory import ASPIRATIONAL, Inventory, Item
@@ -56,7 +58,7 @@ class Step:
     @property
     def rule(self) -> str:
         n = len(self.unlocked)
-        return f"{self.size} piece(s) unlock {n} outfit(s)"
+        return f"{plural(self.size, 'piece')} unlock {plural(n, 'outfit')}"
 
 
 @dataclass

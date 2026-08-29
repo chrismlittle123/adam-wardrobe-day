@@ -27,6 +27,7 @@ from pathlib import Path
 import tomli_w
 
 from . import paths
+from .text import plural
 
 STAMP = "%Y%m%d-%H%M%S"
 
@@ -75,17 +76,17 @@ def describe(key: str) -> str:
         return ""
     if target.is_dir():
         files = [f for f in target.rglob("*") if f.is_file()]
-        return f"{len(files)} file(s)" if files else ""
+        return plural(len(files), "file") if files else ""
     if key == "answers":
         return f"{_count(target, 'answers') or len(tomllib.loads(target.read_text()).get('answers', {}))} answered"
     if key == "inventory":
-        return f"{_count(target, 'items')} item(s)"
+        return plural(_count(target, "items"), "item")
     if key == "outfits":
-        return f"{_count(target, 'outfits')} outfit(s)"
+        return plural(_count(target, "outfits"), "outfit")
     if key == "palette":
-        return f"{_count(target, 'colours')} colour(s)"
+        return plural(_count(target, "colours"), "colour")
     if key == "principles":
-        return f"{_count(target, 'principles')} principle(s)"
+        return plural(_count(target, "principles"), "principle")
     if key == "guide":
         return f"{len(target.read_text().split()):,} words"
     return "present"
