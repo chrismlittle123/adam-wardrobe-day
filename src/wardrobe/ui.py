@@ -220,9 +220,20 @@ details summary { font-family: var(--chrome); font-size: 0.74rem !important;
 }
 
 /* Streamlit's own chrome. The deploy button and the hamburger belong to the
-   framework, not to this app, and they sit on top of the masthead. */
-[data-testid="stToolbar"], [data-testid="stDecoration"],
+   framework, not to this app, and they sit on top of the masthead.
+
+   Hide them one by one, never the whole toolbar: the button that puts a
+   collapsed sidebar back lives inside it, so display:none on the bar left no
+   way of getting the navigation back short of reloading the page. */
+[data-testid="stAppDeployButton"], [data-testid="stMainMenu"],
+[data-testid="stToolbarActions"], [data-testid="stDecoration"],
 [data-testid="stStatusWidget"], #MainMenu, footer { display: none !important; }
+[data-testid="stToolbar"] { display: flex !important; background: transparent; }
+[data-testid="stExpandSidebarButton"] {
+  display: flex !important; visibility: visible !important;
+  color: var(--brass) !important; opacity: 1;
+}
+[data-testid="stExpandSidebarButton"]:hover { color: var(--cream) !important; }
 .stAppHeader, header[data-testid="stHeader"] { background: transparent; height: 0; }
 .stMainBlockContainer, [data-testid="stMainBlockContainer"] { padding-top: 2.4rem; }
 

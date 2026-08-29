@@ -1,0 +1,305 @@
+[[routes]]
+label = "Heavyweight t-shirt"
+garment = "T-shirt"
+stores = [
+    "next",
+]
+id = "heavyweight-t-shirt"
+grade = "Heavyweight"
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = "100% cotton, 200 gsm or heavier"
+note = "The weight is the whole point. Anything thinner drapes like a vest."
+
+[[routes]]
+label = "Plain t-shirt"
+garment = "T-shirt"
+stores = [
+    "uniqlo",
+]
+id = "plain-t-shirt"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = "Supima cotton"
+note = "The default tee. Cheap enough to replace rather than nurse."
+
+[[routes]]
+label = "Blazer"
+garment = "Blazer"
+stores = [
+    "vinted",
+]
+id = "blazer"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "Very Good condition or above"
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Jacket"
+garment = "Jacket"
+stores = [
+    "vinted",
+]
+id = "jacket"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "Very Good condition or above"
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Dress shoes"
+garment = "Derbies"
+stores = [
+    "vinted",
+]
+id = "dress-shoes"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "Very Good condition or above"
+timing = ""
+spec = ""
+note = "Goodyear-welted if you can, so they can be resoled."
+
+[[routes]]
+label = "Boots"
+garment = "Boots"
+stores = [
+    "vinted",
+]
+id = "boots"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "Very Good condition or above"
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Overcoat"
+garment = "Overcoat"
+stores = [
+    "vinted",
+]
+id = "overcoat"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "Very Good condition or above"
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Dress shirt"
+garment = "Shirt"
+stores = [
+    "tyrwhitt",
+]
+id = "dress-shirt"
+grade = "Dress"
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = "wait for the sale"
+spec = ""
+note = "Sized by collar and sleeve, which is the only sane way to buy one."
+
+[[routes]]
+label = "Linen shirt"
+garment = "Shirt"
+stores = [
+    "mango",
+]
+id = "linen-shirt"
+grade = ""
+fabric = ""
+family = "Linen and hemp"
+fit = ""
+condition = ""
+timing = "wait for the sale"
+spec = ""
+note = ""
+
+[[routes]]
+label = "Linen trousers"
+garment = "Trousers"
+stores = [
+    "mango",
+]
+id = "linen-trousers"
+grade = ""
+fabric = ""
+family = "Linen and hemp"
+fit = ""
+condition = ""
+timing = "wait for the sale"
+spec = ""
+note = ""
+
+[[routes]]
+label = "Wool trousers"
+garment = "Trousers"
+stores = [
+    "marks",
+    "next",
+]
+id = "wool-trousers"
+grade = ""
+fabric = ""
+family = "Wool"
+fit = ""
+condition = ""
+timing = ""
+spec = ""
+note = "The nine months of the year linen cannot do. Check the composition: a wool blend below about 60% drapes like a school trouser."
+
+[[routes]]
+label = "Knitted polo"
+garment = "Polo"
+stores = [
+    "mango",
+]
+id = "knitted-polo"
+grade = "Knitted"
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = "wait for the sale"
+spec = ""
+note = ""
+
+[[routes]]
+label = "Polo"
+garment = "Polo"
+stores = [
+    "uniqlo",
+]
+id = "polo"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = "Piqué cotton"
+note = ""
+
+[[routes]]
+label = "Chinos"
+garment = "Chinos"
+stores = [
+    "uniqlo",
+]
+id = "chinos"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Jeans"
+garment = "Jeans"
+stores = [
+    "uniqlo",
+]
+id = "jeans"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Overshirt"
+garment = "Overshirt"
+stores = [
+    "uniqlo",
+]
+id = "overshirt"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Jumper"
+garment = "Knitwear"
+stores = [
+    "marks",
+    "uniqlo",
+]
+id = "jumper"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = ""
+spec = ""
+note = ""
+
+[[routes]]
+label = "Trainers"
+garment = "Trainers"
+stores = [
+    "vinted",
+]
+id = "trainers"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = "New with tags only"
+timing = ""
+spec = ""
+note = "New with tags only. A worn sole has already taken someone else's gait. For a specific pair from a brand's own sale, put the link on the piece rather than a route."
+
+[[routes]]
+label = "Suit"
+garment = "Suit"
+stores = [
+    "marks",
+]
+id = "suit"
+grade = ""
+fabric = ""
+family = ""
+fit = ""
+condition = ""
+timing = "then have it altered"
+spec = ""
+note = "Off the peg for the cloth, a tailor for the fit. The alteration is what makes it look like a suit rather than a costume."

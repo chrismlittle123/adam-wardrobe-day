@@ -175,6 +175,28 @@ def check_seeding_is_idempotent() -> str:
         again = seed.seed_all()
     assert again == first, f"seeding four times grew the data: {first} -> {again}"
     assert all(n > 0 for n in first.values()), f"a seeder produced nothing: {first}"
+
+    # Idempotent is not enough on its own: the answers seeder was a dict update,
+    # so it left the count unchanged while overwriting every real answer with the
+    # sample. Twenty-four of this wardrobe's own answers went that way, and only
+    # git still had them. Anything already written belongs to the owner.
+    from .philosophy import Answers
+    book = Answers.load()
+    mine = dict(book.values)
+    assert mine, "the seeder wrote no answers to check against"
+    question = sorted(mine)[0]
+    book.values[question] = "Words I typed myself."
+    book.save()
+    seed.seed_answers()
+    assert Answers.load().values[question] == "Words I typed myself.", \
+        "seeding overwrote an answer that was already written"
+
+    # And a blank one still gets filled, or the seeder is doing nothing at all.
+    book = Answers.load()
+    book.values[question] = "   "
+    book.save()
+    seed.seed_answers()
+    assert Answers.load().values[question].strip(), "seeding no longer fills a blank"
     return f"stable over four runs at {first['items']} items, {first['principles']} principles"
 
 
@@ -1678,11 +1700,22 @@ def check_no_dead_style_hooks() -> str:
                 dead.append(f"{name}: {rule[:70]}")
     assert not dead, "selectors leaning on the abandoned attribute: " + "; ".join(dead)
 
+    # Hiding the toolbar wholesale takes the sidebar's way back with it: the
+    # button that reopens a collapsed sidebar is a child of that toolbar, so
+    # display:none on the bar left no route back short of reloading the page.
+    for line in ui.CSS.splitlines():
+        rule, _, body = line.partition("{")
+        if '[data-testid="stToolbar"]' in rule and "stExpandSidebarButton" not in rule:
+            assert "display: none" not in body, \
+                "hiding the whole toolbar also hides the button that reopens the sidebar"
+    assert '[data-testid="stExpandSidebarButton"]' in ui.CSS, \
+        "nothing keeps the reopen-sidebar button visible"
+
     # The hooks the layout actually depends on, spelled once so a rename is loud.
     for needed in ('[data-testid="stTab"]', '[data-testid="stSelectbox"]',
                    '[data-testid="stTextInputRootElement"]', '[data-testid="stAlertContainer"]',
                    '[data-testid="stRadioOption"]', '[data-testid="stSidebar"]',
-                   '[data-testid="stToolbar"]'):
+                   '[data-testid="stExpandSidebarButton"]'):
         assert needed in ui.CSS, f"the stylesheet no longer targets {needed}"
 
     styled = len([l for l in ui.CSS.splitlines() if l.strip().endswith("{")])

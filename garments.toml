@@ -45,21 +45,73 @@ fabrics = [
     { name = "Wool-silk-linen", family = "Silk and fine" },
     { name = "Worsted wool", family = "Wool" },
 ]
+colours = [
+    { name = "White", hex = "#F6F4EF", group = "Whites and neutrals" },
+    { name = "Off-white", hex = "#EFEAE0", group = "Whites and neutrals" },
+    { name = "Bone", hex = "#E7E0D4", group = "Whites and neutrals" },
+    { name = "Cream", hex = "#F2E9D8", group = "Whites and neutrals" },
+    { name = "Ecru", hex = "#E8DFC8", group = "Whites and neutrals" },
+    { name = "Oatmeal", hex = "#DDD3C0", group = "Whites and neutrals" },
+    { name = "Sand", hex = "#D9C9A8", group = "Whites and neutrals" },
+    { name = "Stone", hex = "#C9BCA4", group = "Whites and neutrals" },
+    { name = "Beige", hex = "#C8B79A", group = "Whites and neutrals" },
+    { name = "Putty", hex = "#B9AC96", group = "Whites and neutrals" },
+    { name = "Taupe", hex = "#A2917E", group = "Whites and neutrals" },
+    { name = "Mushroom", hex = "#9C9184", group = "Whites and neutrals" },
+    { name = "Silver", hex = "#D8D8D6", group = "Greys" },
+    { name = "Light grey", hex = "#C4C3BF", group = "Greys" },
+    { name = "Mid grey", hex = "#7A7A78", group = "Greys" },
+    { name = "Slate", hex = "#5A6270", group = "Greys" },
+    { name = "Charcoal", hex = "#3C3B3A", group = "Greys" },
+    { name = "Graphite", hex = "#2B2B2E", group = "Greys" },
+    { name = "Black", hex = "#1B1918", group = "Greys" },
+    { name = "Powder blue", hex = "#D3E0EC", group = "Blues" },
+    { name = "Pale blue", hex = "#BFD3E6", group = "Blues" },
+    { name = "Sky blue", hex = "#8FB3D0", group = "Blues" },
+    { name = "Air force", hex = "#5C7B95", group = "Blues" },
+    { name = "Mid blue", hex = "#4A6E96", group = "Blues" },
+    { name = "Denim", hex = "#3E5C79", group = "Blues" },
+    { name = "Petrol", hex = "#2E5561", group = "Blues" },
+    { name = "Navy", hex = "#26303F", group = "Blues" },
+    { name = "Ink", hex = "#1D2430", group = "Blues" },
+    { name = "Midnight", hex = "#171E2B", group = "Blues" },
+    { name = "Mint", hex = "#BFD6C4", group = "Greens" },
+    { name = "Sage", hex = "#A3AF97", group = "Greens" },
+    { name = "Khaki", hex = "#8A8560", group = "Greens" },
+    { name = "Moss", hex = "#6F7A4E", group = "Greens" },
+    { name = "Olive", hex = "#5F6146", group = "Greens" },
+    { name = "Forest", hex = "#2F4032", group = "Greens" },
+    { name = "Bottle", hex = "#1F3A2C", group = "Greens" },
+    { name = "Biscuit", hex = "#D2B48C", group = "Browns" },
+    { name = "Camel", hex = "#C19A6B", group = "Browns" },
+    { name = "Cognac", hex = "#9C5A2D", group = "Browns" },
+    { name = "Tan", hex = "#A9743F", group = "Browns" },
+    { name = "Chestnut", hex = "#8B5A2B", group = "Browns" },
+    { name = "Tobacco", hex = "#7E5835", group = "Browns" },
+    { name = "Chocolate", hex = "#6B4426", group = "Browns" },
+    { name = "Espresso", hex = "#3E2A1E", group = "Browns" },
+    { name = "Dusty pink", hex = "#C9A29B", group = "Warm accents" },
+    { name = "Terracotta", hex = "#B5613F", group = "Warm accents" },
+    { name = "Mustard", hex = "#C08A2E", group = "Warm accents" },
+    { name = "Rust", hex = "#8E3B2E", group = "Warm accents" },
+    { name = "Burgundy", hex = "#6E2C33", group = "Warm accents" },
+    { name = "Oxblood", hex = "#4A1F23", group = "Warm accents" },
+]
 fits = [
     "",
-    "Slim",
+    "Oversized",
     "Regular",
     "Relaxed",
-    "Oversized",
+    "Slim",
 ]
 grades = [
     "",
+    "Branded",
+    "Dress",
     "Everyday",
     "Heavyweight",
     "Knitted",
     "Smart",
-    "Dress",
-    "Branded",
 ]
 
 [[garments]]
@@ -68,23 +120,28 @@ category = "Accessory"
 schemes = [
     "One size",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Belt"
 category = "Accessory"
 schemes = [
-    "Waist",
+    "Waist and leg",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Blazer"
 category = "Outerwear"
 schemes = [
     "Chest and length",
-    "Chest",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = true
 
 [[garments]]
 name = "Boots"
@@ -92,15 +149,18 @@ category = "Shoes"
 schemes = [
     "Shoe",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Chinos"
 category = "Bottom"
 schemes = [
     "Waist and leg",
-    "Waist",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = true
 
 [[garments]]
 name = "Derbies"
@@ -108,6 +168,8 @@ category = "Shoes"
 schemes = [
     "Shoe",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Gilet"
@@ -115,6 +177,8 @@ category = "Outerwear"
 schemes = [
     "Alpha",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Hat"
@@ -123,29 +187,27 @@ schemes = [
     "Head",
     "Alpha",
 ]
-
-[[garments]]
-name = "Heavyweight T Shirt"
-category = "Top"
-schemes = [
-    "Alpha",
-]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Jacket"
 category = "Outerwear"
 schemes = [
     "Alpha",
-    "Chest",
+    "Chest and length",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Jeans"
 category = "Bottom"
 schemes = [
     "Waist and leg",
-    "Waist",
 ]
+takes_grade = false
+takes_fit = true
 
 [[garments]]
 name = "Jewellery"
@@ -153,14 +215,18 @@ category = "Accessory"
 schemes = [
     "One size",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Knitwear"
 category = "Top"
 schemes = [
     "Alpha",
-    "Chest",
+    "Chest and length",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "Loafers"
@@ -168,15 +234,18 @@ category = "Shoes"
 schemes = [
     "Shoe",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Overcoat"
 category = "Outerwear"
 schemes = [
     "Chest and length",
-    "Chest",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Overshirt"
@@ -184,6 +253,8 @@ category = "Outerwear"
 schemes = [
     "Alpha",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Polo"
@@ -191,6 +262,8 @@ category = "Top"
 schemes = [
     "Alpha",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "Sandals"
@@ -198,6 +271,8 @@ category = "Shoes"
 schemes = [
     "Shoe",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Scarf"
@@ -205,23 +280,28 @@ category = "Accessory"
 schemes = [
     "One size",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Shirt"
 category = "Top"
 schemes = [
     "Collar and sleeve",
-    "Collar",
     "Alpha",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "Shorts"
 category = "Bottom"
 schemes = [
-    "Waist",
+    "Waist and leg",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = true
 
 [[garments]]
 name = "Socks"
@@ -229,14 +309,17 @@ category = "Accessory"
 schemes = [
     "Sock",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Suit"
 category = "Outerwear"
 schemes = [
     "Chest and length",
-    "Chest",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Sunglasses"
@@ -244,6 +327,8 @@ category = "Accessory"
 schemes = [
     "One size",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Sweatshirt"
@@ -251,6 +336,8 @@ category = "Top"
 schemes = [
     "Alpha",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "T-shirt"
@@ -258,6 +345,8 @@ category = "Top"
 schemes = [
     "Alpha",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "Trainers"
@@ -265,23 +354,28 @@ category = "Shoes"
 schemes = [
     "Shoe",
 ]
+takes_grade = false
+takes_fit = false
 
 [[garments]]
 name = "Trousers"
 category = "Bottom"
 schemes = [
     "Waist and leg",
-    "Waist",
     "Alpha",
 ]
+takes_grade = false
+takes_fit = true
 
 [[garments]]
 name = "Waistcoat"
 category = "Top"
 schemes = [
-    "Chest",
+    "Chest and length",
     "Alpha",
 ]
+takes_grade = true
+takes_fit = true
 
 [[garments]]
 name = "Watch"
@@ -289,3 +383,5 @@ category = "Accessory"
 schemes = [
     "Watch case",
 ]
+takes_grade = false
+takes_fit = false

@@ -1,0 +1,170 @@
+[[retailers]]
+id = "vinted"
+name = "Vinted"
+kind = "Secondhand"
+strengths = [
+    "Shirt",
+    "T-shirt",
+    "Polo",
+    "Knitwear",
+    "Sweatshirt",
+    "Overshirt",
+    "Waistcoat",
+    "Trousers",
+    "Chinos",
+    "Jeans",
+    "Shorts",
+    "Blazer",
+    "Jacket",
+    "Overcoat",
+    "Overshirt",
+    "Gilet",
+    "Suit",
+    "Loafers",
+    "Derbies",
+    "Boots",
+    "Trainers",
+    "Sandals",
+    "Belt",
+    "Bag",
+    "Scarf",
+    "Hat",
+    "Socks",
+    "Sunglasses",
+    "Watch",
+    "Jewellery",
+]
+price_low = 5
+price_high = 400
+search = "https://www.vinted.co.uk/catalog?search_text={q}"
+note = "Everything worn seldom and kept for years: blazers, coats, dress shoes, boots. Filter by size and brand, then save the search so it tells you when one lands."
+
+[[retailers]]
+id = "uniqlo"
+name = "Uniqlo"
+kind = "High street"
+strengths = [
+    "Shirt",
+    "T-shirt",
+    "Polo",
+    "Knitwear",
+    "Sweatshirt",
+    "Overshirt",
+    "Waistcoat",
+    "Trousers",
+    "Chinos",
+    "Jeans",
+    "Shorts",
+    "Gilet",
+    "Jacket",
+]
+price_low = 15
+price_high = 100
+search = "https://www.uniqlo.com/uk/en/search?q={q}"
+note = "The baseline for plain things: tees, polos, chinos, jeans, overshirts, knitwear. Sizing is consistent across the range, which is why it is the shop to know your size in first."
+
+[[retailers]]
+id = "marks"
+name = "Marks and Spencer"
+kind = "High street"
+strengths = [
+    "Shirt",
+    "T-shirt",
+    "Polo",
+    "Knitwear",
+    "Sweatshirt",
+    "Overshirt",
+    "Waistcoat",
+    "Trousers",
+    "Chinos",
+    "Jeans",
+    "Shorts",
+    "Blazer",
+    "Jacket",
+    "Overcoat",
+    "Overshirt",
+    "Gilet",
+    "Suit",
+    "Trainers",
+    "Belt",
+    "Socks",
+]
+price_low = 20
+price_high = 200
+search = "https://www.marksandspencer.com/search?q={q}"
+note = "Jackets in numbered chest sizes, 36, 38, 40, which is the reference worth using. Also knitwear, wool trousers and a suit to alter."
+
+[[retailers]]
+id = "mango"
+name = "Mango"
+kind = "High street"
+strengths = [
+    "Shirt",
+    "T-shirt",
+    "Polo",
+    "Knitwear",
+    "Sweatshirt",
+    "Overshirt",
+    "Waistcoat",
+    "Trousers",
+    "Chinos",
+    "Jeans",
+    "Shorts",
+    "Blazer",
+    "Jacket",
+    "Overcoat",
+    "Overshirt",
+    "Gilet",
+    "Suit",
+]
+price_low = 25
+price_high = 180
+search = "https://shop.mango.com/gb/en/search?q={q}"
+note = "Linen shirts and linen trousers, alpha sized. Warm neutrals and relaxed tailoring. Wait for the sale; it is reliable."
+
+[[retailers]]
+id = "next"
+name = "Next"
+kind = "High street"
+strengths = [
+    "Shirt",
+    "T-shirt",
+    "Polo",
+    "Knitwear",
+    "Sweatshirt",
+    "Overshirt",
+    "Waistcoat",
+    "Trousers",
+    "Chinos",
+    "Jeans",
+    "Shorts",
+    "Blazer",
+    "Jacket",
+    "Overcoat",
+    "Overshirt",
+    "Gilet",
+    "Suit",
+    "Loafers",
+    "Derbies",
+    "Boots",
+    "Trainers",
+    "Sandals",
+]
+price_low = 15
+price_high = 120
+search = "https://www.next.co.uk/search?w={q}"
+note = "Wide sizing and fast delivery. Heavyweight tees if you read the composition. Quality is a lottery, so check the fabric."
+
+[[retailers]]
+id = "tyrwhitt"
+name = "Charles Tyrwhitt"
+kind = "Tailoring"
+strengths = [
+    "Shirt",
+    "Blazer",
+    "Trousers",
+]
+price_low = 30
+price_high = 200
+search = "https://www.charlestyrwhitt.com/uk/search?q={q}"
+note = "Shirts by collar and sleeve, which is the only sane way to buy one and the reason the fit can be exact. Wait for the sale."

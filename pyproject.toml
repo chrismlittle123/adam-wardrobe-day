@@ -19,7 +19,10 @@ wardrobe-check = "wardrobe.cli:check"
 wardrobe-reset = "wardrobe.cli:clear"
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = [
+    "playwright>=1.62.0",
+    "pytest>=8.0",
+]
 
 [build-system]
 requires = ["hatchling"]

@@ -195,8 +195,18 @@ def seed_outfits(inventory: Inventory, outfits: Outfits | None = None) -> Outfit
 
 
 def seed_answers(answers: Answers | None = None) -> Answers:
+    """Fill the blanks only.
+
+    This one used to be a straight dict update, so seeding a wardrobe that
+    already had real answers in it overwrote every one of them with the sample.
+    That is exactly what happened to this wardrobe: twenty-four answers in the
+    owner's own words were replaced by the fixture, and only git had them.
+    An answer already written is his; the sample is for empty boxes.
+    """
     answers = answers if answers is not None else Answers.load()
-    answers.values.update(ANSWERS)
+    for question, sample in ANSWERS.items():
+        if not str(answers.values.get(question, "")).strip():
+            answers.values[question] = sample
     answers.save()
     return answers
 
