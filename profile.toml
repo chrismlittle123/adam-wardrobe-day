@@ -1,46 +1,32 @@
-# The subject of every generated look. This file is the single source of truth
-# for who the model is; the app reads it, shows it, and folds it into every
-# prompt sent to Gemini. Editable from the app's "Edit subject" panel.
-
 [subject]
 name = "Adam"
 height_cm = 178
 build = "very lean and athletic, narrow waist, defined shoulders"
-body_fat_pct = 10
-
-# Hue 17, lightness 0.43. The lightness matters as much as the hue: at 0.43 he
-# is mid-deep, so a colour needs to clear 0.63 or fall below 0.23 to read as
-# contrast next to his face rather than as a tonal blur.
+body_fat_pct = 8
 skin_tone_hex = "#A0583C"
 skin_tone = "warm medium-deep brown with a red-gold undertone"
-
 hair = "short dark natural curls, cropped close at the sides"
 facial_hair = "light moustache and short stubble along the jaw"
 eyes = "dark brown"
 details = "small gold stud earring, thin gold chain necklace"
+arms = "long"
+description = "Adam is 1.78 m and very lean, under 8% body fat by the tape, with the build of someone who climbs: defined shoulders, a narrow waist, no bulk anywhere. His skin is a warm medium-deep brown with a red-gold undertone. Short dark natural curls cropped close at the sides, a light moustache and short stubble along the jaw, dark brown eyes. He wears a small gold stud earring and a thin gold chain.\n\nHis arms are long for his height. Standing with his hands at his sides his fingertips come almost to mid-thigh, which is the single proportion that most often makes a garment look wrong on him: a sleeve cut to his height leaves his wrists out, and a jacket that fits the shoulder finishes short on the arm. Buy for the shoulder and have the sleeve let down."
 
 [photos]
-# The head-on white-background portrait is the better generation base: plain
-# background and square shoulders give the model far less to fight with.
 neutral = "reference/adam-neutral.png"
 original = "reference/adam.png"
 
 [measurements]
-# Centimetres, straight off a tape measure. Zero means "not measured yet", and
-# the app estimates from height and build until a real number lands here. Ten
-# is the whole set: only what a man can take on himself with a tape and a
-# mirror. Thigh, knee and ankle are derived from height instead.
-neck = 0
-shoulder = 0
 chest = 0
-waist = 0
+waist = 75
 hip = 0
+shoulder = 0
 bicep = 0
 sleeve = 0
+neck = 38
 inseam = 0
 outseam = 0
 
 [style]
-# Free text, folded into the prompt as standing direction for every look.
 direction = "Relaxed European tailoring. Natural shoulder, nothing boxy, nothing skinny."
 avoid = "Baggy fits, loud logos, novelty prints, black-on-black."

@@ -258,6 +258,138 @@ def check_body_measurement_set() -> str:
     return f"{len(wanted)} measured, {len(values) - len(wanted)} derived, hip not seat"
 
 
+def check_body_fat_is_worked_out() -> str:
+    """Body fat comes off the tape now, not off somebody's eye.
+
+    The profile carried a flat 10% that had been guessed once and never
+    revisited. His actual waist of 75 and neck of 38, against 178, put him at
+    7.9 by the US Navy circumference method.
+    """
+    import math
+    from .fitspec import Body, body_fat_percent
+    from .profile import Profile
+
+    got = body_fat_percent(75, 38, 178)
+    assert 7.85 < got < 7.95, f"the formula has drifted: {got}"
+
+    # Recomputed longhand, so a typo in the constants cannot pass by matching
+    # itself. This is the published Navy equation, metric, for men.
+    longhand = 495 / (1.0324 - 0.19077 * math.log10(75 - 38)
+                      + 0.15456 * math.log10(178)) - 450
+    assert abs(got - longhand) < 1e-9, "the implementation and the equation disagree"
+
+    # It has to move the right way, and by an amount worth measuring for. A
+    # centimetre on the waist is about a point of body fat, which is why the
+    # number is derived on every read rather than stored and forgotten.
+    assert body_fat_percent(78, 38, 178) > got > body_fat_percent(72, 38, 178), \
+        "a bigger waist has to read as more fat"
+    assert body_fat_percent(75, 36, 178) > got > body_fat_percent(75, 40, 178), \
+        "a thicker neck has to read as less fat"
+    assert body_fat_percent(76, 38, 178) - got > 0.7, \
+        "a centimetre of waist barely registers; the formula is wrong"
+
+    # Nonsense in must raise rather than return a number nobody can question.
+    for waist, neck, height in ((38, 75, 178), (38, 38, 178), (75, 38, 0)):
+        try:
+            body_fat_percent(waist, neck, height)
+        except ValueError:
+            continue
+        raise AssertionError(f"({waist}, {neck}, {height}) should not produce a figure")
+
+    # Missing either measurement means no figure at all, never a silent zero.
+    assert Body(waist=75).body_fat(178) is None, "a missing neck produced a number"
+    assert Body(neck=38).body_fat(178) is None, "a missing waist produced a number"
+    assert Body().body_fat(178) is None, "an empty body produced a number"
+    assert abs(Body(waist=75, neck=38).body_fat(178) - got) < 1e-9, "Body disagrees with the formula"
+
+    # And the profile has to agree with its own tape, to the point.
+    p = Profile.load()
+    stated, worked = p.subject.body_fat_pct, p.measurements.body_fat(p.subject.height_cm)
+    if worked is not None:
+        assert abs(stated - worked) <= 0.5, \
+            f"the profile says {stated}% and the tape says {worked:.1f}%"
+    return f"75 cm waist, 38 cm neck, 178 cm tall reads as {got:.1f}%"
+
+
+def check_arm_length_moves_the_sleeve() -> str:
+    """Arm length is asked for, not derived, and it has to reach the targets.
+
+    Every dimension used to come off height alone, which puts everyone of the
+    same height at the same reach. It does not work that way: a man with long
+    arms spends his life with his wrists out of his sleeves, and no amount of
+    getting the chest right fixes it.
+    """
+    from .fitspec import ARM_FACTORS, estimate, target_spec, Body
+    from .profile import Profile
+
+    average = estimate(178, "very lean and athletic")
+    long_arms = estimate(178, "very lean and athletic", "long")
+    short = estimate(178, "very lean and athletic", "short")
+    assert long_arms["sleeve"] > average["sleeve"] > short["sleeve"], \
+        "arm length does not order the sleeve estimate"
+    assert long_arms["sleeve"] - average["sleeve"] > 2, \
+        "a long arm moves the sleeve by less than the width of a cuff"
+
+    # It moves the sleeve and nothing else. A long arm is not a wider one, and
+    # it says nothing at all about his chest or his inseam.
+    moved = {k for k in average if average[k] != long_arms[k]}
+    assert moved == {"sleeve"}, f"arm length also moved {moved - {'sleeve'}}"
+
+    # Unknown or empty text must not throw or silently lengthen anything.
+    for text in ("", "   ", "no idea", None):
+        assert estimate(178, "athletic", text or "")["sleeve"] == average["sleeve"], \
+            f"arm text {text!r} was read as something"
+
+    # And it has to survive the trip into an actual garment target, which is the
+    # part that was missed the first time: the estimator knew and the spec did not.
+    body = Body()
+    plain = next(t.value for t in target_spec("Shirt", body, 178, build="athletic")
+                 if t.key == "sleeve")
+    reach = next(t.value for t in target_spec("Shirt", body, 178, build="athletic", arms="long")
+                 if t.key == "sleeve")
+    assert reach > plain, "target_spec ignores arm length"
+
+    assert set(ARM_FACTORS) == {"short", "average", "long"}, "the arm vocabulary changed"
+    assert Profile.load().subject.arms in ("", "short", "average", "long"), \
+        "the profile records an arm length the engine cannot read"
+    return (f"long arms add {long_arms['sleeve'] - average['sleeve']:.1f} cm of sleeve "
+            "and touch nothing else")
+
+
+def check_description_reaches_the_prompt() -> str:
+    """What he looks like in prose has to arrive in the image prompt.
+
+    A field nothing reads is a field that rots. The description and the arm
+    length are both about proportion, which is exactly what an image model gets
+    wrong when it is told only a height.
+    """
+    from .profile import Profile
+    from .prompts import build_outfit_prompt, description_of, physique
+
+    p = Profile.load()
+    p.subject.description = "He has the forearms of a man who climbs."
+    p.subject.arms = "long"
+    p.save()
+
+    p = Profile.load()
+    assert description_of(p) == "He has the forearms of a man who climbs.", "description lost on save"
+    assert "long arms" in physique(p), "the arm length never reaches the physique line"
+
+    prompt = build_outfit_prompt(p, ["A white shirt"])
+    assert "forearms of a man who climbs" in prompt, "the description never reaches the prompt"
+    assert "arms are long" in prompt, "the prompt does not tell the model about his reach"
+    assert "cuffs must not ride up" in prompt, "the prompt does not say what long arms mean"
+
+    # No description, no empty sentence left behind in the prompt.
+    p.subject.description = ""
+    p.subject.arms = ""
+    p.save()
+    bare = build_outfit_prompt(Profile.load(), ["A white shirt"])
+    assert "arms are" not in bare and "\n\n\n" not in bare, \
+        "an empty description left a hole in the prompt"
+    return "description and arm length both reach the prompt, and leave no gap when unset"
+
+
 def check_body_estimate() -> str:
     from .fitspec import estimate
     body = estimate(176, "very lean and athletic")
@@ -2496,6 +2628,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (DATA, "Suggestions are held apart from confirmed", check_suggestions_are_separate),
     (FIT, "Body is the ten takeable measurements", check_body_measurement_set),
     (FIT, "Body estimate is anatomically sane", check_body_estimate),
+    (FIT, "Body fat is worked out, not guessed", check_body_fat_is_worked_out),
+    (FIT, "Arm length moves the sleeve", check_arm_length_moves_the_sleeve),
     (FIT, "Trouser spec keeps its leg opening", check_trouser_spec_survives_derived),
     (FIT, "Ease is added to the body measurement", check_ease_applied),
     (FIT, "Blazer sleeve leaves cuff showing", check_cuff_allowance),
@@ -2542,6 +2676,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (MATHS, "An empty outfit is not wearable", check_empty_outfit_not_wearable),
     (MATHS, "Deleting a garment breaks its outfits", check_deleted_garment_breaks_outfit),
     (MATHS, "Retired pieces are never bought back", check_retired_never_bought),
+    (PROMPTS, "His description reaches the prompt", check_description_reaches_the_prompt),
     (PROMPTS, "Subject reaches the image prompt", check_subject_in_prompt),
     (PROMPTS, "Outfit prompt carries garments and photo roles", check_outfit_prompt),
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),

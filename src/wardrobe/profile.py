@@ -41,6 +41,15 @@ class Subject:
     eyes: str = ""
     details: str = ""
 
+    # How his arms hang. Not derivable from height, and the one proportion that
+    # decides every sleeve in the wardrobe, so it is asked for rather than
+    # guessed: "long", "short", or left alone for average.
+    arms: str = ""
+
+    # Him in prose, in his own words or ours. The measurements say what fits;
+    # this says what he looks like, and it goes into every generated photograph.
+    description: str = ""
+
     @property
     def height_imperial(self) -> str:
         """1.78 m as 5 ft 10 in, for the benefit of the shops that still think so."""

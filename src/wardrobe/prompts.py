@@ -45,6 +45,10 @@ def physique(profile: Profile) -> str:
     parts = [p for p in (s.height_metric and f"{s.height_metric} ({s.height_imperial})", s.build) if p]
     if s.body_fat_pct:
         parts.append(f"around {s.body_fat_pct}% body fat")
+    # Proportion, not size. An image model given only a height draws average
+    # arms every time, and then the sleeves in the picture are not his sleeves.
+    if s.arms:
+        parts.append(f"{s.arms} arms for his height")
     for key, value in profile.measurements.measured().items():
         label = LABELS.get(key, key.replace("_", " "))
         parts.append(f"{label.lower()} {value:g}" + ("" if key in CIRCUMFERENCE_FREE else " cm"))
@@ -61,6 +65,11 @@ def appearance(profile: Profile) -> str:
     return ", ".join(bits)
 
 
+def description_of(profile: Profile) -> str:
+    """His own description, if one has been written. Prose, not a list."""
+    return (profile.subject.description or "").strip()
+
+
 def build_prompt(
     profile: Profile,
     outfit: str,
@@ -74,17 +83,25 @@ def build_prompt(
     body = physique(profile)
     look = appearance(profile)
 
+    prose = description_of(profile)
     lines = [
         "Ultra photorealistic, high-definition full-colour fashion photograph of "
         "the man in the reference image.",
         "",
         f"THE MAN. {body}. {look}.",
+    ]
+    if prose:
+        lines.append(prose)
+    lines += [
         "",
         "Keep his face, head shape, hair, skin tone and facial hair exactly as the "
         "reference image. This must read as the same person. Do not restyle his face.",
         f"Keep his body exactly as described: he is {s.height_metric} and "
         f"{s.build.lower() or 'lean'}, so the clothes hang on a lean frame. Do not "
-        "elongate him into a fashion-model silhouette and do not broaden him.",
+        "elongate him into a fashion-model silhouette and do not broaden him."
+        + (f" His arms are {s.arms} for his height: with his hands at his sides the "
+           "sleeves should sit accordingly, and the cuffs must not ride up his "
+           "forearms." if s.arms else ""),
         "",
         f"THE OUTFIT. {outfit.strip()}",
     ]

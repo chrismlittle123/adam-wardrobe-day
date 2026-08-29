@@ -18,6 +18,8 @@ a tape measure. Estimates are always marked as estimates.
 
 from __future__ import annotations
 
+import math
+
 from dataclasses import asdict, dataclass, fields
 
 # --- body ---------------------------------------------------------------------
@@ -52,6 +54,13 @@ BUILD_FACTORS: dict[str, dict[str, float]] = {
     "average":       {"chest": 1.02, "waist": 1.09, "hip": 1.03, "bicep": 1.04, "thigh": 1.04},
     "solid":         {"chest": 1.06, "waist": 1.20, "hip": 1.07, "bicep": 1.10, "thigh": 1.09},
 }
+
+# Arm length does not follow from height. The ratio above puts everyone at the
+# same reach, which is why a man with long arms spends his life with his wrists
+# out of his sleeves. These multiply the sleeve estimate only: a long arm is a
+# long forearm and upper arm, not a wider one.
+ARM_FACTORS: dict[str, float] = {"short": 0.955, "average": 1.0, "long": 1.045}
+ARM_DRIVEN: tuple[str, ...] = ("sleeve",)
 
 # The ten the form asks for, in the order you would take them: top down, then legs.
 HOW_TO_MEASURE: dict[str, str] = {
@@ -93,29 +102,76 @@ class Body:
     def measured(self) -> dict[str, float]:
         return {f.name: getattr(self, f.name) for f in fields(self) if getattr(self, f.name)}
 
+    def body_fat(self, height_cm: float) -> float | None:
+        """Body fat percentage from the waist and the neck, or None if either is
+        missing. See body_fat_percent."""
+        if not (self.waist and self.neck and height_cm):
+            return None
+        return body_fat_percent(self.waist, self.neck, height_cm)
+
     def missing(self) -> list[str]:
         return [f.name for f in fields(self) if not getattr(self, f.name)]
 
     def missing_critical(self) -> list[str]:
         return self.missing()
 
-    def resolved(self, height_cm: float, build: str = "athletic") -> tuple[dict[str, float], set[str]]:
+    def resolved(self, height_cm: float, build: str = "athletic",
+                 arms: str = "") -> tuple[dict[str, float], set[str]]:
         """Every dimension a garment target needs. Returns (values, estimated names).
 
         Starts from the estimate and lets real measurements overwrite it, so the
         derived-only dimensions are present without being asked for.
         """
-        values = estimate(height_cm, build)
+        values = estimate(height_cm, build, arms)
         taken = self.measured()
         values.update(taken)
         estimated = {k for k in values if k not in taken}
         return {k: round(float(v), 1) for k, v in values.items()}, estimated
 
 
-def estimate(height_cm: float, build: str = "athletic") -> dict[str, float]:
-    """Starting-point body measurements from height and build. Rough on purpose."""
+def body_fat_percent(waist_cm: float, neck_cm: float, height_cm: float) -> float:
+    """Body fat percentage, US Navy circumference method, for men.
+
+    Two tape measurements and a height give a number where there was a guess.
+    The profile carried a flat 10% that somebody had eyeballed; his actual waist
+    of 75 and neck of 38 put him at 7.9.
+
+    It is the gap between waist and neck that carries almost all of the signal,
+    which is why it is worth re-deriving rather than storing: a centimetre on the
+    waist is a point of body fat, and a wrongly-taken neck moves it just as far
+    in the other direction. Take the neck below the Adam's apple, tape sloping
+    slightly down at the front, and the waist at the navel, breathing out.
+    """
+    span = waist_cm - neck_cm
+    if span <= 0 or height_cm <= 0:
+        raise ValueError("the waist must be larger than the neck")
+    return 495 / (1.0324 - 0.19077 * math.log10(span)
+                  + 0.15456 * math.log10(height_cm)) - 450
+
+
+def estimate(height_cm: float, build: str = "athletic", arms: str = "") -> dict[str, float]:
+    """Starting-point body measurements from height, build and arm length.
+
+    Rough on purpose. Arm length is separate from build because it does not
+    follow from either height or bulk: two men the same height and shape can be
+    four centimetres apart at the wrist, and it is the sleeve that gives it away.
+    """
     factors = BUILD_FACTORS.get(_build_key(build), BUILD_FACTORS["athletic"])
-    return {k: round(height_cm * r * factors.get(k, 1.0), 1) for k, r in HEIGHT_RATIOS.items()}
+    reach = ARM_FACTORS.get(_arm_key(arms), 1.0)
+    out = {k: round(height_cm * r * factors.get(k, 1.0), 1) for k, r in HEIGHT_RATIOS.items()}
+    for key in ARM_DRIVEN:
+        out[key] = round(out[key] * reach, 1)
+    return out
+
+
+def _arm_key(arms: str) -> str:
+    """Which row of ARM_FACTORS a free-text arm description lands on."""
+    text = (arms or "").lower()
+    if "long" in text:
+        return "long"
+    if "short" in text:
+        return "short"
+    return "average"
 
 
 def _build_key(build: str) -> str:
@@ -239,6 +295,7 @@ def target_spec(
     *,
     fit: str = "Regular",
     build: str = "athletic",
+    arms: str = "",
     length_style: str | None = None,
     rise: str = "Mid",
     trouser_break: str = "Quarter break",
@@ -249,7 +306,7 @@ def target_spec(
     This is what to take into a shop, or send to an alterations tailor. Every
     value is the finished garment, not the body.
     """
-    values, estimated = body.resolved(height_cm, build)
+    values, estimated = body.resolved(height_cm, build, arms)
     ease = EASE.get(garment, {}).get(fit, {})
     out: list[Target] = []
 

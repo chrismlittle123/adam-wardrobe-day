@@ -208,6 +208,21 @@ def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
         subject_editor(profile)
 
 
+def body_fat_line(profile: Profile) -> str:
+    """The figure, and whether anyone actually worked it out.
+
+    A flat "~10%" had been sitting in the profile since the day it was written,
+    eyeballed and never revisited. Once the waist and the neck are on file it is
+    not a guess any more, so the docket stops hedging and says so.
+    """
+    s = profile.subject
+    derived = profile.measurements.body_fat(s.height_cm)
+    if derived is None:
+        return f"~{s.body_fat_pct}%, estimated" if s.body_fat_pct else ""
+    return (f"{derived:.1f}%, from a {profile.measurements.waist:g} cm waist "
+            f"and a {profile.measurements.neck:g} cm neck")
+
+
 def docket(profile: Profile) -> None:
     s = profile.subject
 
@@ -224,7 +239,7 @@ def docket(profile: Profile) -> None:
     rows = [
         row("Height", height),
         row("Build", s.build, prose=True),
-        row("Body fat", f"~{s.body_fat_pct}%" if s.body_fat_pct else ""),
+        row("Body fat", body_fat_line(profile)),
         row("Skin", swatch),
         row("Hair", s.hair, prose=True),
         row("Face", s.facial_hair, prose=True),
@@ -245,7 +260,18 @@ def subject_editor(profile: Profile) -> None:
         with st.form("subject"):
             s.name = st.text_input("Name", s.name)
             s.height_cm = st.number_input("Height (cm)", 120, 230, s.height_cm or 178)
-            s.body_fat_pct = st.number_input("Body fat (%)", 0, 50, s.body_fat_pct)
+            derived = profile.measurements.body_fat(s.height_cm)
+            if derived is None:
+                s.body_fat_pct = st.number_input(
+                    "Body fat (%)", 0, 50, s.body_fat_pct,
+                    help="A guess until the waist and the neck are measured, at "
+                         "which point it is worked out instead.")
+            else:
+                s.body_fat_pct = round(derived)
+                st.markdown(
+                    f'<div class="look-cap">Body fat &middot; {derived:.1f}%, worked '
+                    f'out from the waist and the neck rather than typed in</div>',
+                    unsafe_allow_html=True)
             s.build = st.text_input("Build", s.build)
             s.skin_tone_hex = st.color_picker("Skin", s.skin_tone_hex)
             s.skin_tone = st.text_input("Skin, in words", s.skin_tone)
@@ -253,6 +279,15 @@ def subject_editor(profile: Profile) -> None:
             s.facial_hair = st.text_input("Facial hair", s.facial_hair)
             s.eyes = st.text_input("Eyes", s.eyes)
             s.details = st.text_input("Always wears", s.details)
+            s.arms = st.selectbox(
+                "Arm length", ["", "long", "average", "short"],
+                index=["", "long", "average", "short"].index(s.arms if s.arms in
+                      ("", "long", "average", "short") else ""),
+                help="Height alone puts everyone at the same reach. Long arms add "
+                     "about 4% to every sleeve target; short arms take 4.5% off.")
+            s.description = st.text_area("Description", s.description, height=110,
+                                         help="Him in prose. It goes into every "
+                                              "generated photograph.")
             profile.style.direction = st.text_area("Style direction", profile.style.direction, height=68)
             profile.style.avoid = st.text_area("Avoid", profile.style.avoid, height=68)
             if st.form_submit_button("Save subject"):
@@ -2240,7 +2275,8 @@ def measurements_panel(profile: Profile) -> None:
                 profile.save()
                 st.rerun()
 
-    values, estimated = body.resolved(profile.subject.height_cm, profile.subject.build)
+    values, estimated = body.resolved(profile.subject.height_cm, profile.subject.build,
+                                      profile.subject.arms)
     rows = [{
         "Dimension": fitspec.LABELS.get(k, k.replace("_", " ").title()),
         "Value": f"{v:g} cm",
@@ -2272,7 +2308,7 @@ def size_targets_panel(profile: Profile) -> None:
 
     targets = fitspec.target_spec(
         garment, profile.measurements, profile.subject.height_cm, fit=fit,
-        build=profile.subject.build, length_style=length_style,
+        build=profile.subject.build, arms=profile.subject.arms, length_style=length_style,
         rise=rise, trouser_break=trouser_break,
     )
     rows = [{

@@ -48,7 +48,7 @@ def size_targets(profile: Profile, item: Item, *, fit: str = "Regular") -> list[
         return []
     return fitspec.target_spec(
         item.garment, profile.measurements, profile.subject.height_cm,
-        fit=fit, build=profile.subject.build,
+        fit=fit, build=profile.subject.build, arms=profile.subject.arms,
     )
 
 
