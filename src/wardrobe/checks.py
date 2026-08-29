@@ -1209,9 +1209,9 @@ def check_sourcing_routes() -> str:
     assert where("Shirt", grade="Dress", fabric="Oxford cotton") == "Charles Tyrwhitt", \
         "dress shirt misrouted"
     assert where("Shirt", fabric="Linen") == "Mango", "linen shirt misrouted"
-    assert where("Trousers", fabric="Wool flannel") == "Marks & Spencer or Next", \
+    assert where("Trousers", fabric="Wool flannel") == "Marks and Spencer or Next", \
         "wool trousers misrouted"
-    assert where("Trousers", fabric="Worsted wool") == "Marks & Spencer or Next", \
+    assert where("Trousers", fabric="Worsted wool") == "Marks and Spencer or Next", \
         "the family match does not cover the whole family"
     assert where("Trousers", fabric="Linen") == "Mango", "the wool route swallowed the linen one"
     assert where("Polo", grade="Knitted") == "Mango", "knitted polo misrouted"
