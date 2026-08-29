@@ -297,7 +297,7 @@ def style_guide_tab(profile: Profile, answers: Answers) -> None:
                         draft[q.id] = points_input(q, answers.get(q.id))
                     else:
                         draft[q.id] = st.text_area(
-                            q.prompt, value=answers.get(q.id), placeholder=q.placeholder,
+                            q.prompt, value=answers.get(q.id), 
                             help=q.help or None, height=max(68, q.lines * 27), key=f"a-{q.id}",
                         )
                     if answers.get(q.id):
@@ -486,7 +486,7 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
     item.category = inv_mod.category_for(garment)
 
     item.name = st.text_input("Name", item.name, key=f"{key}-name",
-                              placeholder="Cream camp-collar shirt")
+                              )
     c1, c2, c3 = st.columns([2, 1, 2])
     options = ["", *COLOUR_NAMES]
     item.colour = c1.selectbox(
@@ -589,7 +589,7 @@ def inventory_tab(profile: Profile, inventory: Inventory, outfits: Outfits) -> N
 
     ui.eyebrow("The wardrobe")
     f1, f2, f3 = st.columns([2, 1, 1])
-    query = f1.text_input("Search", "", key="inv-q", placeholder="brown, linen, Uniqlo…")
+    query = f1.text_input("Search", "", key="inv-q", )
     category = f2.selectbox("Category", ["All", *categories()], key="inv-cat")
     status = f3.selectbox("Status", ["All", *STATUSES], key="inv-status")
 
@@ -788,8 +788,8 @@ def kept_panel(principles: Principles) -> None:
 def handwrite_panel(principles: Principles) -> None:
     with st.expander("Write one by hand"):
         with st.form("add-principle", clear_on_submit=True):
-            text = st.text_input("Instruction", placeholder="Keep the volume in one place only.")
-            reason = st.text_input("Reason", placeholder="Loose on top and below reads as swamped.")
+            text = st.text_input("Instruction", )
+            reason = st.text_input("Reason", )
             group = st.selectbox("Group", GROUPS)
             if st.form_submit_button("Add principle") and text.strip():
                 principles.add(Principle(text=text.strip(), reason=reason.strip(), group=group))
@@ -841,7 +841,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
         hex_code = c1.color_picker("Hex", "#26303F" if custom else hex_for(picked),
                                    key="pal-hex")
         name = c2.text_input("Name", "" if custom else picked, key="pal-name",
-                             placeholder="Give it a name, whatever you call it")
+                             )
         c3, c4 = st.columns([1, 2])
         role = c3.selectbox("Role", list(ROLES), key="pal-role",
                             help=" · ".join(f"{k}: {v}" for k, v in ROLES.items()))
@@ -849,7 +849,7 @@ def palette_panel(palette: Palette, skin: str) -> None:
                                  help="Leave empty to use the role's defaults.")
         seasons = st.multiselect("Seasons", SEASONS, key="pal-seasons",
                                  help="Leave empty for all year round.")
-        note = st.text_input("Note", placeholder="Only in flannel, never in cotton",
+        note = st.text_input("Note", 
                              key="pal-note")
         verdict, why = pal_mod.warmth(hex_code, skin)
         st.markdown(
@@ -1076,9 +1076,9 @@ def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
         index=backgrounds.index(outfit.background) if outfit.background in backgrounds else 0,
         key="var-bg")
     count = c3.number_input("Variations", 1, 4, 1, key="var-count")
-    name = st.text_input("Name it", f"{outfit.name}, again", key="var-name")
+    name = st.text_input("Name it", key="var-name")
     extra = st.text_input("Extra direction", outfit.extra, key="var-extra",
-                          placeholder="Sleeves rolled twice. Overcast daylight.")
+                          )
     use_principles = st.toggle("Apply the principles", value=bool(principles.principles),
                                key="var-prin")
 
@@ -1249,7 +1249,7 @@ def garment_catalogue_panel() -> None:
     with st.expander("Add a garment"):
         with st.form("add-garment", clear_on_submit=True):
             c1, c2, c3 = st.columns([2, 1, 1])
-            name = c1.text_input("Name", placeholder="Cardigan")
+            name = c1.text_input("Name", )
             category = c2.selectbox("Category", vocab.category_names(), key="ag-cat")
             picked = c3.multiselect("Size schemes", list(vocabulary.SCHEMES),
                                     default=["Alpha"], key="ag-scheme",
@@ -1310,11 +1310,11 @@ def garment_catalogue_panel() -> None:
     with st.expander("Add a fabric"):
         with st.form("add-fabric", clear_on_submit=True):
             c1, c2 = st.columns(2)
-            name = c1.text_input("Name", placeholder="Cotton lyocell")
+            name = c1.text_input("Name", )
             family = c2.selectbox("Family", [*vocab.families(), "New family…"],
                                   key="af-family")
             fresh = st.text_input("New family name", key="af-new",
-                                  placeholder="Only if you picked New family")
+                                  )
             if st.form_submit_button("Add fabric"):
                 chosen = fresh.strip() if family == "New family…" else family
                 if not name.strip():
@@ -1392,17 +1392,17 @@ def retailer_catalogue_view() -> None:
     with st.expander("Add a shop"):
         with st.form("add-shop", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
-            name = c1.text_input("Name", placeholder="Percival")
+            name = c1.text_input("Name", )
             kind = c2.selectbox("Kind", retailers.KINDS, key="as-kind")
             search = st.text_input(
-                "Search link", placeholder="https://example.com/search?q={q}",
+                "Search link", 
                 help="Put {q} where the search term goes. The app escapes it for you.")
             strengths = st.multiselect("Sells", garments(), key="as-sells")
             c3, c4 = st.columns(2)
             low = c3.number_input("Typical from £", 0, 5000, 30, step=5, key="as-low")
             high = c4.number_input("Typical to £", 0, 10000, 200, step=10, key="as-high")
             note = st.text_area("Note", height=68, key="as-note",
-                                placeholder="What it is good for, and when to go.")
+                                )
             if st.form_submit_button("Add to the catalogue"):
                 if not name.strip():
                     st.warning("Give it a name.")
@@ -1663,7 +1663,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     with st.expander("Invent a piece you do not own"):
         with st.form("quick-aspirational", clear_on_submit=True):
             c1, c2, c3 = st.columns([3, 2, 1])
-            name = c1.text_input("Name", placeholder="Camel wool overcoat")
+            name = c1.text_input("Name", )
             garment = c2.selectbox("Garment", garments(), key="asp-garment")
             grade = c3.selectbox("Grade", grades(), key="asp-grade")
             c4, c5, c6 = st.columns([2, 1, 2])
@@ -1719,9 +1719,9 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
     background = c2.selectbox("Background", list(BACKGROUNDS), key="gen-bg")
     count = c3.number_input("Variations", 1, 4, 1, key="gen-count")
     c4, c5 = st.columns([2, 2])
-    name = c4.text_input("Outfit name", placeholder="Saturday lunch, Fulham Road")
+    name = c4.text_input("Outfit name", )
     tag_choice = c5.multiselect("Tags", outfits.all_tags(), key="gen-tags")
-    extra = st.text_input("Extra direction", placeholder="Sleeves rolled twice. Overcast daylight.")
+    extra = st.text_input("Extra direction", )
     use_principles = st.toggle("Apply the principles", value=bool(principles.principles),
                                key="gen-prin")
 
@@ -1844,7 +1844,7 @@ def outfit_card(outfit: Outfit, inventory: Inventory, outfits: Outfits) -> None:
             outfit.tags = st.multiselect("Tags", outfits.all_tags(), default=outfit.tags,
                                          key=f"ot-{outfit.id}")
             new_tag = st.text_input("New tag", key=f"nt-{outfit.id}",
-                                    placeholder="rainy Tuesday")
+                                    )
             outfit.notes = st.text_area("Notes", outfit.notes, height=68, key=f"onote-{outfit.id}")
             s1, s2 = st.columns(2)
             if s1.form_submit_button("Save"):
@@ -2271,13 +2271,13 @@ def route_editor(plan: sourcing.Plan, route: sourcing.Route,
 
             t1, t2 = st.columns(2)
             route.condition = t1.text_input("Condition", route.condition,
-                                            placeholder="Very Good condition or above",
+                                            
                                             key=f"rc-{route.id}")
             route.timing = t2.text_input("Timing", route.timing,
-                                         placeholder="wait for the sale",
+                                         
                                          key=f"rt-{route.id}")
             route.spec = st.text_input("Insist on", route.spec,
-                                       placeholder="100% cotton, 200 gsm or heavier",
+                                       
                                        key=f"rsp-{route.id}")
             route.note = st.text_area("Note", route.note, height=68, key=f"rn-{route.id}")
 
@@ -2302,7 +2302,7 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
     with st.expander("Add a route"):
         with st.form("add-route", clear_on_submit=True):
             c1, c2 = st.columns([2, 1])
-            label = c1.text_input("Name it", placeholder="Loafers")
+            label = c1.text_input("Name it", )
             garment = c2.selectbox("Garment", garments(), key="ar-garment")
             book = catalogue.lookup()
             stores = st.multiselect(
@@ -2316,9 +2316,9 @@ def add_route_panel(plan: sourcing.Plan, catalogue: retailers.Catalogue) -> None
                                   key="ar-family")
             fit = m4.selectbox("Fit", fits(), key="ar-fit")
             t1, t2 = st.columns(2)
-            condition = t1.text_input("Condition", placeholder="Very Good condition or above")
-            timing = t2.text_input("Timing", placeholder="wait for the sale")
-            spec = st.text_input("Insist on", placeholder="Goodyear welted")
+            condition = t1.text_input("Condition", )
+            timing = t2.text_input("Timing", )
+            spec = st.text_input("Insist on", )
             note = st.text_area("Note", height=68, key="ar-note")
             if st.form_submit_button("Add route"):
                 if not stores:

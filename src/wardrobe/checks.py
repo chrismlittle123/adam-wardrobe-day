@@ -475,6 +475,8 @@ def check_question_bank() -> str:
     ids = [q.id for q in ALL_QUESTIONS]
     assert len(ids) == len(set(ids)), "duplicate question ids"
     assert all(q.prompt.strip() for q in ALL_QUESTIONS), "a question has no prompt"
+    assert not hasattr(ALL_QUESTIONS[0], "placeholder"), \
+        "questions carry example answers again"
     assert not hasattr(ALL_QUESTIONS[0], "core"), "the core concept is back"
     assert all(s.questions for s in SECTIONS), "an empty section survives"
     return f"{len(ids)} questions across {len(SECTIONS)} sections, ids unique"
@@ -1328,6 +1330,26 @@ def _render():
     return app
 
 
+def check_no_prefilled_hints() -> str:
+    """No text box suggests what to type in it.
+
+    A placeholder in an empty box reads as content until you look twice, and a
+    worked example in a questionnaire answers the question for the person who is
+    supposed to be answering it.
+    """
+    import ast as _ast
+
+    offences: list[str] = []
+    for source in sorted(Path(__file__).parent.glob("*.py")):
+        tree = _ast.parse(source.read_text())
+        for node in _ast.walk(tree):
+            if isinstance(node, _ast.Call) and any(
+                    kw.arg == "placeholder" for kw in node.keywords):
+                offences.append(f"{source.name}:{node.lineno}")
+    assert not offences, "text boxes with prefilled hints: " + ", ".join(offences)
+    return "no box in the app suggests its own answer"
+
+
 def check_typography() -> str:
     """Four faces, one job each, and every rule says which job it is doing.
 
@@ -2006,6 +2028,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (PROMPTS, "Subject reaches the image prompt", check_subject_in_prompt),
     (PROMPTS, "Outfit prompt carries garments and photo roles", check_outfit_prompt),
     (PROMPTS, "Guide prompt carries every answer", check_guide_prompt),
+    (APP, "No text box prefills a suggestion", check_no_prefilled_hints),
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),
