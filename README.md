@@ -129,6 +129,11 @@ Next and M&S on the high street; Moss, Suitsupply and Charles Tyrwhitt for
 tailoring; Clarks, Base London, Loake, Grenson and Solovair for shoes. Each comes
 with its reason and a working search link.
 
+A wanted piece can also carry **one specific thing online**, a link he found and
+kept, and a **buy-it-reduced** rule of its own that overrides whatever the route
+says. The link is matched to a shop by its domain, so pasting a Uniqlo URL makes
+the page say Uniqlo rather than making him read the address.
+
 Then the tactics, which are the actual strategy: save the Vinted search with your
 size in it, wishlist rather than buy so the discount comes to you, buy out of
 season (a coat is cheapest in February, linen in late August), and set a

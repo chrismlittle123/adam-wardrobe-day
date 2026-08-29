@@ -99,6 +99,10 @@ class Item:
     photo: str = ""
     description: str = ""
     starred: bool = False   # marked for purchase in the shopping guide
+    # A specific thing online that is the thing, or near enough. The plan says
+    # which shop a garment comes from; this says which garment.
+    link: str = ""
+    wait_for_sale: bool = False
     # Written by the shopping guide: a product shot and the copy to go with it.
     product_photo: str = ""
     product_copy: str = ""
@@ -123,6 +127,18 @@ class Item:
     @property
     def has_photo(self) -> bool:
         return bool(self.photo) and Path(self.photo).is_file()
+
+    @property
+    def has_link(self) -> bool:
+        return self.link.startswith(("http://", "https://"))
+
+    @property
+    def link_host(self) -> str:
+        """The bare domain, for showing where a link goes without the URL."""
+        if not self.has_link:
+            return ""
+        host = self.link.split("//", 1)[-1].split("/", 1)[0]
+        return host[4:] if host.startswith("www.") else host
 
     @property
     def has_product_photo(self) -> bool:

@@ -539,6 +539,24 @@ def item_fields(item: Item, key: str, garment: str, status: str, scheme: str) ->
                 item.sizes[field.key] = col.text_input(
                     field.label, current, help=field.help or None, key=f"{key}-s-{field.key}")
 
+    if status == ASPIRATIONAL:
+        item.link = st.text_input(
+            "A link to one online", item.link, key=f"{key}-link",
+            help="A specific thing that is the thing, or near enough. The sourcing "
+                 "plan says which shop; this says which garment.").strip()
+        found = retailers.match_url(item.link) if item.has_link else None
+        item.wait_for_sale = st.checkbox(
+            "Only buy this reduced", item.wait_for_sale, key=f"{key}-sale",
+            help="Overrides the route. Some shops are worth full price for the right "
+                 "piece and some never are.")
+        if item.has_link:
+            st.markdown(
+                f'<div class="dict-row"><span class="meta">Points at </span>'
+                f'{found.name if found else item.link_host}</div>',
+                unsafe_allow_html=True)
+        elif item.link:
+            st.warning("That does not look like a link. It wants to start http.")
+
     item.description = st.text_area(
         "Description for the image model", item.description, key=f"{key}-desc", height=68,
         help="Only what a photograph would not show. Drape, weight, how it sits.")
@@ -2510,9 +2528,28 @@ def shop_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                 product_card(profile, item, inventory, principles, plan)
 
 
+def example_link(item: Item, plan: "sourcing.Plan") -> str:
+    """The saved example, and whether it is only worth buying reduced.
+
+    The route says which shop a kind of garment comes from. This says which
+    garment, which is the part that is hard to hold in your head between one
+    browsing session and the next.
+    """
+    route = sourcing.route_for(item, plan)
+    on_sale = item.wait_for_sale or (route and "sale" in (route.timing or "").lower())
+    bits = []
+    if item.has_link:
+        bits.append(f'<a href="{item.link}" target="_blank" rel="noopener">'
+                    f'{item.link_host} &#8599;</a>')
+    if on_sale:
+        bits.append('<span class="sale">only reduced</span>')
+    return f'<div class="example">{" ".join(bits)}</div>' if bits else ""
+
+
 def product_card(profile: Profile, item: Item, inventory: Inventory,
                  principles: Principles, plan: "sourcing.Plan") -> None:
-    flag = "look secondhand" if item.garment in retailers.RARELY_WORN else ""
+    flag = ("only reduced" if item.wait_for_sale
+            else "look secondhand" if item.garment in retailers.RARELY_WORN else "")
     shot = ui.product_shot(Path(item.shop_photo) if item.shop_photo else None, flag)
     sizes = shop_mod.size_line(profile, item)
     detail = " · ".join(b for b in (item.fabric, item.colour) if b)
@@ -2521,6 +2558,7 @@ def product_card(profile: Profile, item: Item, inventory: Inventory,
         f'<div class="nm">{item.name or item.garment}</div>'
         f'<div class="kind">{item.garment}{" · " + detail if detail else ""}</div>'
         f'<div class="size">{sizes or "no size target for this garment"}</div>'
+        f'{example_link(item, plan)}'
         f'<a class="view" href="?item={item.id}" target="_blank">View &#8599;</a>'
         f'</div></div>', unsafe_allow_html=True)
 
@@ -2570,6 +2608,9 @@ def item_view(profile: Profile, item_id: str) -> None:
 
     outfits = Outfits.load()
     principles = Principles.load()
+    # Loaded once at the top: the example link needs it before the where-to-buy
+    # section does, and assigning it lower down leaves it unbound up here.
+    catalogue = retailers.Catalogue.load()
     detail = " · ".join(b for b in (item.garment, item.grade, item.fit,
                                     item.fabric, item.colour) if b)
     st.markdown(
@@ -2638,15 +2679,28 @@ def item_view(profile: Profile, item_id: str) -> None:
         if item.size_line():
             st.markdown(f'<div class="look-cap">Label size wanted: {item.size_line()}</div>',
                         unsafe_allow_html=True)
+        if item.has_link:
+            found = retailers.match_url(item.link, catalogue)
+            ui.eyebrow("One online")
+            st.markdown(
+                f'<div class="buy"><div class="hd">'
+                f'<div class="who">{found.name if found else item.link_host}</div>'
+                f'<a href="{item.link}" target="_blank" rel="noopener">Open &#8599;</a>'
+                f'</div><div class="why">A specific one he found, kept as the example '
+                f'of what he is after'
+                f'{". Only worth buying reduced." if item.wait_for_sale else "."}'
+                f'</div></div>', unsafe_allow_html=True)
 
     ui.eyebrow("Where to buy it")
-    catalogue = retailers.Catalogue.load()
     route = sourcing.route_for(item, sourcing.Plan.load())
     if route:
         terms = "".join(
             f'<div class="term"><b>{label}</b> {value}</div>'
             for label, value in (("Condition", route.condition), ("Timing", route.timing),
                                  ("Insist on", route.spec)) if value)
+        if item.wait_for_sale:
+            terms = ('<div class="term"><b>Only reduced</b> not at full price, '
+                     'whatever the route says</div>') + terms
         shops = route.shops(catalogue)
         links = " ".join(
             f'<a href="{shop.url(retailers.query_for(item))}" target="_blank" '

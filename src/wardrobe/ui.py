@@ -424,6 +424,14 @@ SHOP_CSS = """
   font-family: var(--chrome); font-size: 0.70rem; letter-spacing: .14em;
   text-transform: uppercase; padding: .2rem .5rem;
 }
+.product .example {
+  font-family: var(--chrome); font-size: 0.82rem; letter-spacing: .04em;
+  border-top: 1px solid var(--line); padding-top: .5rem; margin-top: .5rem;
+  display: flex; gap: .7rem; align-items: baseline; flex-wrap: wrap;
+}
+.product .example a { color: var(--brass); text-decoration: none; }
+.product .example a:hover { border-bottom: 1px solid var(--brass); }
+.product .example .sale { color: var(--bad); }
 .product a.view {
   display: block; text-align: center; padding: .7rem; margin-top: .9rem;
   background: var(--brass); color: #17110E; text-decoration: none;

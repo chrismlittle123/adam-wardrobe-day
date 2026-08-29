@@ -307,6 +307,28 @@ class Suggestion:
         return self.retailer.url(self.query)
 
 
+def match_url(url: str, catalogue: "Catalogue | None" = None) -> Retailer | None:
+    """Which shop a link points at, by its domain.
+
+    Paste a Uniqlo link and the page can say Uniqlo rather than making him read
+    the URL. Matched against the search templates already in the catalogue, so a
+    shop he adds is recognised without a second list to maintain.
+    """
+    if "//" not in url:
+        return None
+    host = url.split("//", 1)[1].split("/", 1)[0].lower()
+    host = host[4:] if host.startswith("www.") else host
+    book = catalogue if catalogue is not None else Catalogue.load()
+    for retailer in book.retailers:
+        if "//" not in retailer.search:
+            continue
+        theirs = retailer.search.split("//", 1)[1].split("/", 1)[0].lower()
+        theirs = theirs[4:] if theirs.startswith("www.") else theirs
+        if host == theirs or host.endswith("." + theirs) or theirs.endswith("." + host):
+            return retailer
+    return None
+
+
 def query_for(item) -> str:
     """The search string. Colour and fabric first, because that is how the
     listings are actually titled."""

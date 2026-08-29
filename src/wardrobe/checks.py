@@ -1267,6 +1267,49 @@ def check_restaging_uses_the_photograph() -> str:
     return "photographed garments are restaged from the photo, the rest drawn from words"
 
 
+def check_example_links() -> str:
+    """A wanted piece can carry one specific thing online, and a sale rule."""
+    from streamlit.testing.v1 import AppTest
+
+    from .inventory import Inventory, Item
+    from .retailers import Catalogue, match_url
+    from .sourcing import Plan
+
+    catalogue = Catalogue.load()
+    assert match_url("https://www.uniqlo.com/uk/en/products/E1", catalogue).name == "Uniqlo", \
+        "a Uniqlo link is not recognised as Uniqlo"
+    assert match_url("https://shop.mango.com/gb/en/p/1", catalogue).name == "Mango", \
+        "a subdomain is not matched to its shop"
+    assert match_url("https://example.com/x", catalogue) is None, "an unknown host matched"
+    assert match_url("not a url", catalogue) is None, "a non-url matched"
+
+    inventory, _ = _seeded()
+    trousers = next(i for i in inventory.items if i.name == "Grey flannel trousers")
+    trousers.link = "https://www.uniqlo.com/uk/en/products/E459576-000"
+    trousers.wait_for_sale = True
+    inventory.update(trousers)
+    inventory.save()
+
+    back = Inventory.load().by_id(trousers.id)
+    assert back.has_link and back.link_host == "uniqlo.com", \
+        f"the link did not survive: {back.link!r}"
+    assert back.wait_for_sale, "the sale rule did not survive"
+    assert not Item(link="uniqlo.com/x").has_link, "a bare host counts as a link"
+    assert Item(link="").link_host == "", "an empty link has a host"
+
+    page = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    page.query_params["item"] = trousers.id
+    page = page.run()
+    assert not page.exception, f"the product page raised: {page.exception[0].value}"
+    body = "\n".join(m.value for m in page.markdown)
+    assert "One online" in body, "the saved example is not shown"
+    assert back.link in body, "the link itself is missing"
+    assert "Uniqlo" in body, "the page does not say which shop the link goes to"
+    assert "Only reduced" in body or "only reduced" in body, \
+        "the sale rule is not shown on the page"
+    return f"a {back.link_host} link kept on a wanted piece, marked only-reduced"
+
+
 def check_product_prompts() -> str:
     """The product shot must ask for the garment alone, and the copy for his size."""
     from .inventory import Item
@@ -2093,6 +2136,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (SHOP, "The sourcing plan routes each garment", check_sourcing_routes),
     (SHOP, "The plan is editable and persists", check_plan_is_editable),
     (SHOP, "An uploaded photo is restaged, not described", check_restaging_uses_the_photograph),
+    (SHOP, "A wanted piece keeps a link and a sale rule", check_example_links),
     (SHOP, "Product prompts carry cloth, price and size", check_product_prompts),
     (MATHS, "Plan opens with the best bundle", check_plan_shape),
     (MATHS, "Running totals are arithmetically right", check_plan_arithmetic),
