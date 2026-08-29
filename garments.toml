@@ -96,6 +96,7 @@ colours = [
     { name = "Rust", hex = "#8E3B2E", group = "Warm accents" },
     { name = "Burgundy", hex = "#6E2C33", group = "Warm accents" },
     { name = "Oxblood", hex = "#4A1F23", group = "Warm accents" },
+    { name = "Multicolour", hex = "#8A7767", group = "Not a single colour" },
 ]
 fits = [
     "",

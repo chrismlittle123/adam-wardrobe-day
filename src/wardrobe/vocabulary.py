@@ -194,7 +194,24 @@ DEFAULT_COLOURS: dict[str, tuple[tuple[str, str], ...]] = {
         ("Mustard", "#C08A2E"), ("Rust", "#8E3B2E"), ("Burgundy", "#6E2C33"),
         ("Oxblood", "#4A1F23"),
     ),
+    # A group of its own, because these are not colours in the sense the rest of
+    # the list means. A striped shirt has no single hex, so nothing can be
+    # measured against his skin and the app must say so rather than pick one of
+    # the stripes and pronounce on it.
+    "Not a single colour": (
+        ("Multicolour", "#8A7767"),
+    ),
 }
+
+# Entries that name a garment's colouring without being one colour. They sit in
+# the same list because that is where a man looks for them, and they are held
+# out of every calculation that assumes a single hex.
+UNMEASURABLE_COLOURS: tuple[str, ...] = ("Multicolour",)
+
+
+def is_measurable(colour: str) -> bool:
+    """Whether a colour name can be compared with anything."""
+    return colour not in UNMEASURABLE_COLOURS
 
 
 # Grade applies to tops: knitted, heavyweight, fine. Fit applies to anything

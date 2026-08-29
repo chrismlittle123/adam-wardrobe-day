@@ -216,6 +216,17 @@ def distance_line(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
     return f"{rounded:.0f}"
 
 
+def measurable(colour_name: str) -> bool:
+    """Whether the one rule can be applied to this colour at all.
+
+    Multicolour has no single hex. Measuring the placeholder against his skin
+    would produce a confident verdict about a garment nobody has looked at, so
+    the rule declines instead: it is his eye's call, not the arithmetic's.
+    """
+    from . import vocabulary
+    return vocabulary.is_measurable(colour_name)
+
+
 def face_rule(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> tuple[bool, str]:
     """(passes, why). The only judgement this module makes about a colour."""
     if skin_distance(hex_code, skin_hex) < TOO_CLOSE:
@@ -230,6 +241,7 @@ def breaks_the_rule(palette: "Palette", skin_hex: str = DEFAULT_SKIN) -> list["C
     """Every colour in the palette allowed near the face that sits too close."""
     return [c for c in palette.colours
             if any(c.allows(category) for category in NEAR_THE_FACE)
+            and measurable(c.name)
             and blurs_at_the_collar(c.hex, skin_hex)]
 
 

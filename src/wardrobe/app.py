@@ -993,6 +993,9 @@ def palette_panel(palette: Palette, skin: str) -> None:
         note = st.text_input("Note", 
                              key="pal-note")
         passes, why = pal_mod.face_rule(hex_code, skin)
+        if not pal_mod.measurable(name.strip() or picked):
+            passes, why = True, ("not one colour, so there is nothing to measure "
+                                 "against his skin")
         on_top = "Top" in allowed or (not allowed and
                                       "Top" in pal_mod.ROLE_CATEGORIES.get(role, ()))
         badge = "ok" if passes else ("no" if on_top else "want")
@@ -1022,7 +1025,10 @@ def palette_panel(palette: Palette, skin: str) -> None:
         for colour in colours:
             c1, c2 = st.columns([9, 1], vertical_alignment="center")
             note_line = f"<br>{colour.note}" if colour.note else ""
-            if not colour.near_the_face:
+            if not pal_mod.measurable(colour.name):
+                rule_line = ('<span class="badge">not one colour</span> nothing to '
+                             'measure against his skin, so this one is your eye\'s call')
+            elif not colour.near_the_face:
                 rule_line = (f'<span class="badge">not worn on top</span> '
                              f'{pal_mod.distance_line(colour.hex, skin)} from his '
                              f'skin, which does not matter off the face')
@@ -1866,10 +1872,17 @@ def colour_catalogue_view(palette: Palette) -> None:
                       f'title="{n} {h}"></div>' for n, h in rows)
             + "</div>", unsafe_allow_html=True)
         ui.table([{
-            "": f'<span class="chip" style="background:{h}"></span>',
-            "Name": n, "Hex": h, "Reads as": pal_mod.hue_name(h),
-            "From his skin": pal_mod.distance_line(h, skin),
-            "On top": ('<span class="badge ok">clears</span>'
+            "": f'<span class="chip" style="background:{ui.swatch_for(n, h)}"></span>',
+            "Name": n,
+            # The placeholder hex is scaffolding for the swatch, not a fact
+            # about the garment. Printing it, and calling it orange, is the
+            # app inventing a colour that the shirt does not have.
+            "Hex": h if pal_mod.measurable(n) else "&mdash;",
+            "Reads as": pal_mod.hue_name(h) if pal_mod.measurable(n) else "several",
+            "From his skin": (pal_mod.distance_line(h, skin)
+                              if pal_mod.measurable(n) else "&mdash;"),
+            "On top": ('<span class="badge">your call</span>' if not pal_mod.measurable(n)
+                       else '<span class="badge ok">clears</span>'
                        if pal_mod.clears_the_face(h, skin)
                        else '<span class="badge no">too close</span>'),
             "In the palette": (f"yes &middot; {mine[h.upper()].role}"

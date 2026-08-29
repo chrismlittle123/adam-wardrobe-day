@@ -1,0 +1,92 @@
+[[items]]
+id = "hopsack-wool-mid-grey-suit"
+name = "Hopsack Wool Mid Grey Suit"
+category = "Outerwear"
+garment = "Suit"
+colour = "Mid grey"
+colour_hex = "#7A7A78"
+fabric = "Wool hopsack"
+grade = ""
+fit = ""
+scheme = "Chest and length"
+status = "owned"
+photo = "inventory/photos/hopsack-wool-mid-grey-suit.jpg"
+description = "Hackett mayfair hopsack wool slim fit, no taper on trousers"
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/hopsack-wool-mid-grey-suit.png"
+product_copy = ""
+
+[items.sizes]
+chest = "38"
+length = "Regular"
+
+[[items]]
+id = "purple-brown-suede-loafers"
+name = "Purple Brown Suede Loafers"
+category = "Shoes"
+garment = "Loafers"
+colour = "Oxblood"
+colour_hex = "#4A1F23"
+fabric = "Suede"
+grade = ""
+fit = ""
+scheme = "Shoe"
+status = "owned"
+photo = "inventory/photos/purple-brown-suede-loafers.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/purple-brown-suede-loafers.png"
+product_copy = ""
+
+[items.sizes]
+uk = "8"
+
+[[items]]
+id = "camp-collar-stitched-black-and-white"
+name = "Camp Collar Stitched Black and White Shirt"
+category = "Top"
+garment = "Shirt"
+colour = "Cream"
+colour_hex = "#F2E9D8"
+fabric = "Cotton jersey"
+grade = "Everyday"
+fit = "Regular"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/camp-collar-stitched-black-and-white.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/camp-collar-stitched-black-and-white.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"
+
+[[items]]
+id = "african-printed-blue-shirt"
+name = "African Printed Blue Shirt"
+category = "Top"
+garment = "Shirt"
+colour = "Mid blue"
+colour_hex = "#4A6E96"
+fabric = "Cotton jersey"
+grade = "Everyday"
+fit = "Slim"
+scheme = "Alpha"
+status = "owned"
+photo = "inventory/photos/african-printed-blue-shirt.jpg"
+description = ""
+starred = false
+link = ""
+wait_for_sale = false
+product_photo = "out/products/african-printed-blue-shirt.png"
+product_copy = ""
+
+[items.sizes]
+alpha = "M"

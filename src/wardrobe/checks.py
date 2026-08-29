@@ -916,11 +916,24 @@ def _palette():
 def check_named_colours() -> str:
     """The colours live in the catalogue with the other vocabularies, and can be
     added to like any of them."""
-    from .palette import colour_group, colour_hex, colour_names, hex_for, named_colours
-    assert len(colour_names()) == 50, f"expected 50 colours, got {len(colour_names())}"
-    assert len(set(colour_names())) == 50, "a colour name appears twice"
+    from .palette import (colour_group, colour_hex, colour_names, hex_for,
+                          measurable, named_colours)
+    from .vocabulary import DEFAULT_COLOURS, UNMEASURABLE_COLOURS
+    expected = sum(len(rows) for rows in DEFAULT_COLOURS.values())
+    assert len(colour_names()) == expected, \
+        f"expected {expected} colours, got {len(colour_names())}"
+    assert len(set(colour_names())) == expected, "a colour name appears twice"
     swatches = list(colour_hex().values())
-    assert len(set(swatches)) == 50, "two colours share a hex code"
+    assert len(set(swatches)) == expected, "two colours share a hex code"
+
+    # Multicolour is in the list because that is where a man looks for it, and
+    # held out of every calculation that assumes a single hex. Measuring the
+    # placeholder against his skin would pronounce on a garment nobody has seen.
+    assert "Multicolour" in colour_names(), "multicolour is not offered"
+    assert not measurable("Multicolour"), "the rule is willing to judge multicolour"
+    assert all(measurable(n) for n in colour_names() if n not in UNMEASURABLE_COLOURS), \
+        "a plain colour was marked unmeasurable"
+    assert colour_names() == tuple(sorted(colour_names())), "the dropdown is not alphabetical"
     for name, code in colour_hex().items():
         assert len(code) == 7 and code.startswith("#"), f"{name} has a malformed hex"
         assert code == code.upper(), f"{name} is not upper case"
@@ -937,6 +950,7 @@ def check_named_colours() -> str:
     vocab.add_colour(NamedColour(name="Adam green", hex="#3F5E3A", group="Greens"))
     vocab.save()
     assert "Adam green" in colour_names(), "an added colour is not visible"
+    assert measurable("Adam green"), "a newly added colour must be measurable"
     assert hex_for("Adam green") == "#3F5E3A", "the added colour has no swatch"
     assert colour_group("Adam green") == "Greens", "it landed in no group"
     assert "Adam green" in [n for n, _ in named_colours()["Greens"]], \

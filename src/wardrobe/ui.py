@@ -535,6 +535,21 @@ def table(rows: list[dict[str, str]], numeric: tuple[str, ...] = ()) -> None:
 
 
 
+MULTI_SWATCH = ("linear-gradient(135deg,#B5613F 0 25%,#26303F 25% 50%,"
+                "#5F6146 50% 75%,#F2E9D8 75% 100%)")
+
+
+def swatch_for(name: str, hex_code: str) -> str:
+    """What to paint a swatch with. A flat colour, unless the entry is not one.
+
+    Multicolour carries a placeholder hex so the chip has something to draw. A
+    flat mushroom square standing for a striped shirt reads as a lie, so it gets
+    quarters instead and nobody has to be told what it means.
+    """
+    from . import vocabulary
+    return hex_code if vocabulary.is_measurable(name) else MULTI_SWATCH
+
+
 def swatch_strip(colours, height: str = "2.6rem") -> str:
     """A row of colours as one continuous band, the way a palette is presented."""
     cells = "".join(
