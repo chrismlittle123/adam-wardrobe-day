@@ -1,0 +1,12 @@
+[[fittings]]
+id = "uniqlo-t-shirt"
+retailer = "uniqlo"
+garment = "T-shirt"
+line = "U Crew Neck"
+fit = "Regular"
+confidence = "Guessed"
+verdict = ""
+note = "Shoulder decides it: his 44.9 lands on Uniqlo's M, and a shoulder seam cannot be altered. M gives about +5 cm of chest ease, which reads clean on a lean frame; L would give the drape and drop the seam off the shoulder. The U line rather than the Supima, because U is cut fuller in the body on the same shoulder, which is exactly the conflict here. Guessed, not derived: his body numbers are estimates and M to L is about 3 cm of chest, which is inside that error. Measure the shoulder and this settles."
+
+[fittings.size]
+alpha = "M"
