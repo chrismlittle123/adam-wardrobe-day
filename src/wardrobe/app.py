@@ -33,8 +33,8 @@ from wardrobe.inventory import (
 )
 from wardrobe.outfits import Outfit, Outfits, describe_outfit, reference_photos, wearability
 from wardrobe.palette import (
-    ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND, LEATHER,
-    NAMED_COLOURS, PATTERNS, ROLES, Colour, Palette, hex_for,
+    ACCENT, CATEGORIES as COLOUR_CATEGORIES, COLOUR_NAMES, FIELD, GROUND,
+    NAMED_COLOURS, PATTERNS, ROLES, SEASONS, Colour, Palette, hex_for,
 )
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
@@ -78,6 +78,10 @@ def render() -> None:
     wanted = st.query_params.get("item")
     if wanted is not None:
         item_view(profile, wanted)
+        return
+
+    if st.query_params.get("colours") is not None:
+        colour_catalogue_view(Palette.load())
         return
 
     inventory = Inventory.load()
@@ -124,7 +128,7 @@ def sidebar(profile: Profile, inventory: Inventory, outfits: Outfits) -> None:
     with st.sidebar:
         photo = profile.photo("neutral")
         if photo:
-            ui.plate(photo, photo.name, width=380)
+            ui.plate(photo, width=380)
         docket(profile)
         counts = inventory.counts()
         st.markdown(
@@ -788,6 +792,7 @@ def colour_tab(profile: Profile, palette: Palette) -> None:
         f"relative to his skin at {skin}."
     )
     palette_panel(palette, skin)
+    season_panel(palette)
     harmony_panel(palette, skin)
     pattern_panel(palette)
     rules_panel(palette)
@@ -796,39 +801,49 @@ def colour_tab(profile: Profile, palette: Palette) -> None:
 
 def palette_panel(palette: Palette, skin: str) -> None:
     ui.eyebrow("The palette")
-    wheel, controls = st.columns([2, 3], gap="large")
+    st.markdown(
+        '<div class="look-cap">Every colour carries a name, a role, the garments it '
+        'is allowed on, and the seasons it is worn in. '
+        '<a href="?colours=all" target="_blank">Open the full colour catalogue '
+        '&#8599;</a></div>', unsafe_allow_html=True)
 
-    with wheel:
-        st.markdown(ui.wheel_svg(palette.colours, skin), unsafe_allow_html=True)
+    # The catalogue picker sits outside the form: choosing from it fills the name
+    # and the swatch, which inside a form would not happen until submit.
+    picked = st.selectbox(
+        "Start from the catalogue", ["Pick a colour of your own", *COLOUR_NAMES],
+        key="pal-pick",
+        help="Fifty colours a wardrobe is built from. Or name your own and set "
+             "the hex yourself.")
+    custom = picked == "Pick a colour of your own"
+
+    with st.form("add-colour", clear_on_submit=True):
+        c1, c2 = st.columns([1, 3])
+        hex_code = c1.color_picker("Hex", "#26303F" if custom else hex_for(picked),
+                                   key="pal-hex")
+        name = c2.text_input("Name", "" if custom else picked, key="pal-name",
+                             placeholder="Give it a name, whatever you call it")
+        c3, c4 = st.columns([1, 2])
+        role = c3.selectbox("Role", list(ROLES), key="pal-role",
+                            help=" · ".join(f"{k}: {v}" for k, v in ROLES.items()))
+        categories = c4.multiselect("Allowed on", COLOUR_CATEGORIES, key="pal-cats",
+                                    help="Leave empty to use the role's defaults.")
+        seasons = st.multiselect("Seasons", SEASONS, key="pal-seasons",
+                                 help="Leave empty for all year round.")
+        note = st.text_input("Note", placeholder="Only in flannel, never in cotton",
+                             key="pal-note")
+        verdict, why = pal_mod.warmth(hex_code, skin)
         st.markdown(
-            '<div class="look-cap">Angle is hue, distance from the centre is '
-            'saturation. The hollow ring is his skin. A tight cluster is a '
-            'disciplined palette; a scatter is not.</div>', unsafe_allow_html=True)
-
-    with controls:
-        with st.form("add-colour", clear_on_submit=True):
-            c1, c2 = st.columns([1, 3])
-            hex_code = c1.color_picker("Colour", "#26303F", key="pal-hex")
-            name = c2.text_input("Name", placeholder="Navy", key="pal-name")
-            c3, c4 = st.columns([1, 2])
-            role = c3.selectbox("Role", list(ROLES), key="pal-role",
-                                help=" · ".join(f"{k}: {v}" for k, v in ROLES.items()))
-            categories = c4.multiselect("Allowed on", COLOUR_CATEGORIES, key="pal-cats",
-                                        help="Leave empty to use the role's defaults.")
-            note = st.text_input("Note", placeholder="Only in flannel, never in cotton",
-                                 key="pal-note")
-            verdict, why = pal_mod.warmth(hex_code, skin)
-            st.markdown(
-                f'<div class="look-cap"><span class="badge {VERDICT_BADGE[verdict]}">'
-                f'{verdict}</span> {why} &middot; reads as '
-                f'{pal_mod.hue_name(hex_code)}, lightness '
-                f'{pal_mod.lightness(hex_code):.2f}</div>', unsafe_allow_html=True)
-            if st.form_submit_button("Add to palette"):
-                palette.add(Colour(name=name.strip() or pal_mod.hue_name(hex_code).title(),
-                                   hex=hex_code, role=role,
-                                   categories=list(categories), note=note.strip()))
-                palette.save()
-                st.rerun()
+            f'<div class="look-cap"><span class="badge {VERDICT_BADGE[verdict]}">'
+            f'{verdict}</span> {why} &middot; reads as {pal_mod.hue_name(hex_code)}, '
+            f'lightness {pal_mod.lightness(hex_code):.2f}</div>', unsafe_allow_html=True)
+        if st.form_submit_button("Add to palette"):
+            chosen = name.strip() or (picked if not custom else
+                                      pal_mod.hue_name(hex_code).title())
+            palette.add(Colour(name=chosen, hex=hex_code, role=role,
+                               categories=list(categories), seasons=list(seasons),
+                               note=note.strip()))
+            palette.save()
+            st.rerun()
 
     if not palette.colours:
         ui.empty("No colours yet. Pick one above, or steal a harmony below.")
@@ -849,12 +864,86 @@ def palette_panel(palette: Palette, skin: str) -> None:
                 f'{colour.name}</div><div class="cost">{colour.hex}</div></div>'
                 f'<div class="why"><span class="badge {VERDICT_BADGE[verdict]}">{verdict}</span> '
                 f'{why}<br>{colour.family}, lightness {colour.light:.2f} &middot; '
-                f'{", ".join(colour.allowed)}{note_line}</div></div>',
+                f'{", ".join(colour.allowed)} &middot; {colour.season_line}'
+                f'{note_line}</div></div>',
                 unsafe_allow_html=True)
             if c2.button("Drop", key=f"pdrop-{colour.id}", type="secondary"):
                 palette.remove(colour.id)
                 palette.save()
                 st.rerun()
+
+
+def season_panel(palette: Palette) -> None:
+    ui.eyebrow("The four palettes")
+    ui.blurb(
+        "One wardrobe, four palettes. A colour with no seasons recorded is worn all "
+        "year and appears in every one of these; the rest belong where the cloth and "
+        "the light put them. Cream is a June colour and oatmeal is a February one "
+        "even though both are pale."
+    )
+    if not palette.colours:
+        ui.empty("Add some colours first.")
+        return
+
+    for chunk in (SEASONS[i:i + 2] for i in range(0, len(SEASONS), 2)):
+        for column, season in zip(st.columns(2, gap="large"), chunk):
+            with column:
+                colours = palette.for_season(season)
+                counts = pal_mod.coverage(palette, season)
+                thin = [c for c, n in counts.items() if not n and c != "Accessory"]
+                st.markdown(
+                    f'<div class="look-cap">{season} &middot; {len(colours)} colours'
+                    f'</div>', unsafe_allow_html=True)
+                if colours:
+                    st.markdown(ui.swatch_strip(colours, height="3.4rem"),
+                                unsafe_allow_html=True)
+                    st.markdown(
+                        '<div class="look-cap">'
+                        + " &middot; ".join(c.name for c in colours) + "</div>",
+                        unsafe_allow_html=True)
+                    if thin:
+                        st.markdown(f'<div class="look-cap" style="color:var(--bad)">'
+                                    f'nothing for {", ".join(thin).lower()}</div>',
+                                    unsafe_allow_html=True)
+                else:
+                    ui.empty(f"Nothing for {season.lower()}")
+
+
+def colour_catalogue_view(palette: Palette) -> None:
+    """Every colour with a name, on its own page."""
+    st.markdown(ui.CSS, unsafe_allow_html=True)
+    mine = {c.hex.upper(): c for c in palette.colours}
+    st.markdown(
+        '<div class="masthead"><h1>Colour <em>catalogue</em></h1>'
+        f'<div class="sub">{len(COLOUR_NAMES)} named colours &middot; '
+        f'{len(palette.colours)} in the palette</div></div>', unsafe_allow_html=True)
+
+    extras = [c for c in palette.colours if c.name not in COLOUR_NAMES]
+    if extras:
+        ui.eyebrow("Yours, named by you")
+        ui.table([{
+            "": f'<span class="chip" style="background:{c.hex}"></span>',
+            "Name": c.name, "Hex": c.hex, "Reads as": c.family,
+            "Role": c.role, "Seasons": c.season_line,
+        } for c in extras])
+
+    for group, rows in NAMED_COLOURS.items():
+        ui.eyebrow(group)
+        st.markdown(
+            '<div style="display:flex;border:1px solid var(--line)">'
+            + "".join(f'<div style="flex:1;background:{h};height:3.2rem" '
+                      f'title="{n} {h}"></div>' for n, h in rows)
+            + "</div>", unsafe_allow_html=True)
+        ui.table([{
+            "": f'<span class="chip" style="background:{h}"></span>',
+            "Name": n, "Hex": h, "Reads as": pal_mod.hue_name(h),
+            "Lightness": f"{pal_mod.lightness(h):.2f}",
+            "In the palette": (f"yes &middot; {mine[h.upper()].role}"
+                               if h.upper() in mine else "—"),
+        } for n, h in rows], numeric=("Lightness",))
+
+    st.markdown('<div class="answer-nav"><a href="./" target="_self">Back to the app</a>'
+                '</div>', unsafe_allow_html=True)
 
 
 def harmony_panel(palette: Palette, skin: str) -> None:
@@ -959,16 +1048,23 @@ def combination_panel(palette: Palette, skin: str) -> None:
         return
 
     c1, c2, c3 = st.columns([1, 1, 2])
-    with_coat = c1.toggle("Include a coat", key="comb-coat")
-    minimum = c2.slider("Minimum score", 0, 100, 55, step=5, key="comb-min")
+    season = c1.selectbox("Season", ["All year", *SEASONS], key="comb-season")
+    with_coat = c2.toggle("Include a coat", key="comb-coat")
+    minimum = c3.slider("Minimum score", 0, 100, 55, step=5, key="comb-min")
+    season = "" if season == "All year" else season
+    counts = pal_mod.coverage(palette, season)
+    if not all(counts[c] for c in ("Top", "Bottom", "Shoes")):
+        ui.empty(f"Nothing for {season.lower() or 'that'} in one of the slots. "
+                 "Widen the seasons on some colours.")
+        return
     total = (counts["Top"] * counts["Bottom"] * counts["Shoes"]
              * (counts["Outerwear"] if with_coat else 1))
-    c3.markdown(f'<div class="look-cap">{total:,} recipes scored, best first. Every one '
+    st.markdown(f'<div class="look-cap">{total:,} recipes scored, best first. Every one '
                 f'is enumerated, so nothing plausible is missed and nothing implausible '
                 f'gets a free pass.</div>', unsafe_allow_html=True)
 
     found = pal_mod.combinations(palette, with_outerwear=with_coat, skin_hex=skin,
-                                 limit=15, minimum=minimum)
+                                 limit=15, minimum=minimum, season=season)
     if not found:
         ui.empty("Nothing clears that score. Lower it, or widen the grid above.")
         return

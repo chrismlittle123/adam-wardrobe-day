@@ -55,12 +55,14 @@ Six tabs, in the order the work happens.
    five suggestions at a time and you keep the ones that ring true; each round
    is told what you already kept so it goes somewhere new. Hand-written ones
    sit alongside. All of them are fed into every generated look.
-4. **Colour** — the palette as a set of roles rather than a list. Ground, Field,
-   Accent, Leather, each with the garments it is allowed on. A hue wheel plots
-   the palette against his actual skin tone, harmonies are stolen off the wheel
-   with one click, patterns are picked from a list, and a grid says which colour
-   goes on which garment. Then every recipe the grid permits is enumerated and
-   scored, best first, with its reasoning printed next to it.
+4. **Colour** — the palette as a set of roles rather than a list. Ground, Field
+   and Accent, each with the garments it is allowed on and the seasons it is worn
+   in, which gives four palettes out of one. Every colour carries a name, taken
+   from a catalogue of fifty or given by hand, and the catalogue opens in its own
+   tab. Harmonies are stolen off the wheel with one click, patterns are picked
+   from a list, and a grid says which colour goes on which garment. Then every
+   recipe the grid permits is enumerated and scored, best first, filterable by
+   season, with its reasoning printed next to it.
 5. **Outfit Generator** — assemble a look from the wardrobe, or invent a piece
    you do not own yet. Item photos ride along as references so the generated
    image shows *that* jacket.

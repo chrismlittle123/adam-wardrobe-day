@@ -35,22 +35,25 @@ from . import paths
 
 # --- roles --------------------------------------------------------------------
 
-GROUND, FIELD, ACCENT, LEATHER = "Ground", "Field", "Accent", "Leather"
+GROUND, FIELD, ACCENT = "Ground", "Field", "Accent"
 
 ROLES: dict[str, str] = {
-    GROUND: "The base of the outfit: trousers, coats. Usually mid to dark, quiet.",
+    GROUND: "The base of the outfit: trousers, coats, shoes. Mid to dark, and quiet.",
     FIELD: "The large area next to the face: shirts, knitwear. Usually lighter.",
     ACCENT: "Small doses only: a scarf, socks, one knit. Where the chroma lives.",
-    LEATHER: "Shoes, belts, bags. A wardrobe needs two of these and no more.",
 }
 
 # What each role is allowed on unless overridden per colour.
 ROLE_CATEGORIES: dict[str, tuple[str, ...]] = {
-    GROUND: ("Bottom", "Outerwear"),
+    GROUND: ("Bottom", "Outerwear", "Shoes"),
     FIELD: ("Top", "Outerwear"),
     ACCENT: ("Accessory", "Top"),
-    LEATHER: ("Shoes", "Accessory"),
 }
+
+# A wardrobe is not worn all year, and a palette that ignores that produces
+# linen colours in February. Every colour belongs to at least one season; the
+# ones that belong to all four are the spine of the thing.
+SEASONS: tuple[str, ...] = ("Spring", "Summer", "Autumn", "Winter")
 
 CATEGORIES: tuple[str, ...] = ("Top", "Bottom", "Outerwear", "Shoes", "Accessory")
 
@@ -255,6 +258,7 @@ class Colour:
     hex: str = "#888888"
     role: str = GROUND
     categories: list[str] = field(default_factory=list)
+    seasons: list[str] = field(default_factory=list)
     note: str = ""
 
     @property
@@ -263,6 +267,18 @@ class Colour:
 
     def allows(self, category: str) -> bool:
         return category in self.allowed
+
+    @property
+    def wears(self) -> tuple[str, ...]:
+        """Seasons this colour is for. None recorded means all of them."""
+        return tuple(self.seasons) if self.seasons else SEASONS
+
+    def in_season(self, season: str) -> bool:
+        return season in self.wears
+
+    @property
+    def season_line(self) -> str:
+        return "all year" if len(self.wears) == len(SEASONS) else ", ".join(self.wears)
 
     @property
     def light(self) -> float:
@@ -322,8 +338,19 @@ class Palette:
             n += 1
         return f"{base}-{n}"
 
-    def for_category(self, category: str) -> list[Colour]:
-        return sorted((c for c in self.colours if c.allows(category)), key=lambda c: -c.light)
+    def for_category(self, category: str, season: str = "") -> list[Colour]:
+        return sorted(
+            (c for c in self.colours
+             if c.allows(category) and (not season or c.in_season(season))),
+            key=lambda c: -c.light,
+        )
+
+    def for_season(self, season: str) -> list[Colour]:
+        return sorted((c for c in self.colours if c.in_season(season)),
+                      key=lambda c: (c.role, -c.light))
+
+    def by_season(self) -> dict[str, list[Colour]]:
+        return {season: self.for_season(season) for season in SEASONS}
 
     def by_role(self) -> dict[str, list[Colour]]:
         out: dict[str, list[Colour]] = {}
@@ -424,9 +451,11 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> C
         else:
             reasons.append(f"next to the face: {why}")
 
-    # 4. Chroma budget. One loud thing may be interesting; two argue. Leather is
+    # 4. Chroma budget. One loud thing may be interesting; two argue. Shoes are
     # exempt: a chestnut shoe is saturated by the numbers and is never the event.
-    loud = [c for c in pieces.values() if c.role != LEATHER and chroma(c.hex) > LOUD]
+    loud = [c for c in pieces.items()
+            if c[0] != "Shoes" and chroma(c[1].hex) > LOUD]
+    loud = [c for _, c in loud]
     if len(loud) > 1:
         score -= 20
         faults.append(f"{len(loud)} loud colours competing: "
@@ -456,7 +485,7 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = "#C58466") -> C
 
 def combinations(palette: Palette, *, with_outerwear: bool = False,
                  skin_hex: str = "#C58466", limit: int = 12,
-                 minimum: int = 55) -> list[Combination]:
+                 minimum: int = 55, season: str = "") -> list[Combination]:
     """Every colour recipe the palette allows, best first.
 
     Enumerated rather than invented: the palette is small enough that every
@@ -464,7 +493,7 @@ def combinations(palette: Palette, *, with_outerwear: bool = False,
     implausible gets a free pass.
     """
     slots = ["Top", "Bottom", "Shoes"] + (["Outerwear"] if with_outerwear else [])
-    options = [palette.for_category(slot) for slot in slots]
+    options = [palette.for_category(slot, season) for slot in slots]
     if not all(options):
         return []
 
@@ -479,7 +508,8 @@ def combinations(palette: Palette, *, with_outerwear: bool = False,
     return scored[:limit]
 
 
-def coverage(palette: Palette) -> dict[str, int]:
+def coverage(palette: Palette, season: str = "") -> dict[str, int]:
     """How many colours each garment category has to choose from. A zero here is
     why the combination list is empty."""
-    return {category: len(palette.for_category(category)) for category in CATEGORIES}
+    return {category: len(palette.for_category(category, season))
+            for category in CATEGORIES}

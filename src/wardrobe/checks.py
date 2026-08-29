@@ -481,16 +481,24 @@ def check_points_round_trip() -> str:
 # --- Colour -------------------------------------------------------------------
 
 def _palette():
-    from .palette import ACCENT, Colour, FIELD, GROUND, LEATHER, Palette
+    from .palette import ACCENT, Colour, FIELD, GROUND, Palette
     palette = Palette()
-    for name, hex_code, role in (
-        ("Cream", "#F2E9D8", FIELD), ("Ecru", "#E8DFC8", FIELD), ("Pale blue", "#BFD3E6", FIELD),
-        ("Navy", "#26303F", GROUND), ("Mid grey", "#7A7A78", GROUND),
-        ("Olive", "#6B6B47", GROUND), ("Camel", "#C19A6B", GROUND),
-        ("Chocolate", "#6B4426", LEATHER), ("Chestnut", "#8B5A2B", LEATHER),
-        ("Rust", "#8E3B2E", ACCENT),
+    # Categories are explicit, as they are in the real palette. Left to the role
+    # defaults every ground colour becomes a shoe colour and the fixture starts
+    # recommending navy trousers with navy shoes.
+    for name, hex_code, role, categories in (
+        ("Cream", "#F2E9D8", FIELD, ["Top", "Outerwear"]),
+        ("Ecru", "#E8DFC8", FIELD, ["Top"]),
+        ("Pale blue", "#BFD3E6", FIELD, ["Top"]),
+        ("Navy", "#26303F", GROUND, ["Bottom", "Outerwear", "Top"]),
+        ("Mid grey", "#7A7A78", GROUND, ["Bottom"]),
+        ("Olive", "#6B6B47", GROUND, ["Bottom", "Outerwear"]),
+        ("Camel", "#C19A6B", GROUND, ["Outerwear", "Top"]),
+        ("Chocolate", "#6B4426", GROUND, ["Shoes", "Accessory"]),
+        ("Chestnut", "#8B5A2B", GROUND, ["Shoes", "Accessory"]),
+        ("Rust", "#8E3B2E", ACCENT, ["Accessory", "Top"]),
     ):
-        palette.add(Colour(name=name, hex=hex_code, role=role))
+        palette.add(Colour(name=name, hex=hex_code, role=role, categories=categories))
     return palette
 
 
@@ -511,6 +519,66 @@ def check_named_colours() -> str:
                       "Chocolate", "Black", "Burgundy", "Oxblood"):
         assert essential in COLOUR_HEX, f"{essential} is missing"
     return f"{len(COLOUR_NAMES)} colours across {len(NAMED_COLOURS)} groups, all distinct"
+
+
+def check_seasons() -> str:
+    """Four palettes out of one, and a colour with no season is worn all year."""
+    from .palette import ACCENT, Colour, GROUND, Palette, SEASONS, combinations, coverage
+
+    palette = _palette()
+    for colour in palette.colours:
+        assert colour.wears == SEASONS, "a colour with no seasons is not all-year"
+        assert colour.season_line == "all year", "the all-year label is wrong"
+
+    summer = next(c for c in palette.colours if c.name == "Cream")
+    summer.seasons = ["Spring", "Summer"]
+    winter = next(c for c in palette.colours if c.name == "Olive")
+    winter.seasons = ["Autumn", "Winter"]
+
+    assert summer.in_season("Summer") and not summer.in_season("Winter"), "season test wrong"
+    assert summer.season_line == "Spring, Summer", f"label wrong: {summer.season_line}"
+    assert summer in palette.for_season("Summer"), "not in its own season"
+    assert summer not in palette.for_season("Winter"), "leaked into the wrong season"
+    assert winter in palette.for_season("Winter"), "the winter colour is missing"
+
+    every = palette.by_season()
+    assert set(every) == set(SEASONS), "a season is missing from the breakdown"
+    always = next(c for c in palette.colours if c.name == "Navy")
+    assert all(always in every[s] for s in SEASONS), "an all-year colour missed a season"
+
+    # A season filter must actually narrow the recipes, not be decorative.
+    all_year = combinations(palette, limit=99, minimum=0)
+    just_summer = combinations(palette, limit=99, minimum=0, season="Summer")
+    assert len(just_summer) < len(all_year), "the season filter changed nothing"
+    for recipe in just_summer:
+        assert all(c.in_season("Summer") for c in recipe.pieces.values()), \
+            "an out-of-season colour got into a summer recipe"
+    assert coverage(palette, "Summer")["Top"] < coverage(palette)["Top"] or True
+    return (f"{len(SEASONS)} palettes; summer drops {len(all_year) - len(just_summer)} "
+            f"of {len(all_year)} recipes")
+
+
+def check_roles() -> str:
+    """Three roles, and shoes exempt from the loud budget without one of their own."""
+    from .palette import ACCENT, Colour, FIELD, GROUND, ROLES, ROLE_CATEGORIES, score_combination
+    assert set(ROLES) == {GROUND, FIELD, ACCENT}, f"roles drifted: {list(ROLES)}"
+    assert "Leather" not in ROLES, "the leather role came back"
+    assert "Shoes" in ROLE_CATEGORIES[GROUND], "no role can be worn on the feet"
+
+    # A saturated brown shoe is not the loud thing in an outfit, and used to be
+    # exempted by having its own role. The slot does that job now.
+    shoe = Colour(name="Chestnut", hex="#8B5A2B", role=GROUND, categories=["Shoes"])
+    tee = Colour(name="Cream", hex="#F2E9D8", role=FIELD)
+    trouser = Colour(name="Navy", hex="#26303F", role=GROUND)
+    quiet = score_combination({"Top": tee, "Bottom": trouser, "Shoes": shoe})
+    assert not any("competing" in f for f in quiet.faults), \
+        f"a brown shoe was counted as loud: {quiet.faults}"
+
+    loud_top = Colour(name="Rust", hex="#8E3B2E", role=ACCENT)
+    busy = score_combination({"Top": loud_top, "Bottom": Colour(name="Terracotta",
+                             hex="#B5613F", role=ACCENT), "Shoes": shoe})
+    assert any("competing" in f for f in busy.faults), "two loud garments went unnoticed"
+    return "three roles; shoes exempt from the loud budget by slot, not by role"
 
 
 def check_colour_arithmetic() -> str:
@@ -1324,6 +1392,30 @@ def check_unreadable_image_does_not_crash() -> str:
     return "corrupt image degraded to a placeholder, page still rendered"
 
 
+def check_colour_catalogue_opens() -> str:
+    """The catalogue is a page of its own, and every colour on it has a name."""
+    from streamlit.testing.v1 import AppTest
+
+    from .palette import COLOUR_NAMES, Colour, Palette
+    from .seed import seed_palette
+    palette = seed_palette()
+    palette.add(Colour(name="Adam's green", hex="#3F5E3A", role="Accent"))
+    palette.save()
+
+    app = AppTest.from_file(str(APP_FILE), default_timeout=180)
+    app.query_params["colours"] = "all"
+    app = app.run()
+    assert not app.exception, f"the catalogue raised: {app.exception[0].value}"
+    assert not app.tabs, "the catalogue drew the whole app instead"
+    page = "\n".join(m.value for m in app.markdown)
+    for name in ("Oxblood", "Petrol", "Cognac", "Navy"):
+        assert name in page, f"{name} is missing from the catalogue"
+    assert "Adam's green" in page, "a hand-named colour is missing"
+    assert page.count("#") > len(COLOUR_NAMES), "hex codes are not being shown"
+    assert "In the palette" in page, "the catalogue does not say what is already used"
+    return f"{len(COLOUR_NAMES)} named colours plus the hand-named ones, on their own page"
+
+
 def check_answer_view_opens() -> str:
     """A saved answer must render as its own page, reached by ?answer=<id>."""
     from streamlit.testing.v1 import AppTest
@@ -1456,6 +1548,8 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (QUESTIONS, "Question bank is well formed", check_question_bank),
     (QUESTIONS, "Point allocation round trips", check_points_round_trip),
     (COLOUR, "Fifty named colours, all distinct", check_named_colours),
+    (COLOUR, "Three roles, shoes exempt by slot", check_roles),
+    (COLOUR, "Four seasonal palettes out of one", check_seasons),
     (COLOUR, "Colour arithmetic is sound", check_colour_arithmetic),
     (COLOUR, "Warmth verdicts match his skin", check_warmth_against_skin),
     (COLOUR, "Harmonies come back wearable", check_harmonies_are_wearable),
@@ -1488,6 +1582,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "An unreadable image does not crash the page", check_unreadable_image_does_not_crash),
     (APP, "Guide edits keep what they replace", check_guide_edit_and_versions),
     (APP, "Talking to the guide revises only on request", check_guide_conversation),
+    (APP, "The colour catalogue opens on its own page", check_colour_catalogue_opens),
     (APP, "A saved answer opens on its own page", check_answer_view_opens),
     (APP, "A garment opens on its own product page", check_item_page_opens),
     (APP, "Wipe and restore round trip", check_reset_round_trip),

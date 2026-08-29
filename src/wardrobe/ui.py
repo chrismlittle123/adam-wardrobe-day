@@ -9,9 +9,7 @@ carries every number, Karla does the rest.
 from __future__ import annotations
 
 import base64
-import colorsys
 import io
-import math
 from pathlib import Path
 
 import streamlit as st
@@ -319,71 +317,6 @@ def table(rows: list[dict[str, str]], numeric: tuple[str, ...] = ()) -> None:
     )
     st.markdown(f'<table class="tbl"><tr>{head}</tr>{body}</table>', unsafe_allow_html=True)
 
-
-
-# --- colour wheel -------------------------------------------------------------
-
-def wheel_svg(colours, skin_hex: str = "#C58466", size: int = 300) -> str:
-    """The palette plotted on a hue wheel.
-
-    Angle is hue, distance from the centre is saturation, so a tight cluster is
-    a disciplined palette and a scatter is not. His skin sits on the same wheel
-    as a hollow ring, which is the only way to see at a glance whether the
-    palette is arranged around him or merely near him.
-    """
-    from wardrobe.palette import HUE_NAMES, hsl
-
-    centre = size / 2
-    radius = centre - 26
-    parts: list[str] = []
-
-    # Twelve hue sectors, drawn light so the plotted colours read on top.
-    for sector in range(12):
-        start, end = math.radians(sector * 30 - 90), math.radians((sector + 1) * 30 - 90)
-        x1, y1 = centre + radius * math.cos(start), centre + radius * math.sin(start)
-        x2, y2 = centre + radius * math.cos(end), centre + radius * math.sin(end)
-        fill = _hue_swatch(sector * 30 + 15)
-        parts.append(
-            f'<path d="M {centre} {centre} L {x1:.1f} {y1:.1f} '
-            f'A {radius} {radius} 0 0 1 {x2:.1f} {y2:.1f} Z" fill="{fill}" opacity="0.16"/>')
-
-    for ring in (0.33, 0.66, 1.0):
-        parts.append(f'<circle cx="{centre}" cy="{centre}" r="{radius * ring:.1f}" '
-                     f'fill="none" stroke="rgba(240,230,219,.14)" stroke-width="1"/>')
-
-    for sector, name in enumerate(HUE_NAMES):
-        angle = math.radians(sector * 30 + 15 - 90)
-        lx, ly = centre + (radius + 14) * math.cos(angle), centre + (radius + 14) * math.sin(angle)
-        parts.append(
-            f'<text x="{lx:.1f}" y="{ly:.1f}" text-anchor="middle" dominant-baseline="middle" '
-            f'font-family="IBM Plex Mono, monospace" font-size="7" letter-spacing="1" '
-            f'fill="#8A7767">{name}</text>')
-
-    def plot(hex_code: str, saturation: float, hue: float) -> tuple[float, float]:
-        angle = math.radians(hue - 90)
-        distance = radius * max(0.08, min(1.0, saturation))
-        return centre + distance * math.cos(angle), centre + distance * math.sin(angle)
-
-    sh, ss, _ = hsl(skin_hex)
-    sx, sy = plot(skin_hex, ss, sh)
-    parts.append(f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="9" fill="none" '
-                 f'stroke="{skin_hex}" stroke-width="2"/>')
-    parts.append(f'<circle cx="{sx:.1f}" cy="{sy:.1f}" r="2" fill="{skin_hex}"/>')
-
-    for colour in colours:
-        hue, saturation, _ = hsl(colour.hex)
-        x, y = plot(colour.hex, saturation, hue)
-        parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{colour.hex}" '
-                     f'stroke="rgba(240,230,219,.45)" stroke-width="1"><title>'
-                     f'{colour.name or colour.hex} · {colour.role}</title></circle>')
-
-    return (f'<svg viewBox="0 0 {size} {size}" width="100%" style="max-width:{size}px" '
-            f'role="img" aria-label="Palette plotted on a hue wheel">{"".join(parts)}</svg>')
-
-
-def _hue_swatch(hue: float) -> str:
-    r, g, b = colorsys.hls_to_rgb((hue % 360) / 360, 0.5, 0.75)
-    return "#" + "".join(f"{round(c * 255):02X}" for c in (r, g, b))
 
 
 def swatch_strip(colours, height: str = "2.6rem") -> str:

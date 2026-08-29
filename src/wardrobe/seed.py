@@ -130,21 +130,24 @@ PRINCIPLES: tuple[tuple[str, str, str], ...] = (
 # A starting palette, arranged by role rather than by preference, so the colour
 # page has something with real structure in it. Two leathers and no more: any
 # wardrobe that needs three has a problem somewhere else.
-COLOURS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
-    ("Cream", "#F2E9D8", "Field", ("Top", "Outerwear")),
-    ("Ecru", "#E8DFC8", "Field", ("Top",)),
-    ("Pale blue", "#BFD3E6", "Field", ("Top",)),
-    ("White", "#F6F4EF", "Field", ("Top",)),
-    ("Navy", "#26303F", "Ground", ("Bottom", "Outerwear", "Top")),
-    ("Charcoal", "#3A3A3C", "Ground", ("Bottom", "Outerwear")),
-    ("Mid grey", "#7A7A78", "Ground", ("Bottom",)),
-    ("Olive", "#5F6146", "Ground", ("Bottom", "Outerwear")),
-    ("Camel", "#C19A6B", "Ground", ("Outerwear", "Top")),
-    ("Stone", "#C9BCA4", "Ground", ("Bottom",)),
-    ("Chocolate", "#6B4426", "Leather", ("Shoes", "Accessory")),
-    ("Chestnut", "#8B5A2B", "Leather", ("Shoes", "Accessory")),
-    ("Rust", "#8E3B2E", "Accent", ("Accessory", "Top")),
-    ("Burgundy", "#6E2C33", "Accent", ("Accessory",)),
+# name, hex, role, categories, seasons ("" means all year)
+COLOURS: tuple[tuple[str, str, str, tuple[str, ...], tuple[str, ...]], ...] = (
+    ("Cream", "#F2E9D8", "Field", ("Top", "Outerwear"), ("Spring", "Summer")),
+    ("Ecru", "#E8DFC8", "Field", ("Top",), ("Spring", "Summer")),
+    ("White", "#F6F4EF", "Field", ("Top",), ()),
+    ("Pale blue", "#BFD3E6", "Field", ("Top",), ("Spring", "Summer")),
+    ("Oatmeal", "#DDD3C0", "Field", ("Top", "Outerwear"), ("Autumn", "Winter")),
+    ("Navy", "#26303F", "Ground", ("Bottom", "Outerwear", "Top"), ()),
+    ("Charcoal", "#3C3B3A", "Ground", ("Bottom", "Outerwear"), ("Autumn", "Winter")),
+    ("Mid grey", "#7A7A78", "Ground", ("Bottom",), ()),
+    ("Olive", "#5F6146", "Ground", ("Bottom", "Outerwear"), ("Autumn", "Winter")),
+    ("Camel", "#C19A6B", "Ground", ("Outerwear", "Top"), ("Autumn", "Winter")),
+    ("Stone", "#C9BCA4", "Ground", ("Bottom",), ("Spring", "Summer")),
+    ("Chocolate", "#6B4426", "Ground", ("Shoes", "Accessory"), ()),
+    ("Chestnut", "#8B5A2B", "Ground", ("Shoes", "Accessory"), ()),
+    ("Rust", "#8E3B2E", "Accent", ("Accessory", "Top"), ("Autumn",)),
+    ("Burgundy", "#6E2C33", "Accent", ("Accessory",), ("Autumn", "Winter")),
+    ("Terracotta", "#B5613F", "Accent", ("Accessory", "Top"), ("Spring", "Summer")),
 )
 
 SEED_PATTERNS: tuple[str, ...] = (
@@ -155,8 +158,9 @@ SEED_PATTERNS: tuple[str, ...] = (
 def seed_palette(palette=None):
     from .palette import Colour, Palette
     palette = palette if palette is not None else Palette.load()
-    for name, hex_code, role, categories in COLOURS:
-        palette.add(Colour(name=name, hex=hex_code, role=role, categories=list(categories)))
+    for name, hex_code, role, categories, seasons in COLOURS:
+        palette.add(Colour(name=name, hex=hex_code, role=role,
+                           categories=list(categories), seasons=list(seasons)))
     palette.patterns = list(SEED_PATTERNS)
     palette.save()
     return palette
