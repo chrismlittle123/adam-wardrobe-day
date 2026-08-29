@@ -1273,34 +1273,59 @@ def _render():
 
 
 def check_typography() -> str:
-    """One prose face, one data face, one display face, and no leftovers.
+    """Four faces, one job each, and every rule says which job it is doing.
 
-    Swapping a font by search and replace leaves half the rules on the old one,
-    which looks like nothing much and reads as two apps stitched together.
+    Mono used to carry labels, values and captions at once, which is why
+    everything small looked the same weight and nothing told you what it was.
+    Naming the roles is what stops that happening again by accident.
     """
+    import re as _re
+
     from . import ui
 
     css = ui.CSS + ui.SHOP_CSS
-    prose, data, display = "IBM Plex Sans", "IBM Plex Mono", "Bodoni Moda"
+    roles = {"display": "Bodoni Moda", "chrome": "Jost",
+             "prose": "IBM Plex Sans", "data": "IBM Plex Mono"}
 
-    assert f"font-family: '{prose}'" in css, "the prose face is not set"
-    assert f"family=IBM+Plex+Sans" in css, "the prose face is never fetched"
-    assert f"family=IBM+Plex+Mono" in css, "the data face is never fetched"
-    assert f"family=Bodoni+Moda" in css, "the display face is never fetched"
+    for role, face in roles.items():
+        assert f"--{role}:" in css, f"the {role} face is not defined"
+        assert face in css.split(f"--{role}:", 1)[1].split(";", 1)[0], \
+            f"--{role} is not set to {face}"
+        assert f"var(--{role})" in css, f"nothing uses --{role}"
 
-    for gone in ("Karla", "Helvetica", "Arial", "Inter"):
+    # Every declaration goes through a role. A literal face name in a rule is a
+    # rule that has quietly opted out of the system.
+    literal = [line.strip() for line in css.splitlines()
+               if "font-family" in line and "var(--" not in line]
+    assert not literal, f"rules naming a face directly: {literal}"
+
+    for fetched in ("Bodoni+Moda", "Jost", "IBM+Plex+Sans", "IBM+Plex+Mono"):
+        assert fetched in css, f"{fetched} is never fetched"
+    for gone in ("Karla", "Helvetica", "Arial", "Inter:"):
         assert gone not in css, f"{gone} lingers in the stylesheet"
 
-    # Georgia may survive only as the fallback behind the serif display face.
-    for line in css.splitlines():
-        if "Georgia" in line:
-            assert display in line, f"Georgia is set as something other than a fallback: {line.strip()}"
+    # Exactly one serif, and it is only ever a title.
+    serif_rules = [b for b in _re.findall(r"\{([^{}]*)\}", css)
+                   if "var(--display)" in b]
+    assert serif_rules, "the serif is used nowhere"
+    assert "var(--display)" not in css.split(".stTextArea", 1)[-1].split("}", 1)[0], \
+        "the serif crept into a text input"
 
-    # Numbers and labels stay monospaced, or the docket stops lining up.
-    for rule in (".docket dt", ".docket dd", ".look-cap", ".eyebrow"):
-        block = css.split(rule, 1)[1].split("}", 1)[0] if rule in css else ""
-        assert data in block or "monospace" in block, f"{rule} is not monospaced"
-    return f"{prose} for prose, {data} for data, {display} for display"
+    # Headers take the serif; small furniture takes the geometric.
+    for header in (".masthead h1", ".eyebrow", ".guide-body h1", ".guide-body h2",
+                   ".docket .name", ".item .nm", ".answer-q", ".route-card .who"):
+        block = css.split(header, 1)[1].split("}", 1)[0] if header in css else ""
+        assert "var(--display)" in block, f"{header} is not set in the serif"
+    for furniture in (".badge", ".look-cap", ".stat .k"):
+        block = css.split(furniture, 1)[1].split("}", 1)[0] if furniture in css else ""
+        assert "var(--chrome)" in block, f"{furniture} is not set in the chrome face"
+    for figures in (".docket dd", ".tbl", ".stCode"):
+        block = css.split(figures, 1)[1].split("}", 1)[0] if figures in css else ""
+        assert "var(--data)" in block, f"{figures} is not monospaced"
+
+    counts = {role: css.count(f"var(--{role})") for role in roles}
+    assert all(counts.values()), f"a role is unused: {counts}"
+    return " · ".join(f"{r} {n}" for r, n in counts.items())
 
 
 def check_app_renders_empty() -> str:
