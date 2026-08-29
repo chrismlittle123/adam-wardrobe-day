@@ -25,7 +25,8 @@ from .philosophy import Answers, transcript
 from .profile import Profile
 from .prompts import appearance, physique
 
-GROUPS: tuple[str, ...] = ("Silhouette", "Colour", "Fabric", "Proportion", "Restraint", "Occasion")
+GROUPS: tuple[str, ...] = ("Colour", "Fabric", "Occasion", "Proportion",
+                           "Restraint", "Silhouette")
 
 # Five suggestions a round; about ten kept is a set you can actually hold in mind.
 BATCH = 5

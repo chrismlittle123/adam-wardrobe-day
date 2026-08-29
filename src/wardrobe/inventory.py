@@ -25,7 +25,7 @@ from PIL import Image, UnidentifiedImageError
 from . import paths
 
 OWNED, ASPIRATIONAL, RETIRED = "owned", "aspirational", "retired"
-STATUSES: tuple[str, ...] = (OWNED, ASPIRATIONAL, RETIRED)
+STATUSES: tuple[str, ...] = tuple(sorted((OWNED, ASPIRATIONAL, RETIRED)))
 
 # The vocabularies now live in the garment catalogue, which is editable. These
 # are lookups rather than constants: a dropdown asking for the list on every
@@ -50,11 +50,16 @@ def category_names() -> tuple[str, ...]:
 
 
 def fits() -> tuple[str, ...]:
-    return tuple(current().fits)
+    return _sorted_words(current().fits)
 
 
 def grades() -> tuple[str, ...]:
-    return tuple(current().grades)
+    return _sorted_words(current().grades)
+
+
+def _sorted_words(words) -> tuple[str, ...]:
+    """Alphabetical, with the blank "not set" option kept at the front."""
+    return ("", *sorted(w for w in words if w)) if "" in words else tuple(sorted(words))
 
 
 def fabric_options() -> tuple[str, ...]:

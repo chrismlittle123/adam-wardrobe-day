@@ -12,21 +12,26 @@ from __future__ import annotations
 from .fitspec import LABELS
 from .profile import Profile
 
+# Alphabetical, because these fill a dropdown. The sensible default is chosen by
+# name where they are used, not by being first in the list.
+DEFAULT_SHOT = "Full length"
+DEFAULT_BACKGROUND = "White studio"
+
 SHOTS: dict[str, str] = {
+    "Detail": "Close detail shot of the upper garment, fabric and stitching filling the frame",
     "Full length": (
         "Full-length shot, head to feet, standing square to the camera. "
         "The entire outfit including the shoes is in frame with room above the head"
     ),
     "Three quarter": "Three-quarter shot, framed from mid-thigh up",
     "Upper body": "Upper-body shot, framed from the waist up",
-    "Detail": "Close detail shot of the upper garment, fabric and stitching filling the frame",
 }
 
 BACKGROUNDS: dict[str, str] = {
-    "White studio": "Plain seamless pure white studio background",
-    "Warm grey studio": "Plain seamless warm mid-grey studio background",
-    "Street": "Blurred European city street behind him, shallow depth of field, background well out of focus",
     "Interior": "Warm domestic interior behind him, softly out of focus",
+    "Street": "Blurred European city street behind him, shallow depth of field, background well out of focus",
+    "Warm grey studio": "Plain seamless warm mid-grey studio background",
+    "White studio": "Plain seamless pure white studio background",
 }
 
 CIRCUMFERENCE_FREE = {"shoe_eu"}

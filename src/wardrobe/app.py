@@ -42,7 +42,9 @@ from wardrobe.palette import (
 from wardrobe.philosophy import Answers, build_guide_prompt, synthesise_guide
 from wardrobe.principles import BATCH, GROUPS, TARGET, Principle, Principles
 from wardrobe.profile import Profile
-from wardrobe.prompts import BACKGROUNDS, SHOTS, build_outfit_prompt
+from wardrobe.prompts import (
+    BACKGROUNDS, DEFAULT_BACKGROUND, DEFAULT_SHOT, SHOTS, build_outfit_prompt,
+)
 from wardrobe.questions import (
     BY_ID, POINTS, SECTIONS, Question, format_points, parse_points,
 )
@@ -1081,12 +1083,14 @@ def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
     c1, c2, c3 = st.columns([2, 2, 1])
     shots = list(SHOTS)
     backgrounds = list(BACKGROUNDS)
-    shot = c1.selectbox("Framing", shots,
-                        index=shots.index(outfit.shot) if outfit.shot in shots else 0,
-                        key="var-shot")
+    shot = c1.selectbox(
+        "Framing", shots,
+        index=shots.index(outfit.shot if outfit.shot in shots else DEFAULT_SHOT),
+        key="var-shot")
     background = c2.selectbox(
         "Background", backgrounds,
-        index=backgrounds.index(outfit.background) if outfit.background in backgrounds else 0,
+        index=backgrounds.index(
+            outfit.background if outfit.background in backgrounds else DEFAULT_BACKGROUND),
         key="var-bg")
     count = c3.number_input("Variations", 1, 4, 1, key="var-count")
     name = st.text_input("Name it", key="var-name")
@@ -1909,8 +1913,11 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
 
     ui.eyebrow("The shot")
     c1, c2, c3 = st.columns([2, 2, 1])
-    shot = c1.selectbox("Framing", list(SHOTS), key="gen-shot")
-    background = c2.selectbox("Background", list(BACKGROUNDS), key="gen-bg")
+    # The lists are alphabetical, so the sensible default is chosen by name.
+    shot = c1.selectbox("Framing", list(SHOTS), key="gen-shot",
+                        index=list(SHOTS).index(DEFAULT_SHOT))
+    background = c2.selectbox("Background", list(BACKGROUNDS), key="gen-bg",
+                              index=list(BACKGROUNDS).index(DEFAULT_BACKGROUND))
     count = c3.number_input("Variations", 1, 4, 1, key="gen-count")
     c4, c5 = st.columns([2, 2])
     name = c4.text_input("Outfit name")

@@ -75,12 +75,12 @@ ALPHA = (NONE, "XXS", "XS", "S", "M", "L", "XL", "XXL", "XXXL")
 # with fabric and fit it is what makes a sourcing route precise instead of a
 # guess at keywords in a name.
 DEFAULT_GRADES: tuple[str, ...] = (
-    "", "Everyday", "Heavyweight", "Knitted", "Smart", "Dress", "Branded",
+    "", "Branded", "Dress", "Everyday", "Heavyweight", "Knitted", "Smart",
 )
 
 # How it is cut. Kept on the item rather than in the size scheme, because it is
 # a property of the garment and not a number on a label.
-DEFAULT_FITS: tuple[str, ...] = ("", "Slim", "Regular", "Relaxed", "Oversized")
+DEFAULT_FITS: tuple[str, ...] = ("", "Oversized", "Regular", "Relaxed", "Slim")
 
 _alpha = SizeField("alpha", "Size", ALPHA)
 _collar = SizeField("collar", "Collar", (NONE, *_range(13.5, 18.5, 0.5, '"')),
@@ -113,13 +113,13 @@ SCHEMES: dict[str, tuple[SizeField, ...]] = {
     "Alpha": (_alpha,),
     "Chest and length": (_chest, _jkt_len),
     "Collar and sleeve": (_collar, _sleeve),
-    "Waist and leg": (_waist, _leg),
-    "Shoe": (_uk_shoe, _width),
-    "Head": (_head,),
-    "Sock": (_socks,),
-    "Watch case": (_case,),
-    "One size": (),
     "Free text": (_free,),
+    "Head": (_head,),
+    "One size": (),
+    "Shoe": (_uk_shoe, _width),
+    "Sock": (_socks,),
+    "Waist and leg": (_waist, _leg),
+    "Watch case": (_case,),
 }
 
 # There used to be a "Chest" as well as a "Chest and length", and the same for
@@ -386,7 +386,9 @@ class Vocabulary:
         self.garments = [g for g in self.garments if g.name != name]
 
     def colour_names(self) -> tuple[str, ...]:
-        return tuple(c.name for c in self.colours)
+        """Alphabetical, because this fills a dropdown. The groups keep their own
+        order on the page, where the swatches make the grouping the point."""
+        return tuple(sorted(c.name for c in self.colours))
 
     def colour_hex(self) -> dict[str, str]:
         return {c.name: c.hex for c in self.colours}

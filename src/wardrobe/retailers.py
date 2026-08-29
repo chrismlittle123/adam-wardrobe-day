@@ -213,7 +213,8 @@ SECONDHAND_ORDER: dict[str, int] = {
     "vinted": 12, "ebay": 8, "watchfinder": 6, "vestiaire": 3, "depop": 2,
 }
 
-KINDS: tuple[str, ...] = (SECONDHAND, HIGH_STREET, ONLINE, TAILORING, SHOES, OFF_PRICE)
+KINDS: tuple[str, ...] = tuple(sorted(
+    (SECONDHAND, HIGH_STREET, ONLINE, TAILORING, SHOES, OFF_PRICE)))
 
 
 @dataclass

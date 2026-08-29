@@ -61,9 +61,9 @@ VALUE_GAP = 0.20
 GROUND, FIELD, ACCENT = "Ground", "Field", "Accent"
 
 ROLES: dict[str, str] = {
-    GROUND: "The base of the outfit: trousers, coats, shoes. Mid to dark, and quiet.",
-    FIELD: "The large area next to the face: shirts, knitwear. Usually lighter.",
     ACCENT: "Small doses only: a scarf, socks, one knit. Where the chroma lives.",
+    FIELD: "The large area next to the face: shirts, knitwear. Usually lighter.",
+    GROUND: "The base of the outfit: trousers, coats, shoes. Mid to dark, and quiet.",
 }
 
 # What each role is allowed on unless overridden per colour.

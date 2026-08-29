@@ -355,6 +355,49 @@ def check_fabric_list() -> str:
     return f"{len(flat)} fabrics across {len(vocabulary().families())} families, sample data conforms"
 
 
+def check_dropdowns_are_alphabetical() -> str:
+    """Every list of names that fills a dropdown is in alphabetical order.
+
+    Scales are not, and must not be: sorting XS, S, M, L gives L, M, S, XL, XS.
+    Nor are the seasons, which have an order of their own. Everything else is a
+    list of names with no inherent order, and a person scans those by eye.
+    """
+    from .inventory import STATUSES, categories, fabric_options, fits, garments, grades
+    from .palette import ROLES, SEASONS, colour_names
+    from .prompts import BACKGROUNDS, DEFAULT_BACKGROUND, DEFAULT_SHOT, SHOTS
+    from .principles import GROUPS
+    from .retailers import KINDS
+    from .vocabulary import ALPHA, SCHEMES
+
+    lists = {
+        "colours": colour_names(), "garments": garments(), "fabrics": fabric_options(),
+        "categories": list(categories()), "grades": grades(), "fits": fits(),
+        "size schemes": list(SCHEMES), "retailer kinds": KINDS,
+        "colour roles": list(ROLES), "principle groups": GROUPS,
+        "framings": list(SHOTS), "backgrounds": list(BACKGROUNDS),
+        "statuses": STATUSES,
+    }
+    for label, values in lists.items():
+        names = [v for v in values if v and v != "—"]
+        assert names == sorted(names), f"{label} is not alphabetical: {names[:5]}"
+        blanks = [v for v in values if not v or v == "—"]
+        if blanks:
+            assert list(values)[0] in ("", "—"), f"{label} does not lead with its blank"
+
+    # Scales keep their own order, or the dropdown becomes nonsense.
+    assert list(ALPHA) != sorted(ALPHA), "alpha sizes were alphabetised into gibberish"
+    assert ALPHA.index("S") < ALPHA.index("M") < ALPHA.index("L"), "sizes out of order"
+    assert list(SEASONS) == ["Spring", "Summer", "Autumn", "Winter"], \
+        "the seasons were alphabetised out of the calendar"
+
+    # Sorting must not have changed what a fresh form defaults to.
+    assert list(SHOTS)[0] != DEFAULT_SHOT, "this no longer tests anything"
+    assert DEFAULT_SHOT in SHOTS and DEFAULT_BACKGROUND in BACKGROUNDS, \
+        "the sensible defaults are not in their lists"
+    return (f"{len(lists)} name lists alphabetical; sizes and seasons keep their "
+            f"own order; defaults still {DEFAULT_SHOT} and {DEFAULT_BACKGROUND}")
+
+
 def check_alphabetical() -> str:
     from .inventory import categories, garments
     assert list(garments()) == sorted(garments()), "garments not alphabetical"
@@ -2162,6 +2205,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (INVENTORY, "Fabric comes from a fixed list", check_fabric_list),
     (INVENTORY, "UK sizes on labels, centimetres for measurements", check_uk_sizing),
     (INVENTORY, "Garments and categories alphabetical", check_alphabetical),
+    (INVENTORY, "Every name dropdown is alphabetical", check_dropdowns_are_alphabetical),
     (INVENTORY, "Each garment has its own size scheme", check_size_schemes),
     (INVENTORY, "Size line hides blanks and junk", check_size_line_and_category),
     (INVENTORY, "Stale sizes pruned on re-classification", check_size_pruning),
