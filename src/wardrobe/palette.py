@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import colorsys
 import itertools
+import math
 import re
 import tomllib
 from dataclasses import asdict, dataclass, field, fields
@@ -40,9 +41,20 @@ from . import paths
 # is only the fallback for calling the maths directly.
 DEFAULT_SKIN = "#A0583C"
 
-# A colour has to stand off his skin on at least one axis, and either will do.
-# These are the distances at which each one is enough on its own: sixty degrees
-# of hue, or twenty points of lightness.
+# How far a colour sits from his skin, measured properly. Hue and lightness
+# separately was the wrong shape: taking the larger of two axes threw away the
+# fact that burgundy differs from him moderately on both at once, and moderate
+# plus moderate is a real difference. Distance in CIELAB counts both, and counts
+# them the way an eye does.
+#
+# Two thresholds, because a binary was also the wrong shape. Below the first a
+# colour reads as more of him. Between them it reads as tonal: a deliberate,
+# close-toned look rather than a mistake, which is what burgundy on brown skin
+# actually is. Above the second it plainly frames him.
+TOO_CLOSE = 20.0
+CLEARLY_APART = 32.0
+
+# Kept for the warmth verdict, which is a separate question about family.
 HUE_GAP = 60.0
 VALUE_GAP = 0.20
 
@@ -197,6 +209,39 @@ def contrast(a: str, b: str) -> float:
     return abs(lightness(a) - lightness(b))
 
 
+def to_lab(hex_code: str) -> tuple[float, float, float]:
+    """sRGB to CIELAB, D65.
+
+    Distances are meant to be taken in this space: a step of a given size looks
+    like the same size wherever in the space it is taken, which is not true of
+    RGB or of HSL.
+    """
+    def linear(channel: float) -> float:
+        return (channel / 12.92 if channel <= 0.04045
+                else ((channel + 0.055) / 1.055) ** 2.4)
+
+    r, g, b = (linear(c) for c in to_rgb(hex_code))
+    x = (0.4124 * r + 0.3576 * g + 0.1805 * b) / 0.95047
+    y = 0.2126 * r + 0.7152 * g + 0.0722 * b
+    z = (0.0193 * r + 0.1192 * g + 0.9505 * b) / 1.08883
+
+    def f(t: float) -> float:
+        return t ** (1 / 3) if t > (6 / 29) ** 3 else t / (3 * (6 / 29) ** 2) + 4 / 29
+
+    fx, fy, fz = f(x), f(y), f(z)
+    return 116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)
+
+
+def skin_distance(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
+    """How far this colour sits from his skin, perceptually.
+
+    Straight Euclidean distance in CIELAB. Roughly: under 20 the two are more
+    alike than not, over 50 nobody would group them.
+    """
+    a, b = to_lab(hex_code), to_lab(skin_hex)
+    return math.dist(a, b)
+
+
 def value_gap(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
     """How far a colour sits from his own lightness.
 
@@ -209,46 +254,37 @@ def value_gap(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
 
 
 def separation(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> float:
-    """How far a colour stands off his skin, on whichever axis does the work.
+    """Perceptual distance from his skin. See skin_distance."""
+    return skin_distance(hex_code, skin_hex)
 
-    Two axes, and either is enough on its own. Far round the wheel separates a
-    colour whatever its lightness: cobalt sits as close to his lightness as
-    chocolate does and reads as a garment, because at 162 degrees it could not
-    be mistaken for him. Far in lightness separates it whatever its hue: cream
-    is the same warm family and reads as a garment because it is half a scale
-    lighter.
 
-    What fails is being close on both, which is exactly brown. One is enough;
-    neither is a blur.
-
-    Returns a ratio: one and above separates, below one does not.
-    """
-    by_hue = hue_distance(hex_code, skin_hex) / HUE_GAP
-    by_value = value_gap(hex_code, skin_hex) / VALUE_GAP
-    return max(by_hue, by_value)
+def reads_against_skin(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
+    """One of: too close, tonal, clear."""
+    distance = skin_distance(hex_code, skin_hex)
+    if distance < TOO_CLOSE:
+        return "too close"
+    return "tonal" if distance < CLEARLY_APART else "clear"
 
 
 def separates_from_skin(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
-    return separation(hex_code, skin_hex) >= 1.0
+    """Anything that is not actively disappearing into him."""
+    return reads_against_skin(hex_code, skin_hex) != "too close"
 
 
 def blurs_at_the_collar(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> bool:
-    return not separates_from_skin(hex_code, skin_hex)
+    return reads_against_skin(hex_code, skin_hex) == "too close"
 
 
 def separation_reason(hex_code: str, skin_hex: str = DEFAULT_SKIN) -> str:
-    """Which axis is doing the work, or why neither is."""
-    hue = hue_distance(hex_code, skin_hex)
-    gap = value_gap(hex_code, skin_hex)
-    if hue / HUE_GAP >= 1.0:
-        return (f"{hue:.0f}° round the wheel from his skin, which separates it "
-                "whatever its lightness")
-    if gap / VALUE_GAP >= 1.0:
-        lighter = "lighter" if lightness(hex_code) > lightness(skin_hex) else "darker"
-        return (f"{gap:.2f} {lighter} than his skin, which separates it whatever "
-                "its hue")
-    return (f"only {hue:.0f}° from his skin hue and {gap:.2f} from his lightness, "
-            "so it blurs on both axes at once")
+    distance = skin_distance(hex_code, skin_hex)
+    verdict = reads_against_skin(hex_code, skin_hex)
+    if verdict == "too close":
+        return (f"sits {distance:.0f} from his own colouring, near enough to read "
+                "as more of him than as a garment")
+    if verdict == "tonal":
+        return (f"sits {distance:.0f} from his own colouring: close-toned, which is "
+                "a deliberate look rather than a contrast one")
+    return f"sits {distance:.0f} from his own colouring, plainly a garment"
 
 
 def hue_distance(a: str, b: str) -> float:
@@ -500,11 +536,15 @@ def score_combination(pieces: dict[str, Colour], skin_hex: str = DEFAULT_SKIN) -
             faults.append(f"next to the face: {why}")
         else:
             reasons.append(f"next to the face: {why}")
-        if blurs_at_the_collar(top.hex, skin_hex):
+        against = reads_against_skin(top.hex, skin_hex)
+        if against == "too close":
             score -= 14
             faults.append(f"at the collar it {separation_reason(top.hex, skin_hex)}")
+        elif against == "tonal":
+            score -= 4
+            reasons.append(f"tonal at the collar: {separation_reason(top.hex, skin_hex)}")
         else:
-            reasons.append(f"stands off his skin: {separation_reason(top.hex, skin_hex)}")
+            reasons.append(f"at the collar it {separation_reason(top.hex, skin_hex)}")
 
     # 4. Chroma budget. One loud thing may be interesting; two argue. Shoes are
     # exempt: a chestnut shoe is saturated by the numbers and is never the event.

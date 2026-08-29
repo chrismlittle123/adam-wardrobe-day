@@ -634,46 +634,45 @@ def check_warmth_against_skin() -> str:
     # Hue and lightness are separate questions. At his depth a mid-brown can be
     # perfectly harmonious in family and still vanish against him, and the
     # engine has to be able to say both things at once.
-    from .palette import (HUE_GAP, VALUE_GAP, blurs_at_the_collar, hue_distance,
-                          separation, separation_reason, value_gap)
+    from .palette import (CLEARLY_APART, TOO_CLOSE, reads_against_skin,
+                          separation_reason, skin_distance, to_lab)
     from .profile import Profile
     assert Profile.load().subject.skin_tone_hex == skin, \
         "the profile and the engine disagree about his skin"
     assert warmth("#C19A6B", skin)[0] == "harmonious", "camel should still be in family"
 
-    # A colour must stand off his skin on one axis, and either will do. What
-    # fails is being close on both, which is exactly brown.
-    assert blurs_at_the_collar("#C19A6B", skin), "camel is close on both axes"
-    assert blurs_at_the_collar("#6B4426", skin), "chocolate is close on both axes"
-    assert blurs_at_the_collar("#7E5835", skin), "tobacco is close on both axes"
+    # Distance is measured in CIELAB, where a step of a given size looks the
+    # same size wherever it is taken. A colour compared with itself is zero.
+    assert skin_distance(skin, skin) < 0.001, "a colour differs from itself"
+    assert to_lab("#000000")[0] < 1 and to_lab("#FFFFFF")[0] > 99, "the L axis is wrong"
+    assert skin_distance("#FFFFFF", skin) > skin_distance("#C19A6B", skin), \
+        "white should be further from him than camel"
 
-    # Far in lightness is enough on its own, at his own warm hue.
-    cream = "#F2E9D8"
-    assert hue_distance(cream, skin) < HUE_GAP, "cream should be close in hue"
-    assert not blurs_at_the_collar(cream, skin), "cream is light enough on its own"
-    assert "lighter than his skin" in separation_reason(cream, skin), \
-        "cream should separate on lightness, and say so"
+    # Three bands, because a binary was the wrong shape. Hue and lightness taken
+    # separately banned burgundy, which is a good combination on brown skin; it
+    # differs moderately on both axes at once and the max of two threw that away.
+    bands = {n: reads_against_skin(h, skin) for n, h in (
+        ("terracotta", "#B5613F"), ("rust", "#8E3B2E"), ("tobacco", "#7E5835"),
+        ("chocolate", "#6B4426"), ("burgundy", "#6E2C33"), ("camel", "#C19A6B"),
+        ("cream", "#F2E9D8"), ("navy", "#26303F"), ("cobalt", "#0F4C9E"),
+        ("emerald", "#0F7B5F"))}
+    for name in ("terracotta", "rust", "tobacco", "chocolate"):
+        assert bands[name] == "too close", f"{name} should read as more of him"
+    for name in ("burgundy", "camel"):
+        assert bands[name] == "tonal", f"{name} should be close-toned, not banned"
+    for name in ("cream", "navy", "cobalt", "emerald"):
+        assert bands[name] == "clear", f"{name} should plainly frame him"
 
-    # Far round the wheel is enough on its own, at his own lightness. This is
-    # what a lightness-only rule got wrong: cobalt sits as close to him as
-    # chocolate does and reads as a garment, because it could not be him.
-    cobalt = "#0F4C9E"
-    assert value_gap(cobalt, skin) < VALUE_GAP, "cobalt should be close in lightness"
-    assert value_gap(cobalt, skin) < value_gap("#6B4426", skin), \
-        "cobalt should be closer in lightness than the chocolate that fails"
-    assert not blurs_at_the_collar(cobalt, skin), "cobalt separates on hue alone"
-    assert "round the wheel" in separation_reason(cobalt, skin), \
-        "cobalt should separate on hue, and say so"
-    assert not blurs_at_the_collar("#0F7B5F", skin), "emerald separates on hue alone"
-
-    # And the failure names both axes, since that is what went wrong.
-    both = separation_reason("#B5613F", skin)
-    assert "blurs on both axes" in both, f"terracotta's fault is not named: {both}"
-    assert separation("#F2E9D8", skin) > 1 > separation("#B5613F", skin), \
-        "the threshold is not at one"
-    return (f"one axis is enough: cobalt clears on hue at "
-            f"{hue_distance(cobalt, skin):.0f}°, cream on lightness at "
-            f"{value_gap(cream, skin):.2f}; brown clears on neither")
+    assert TOO_CLOSE < CLEARLY_APART, "the bands are the wrong way round"
+    assert skin_distance("#6E2C33", skin) > skin_distance("#6B4426", skin), \
+        "burgundy should sit further off him than chocolate"
+    assert "deliberate look" in separation_reason("#6E2C33", skin), \
+        "the tonal band does not explain itself"
+    assert "more of him" in separation_reason("#B5613F", skin), \
+        "the too-close band does not explain itself"
+    return (f"CIELAB distance in three bands: terracotta {skin_distance('#B5613F', skin):.0f} "
+            f"too close, burgundy {skin_distance('#6E2C33', skin):.0f} tonal, "
+            f"cobalt {skin_distance('#0F4C9E', skin):.0f} clear")
 
 
 def check_harmonies_are_wearable() -> str:
