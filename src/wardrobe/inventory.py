@@ -199,6 +199,25 @@ class Item:
         return bool(self.product_photo) and Path(self.product_photo).is_file()
 
     @property
+    def reference_photo(self) -> Path | None:
+        """The picture to hand an image model when asking for this garment.
+
+        The catalogue shot first, then the original. A generated shot is the
+        garment alone on white with nothing else in frame; the photograph it was
+        made from usually has a duvet in it, and the model will happily take the
+        duvet as part of the brief.
+        """
+        if self.has_product_photo:
+            return Path(self.product_photo)
+        if self.has_photo:
+            return Path(self.photo)
+        return None
+
+    @property
+    def has_reference(self) -> bool:
+        return self.reference_photo is not None
+
+    @property
     def shop_photo(self) -> str:
         """The generated product shot if there is one, else his own snap."""
         return (self.product_photo if self.has_product_photo

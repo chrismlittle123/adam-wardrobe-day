@@ -1884,6 +1884,80 @@ def _every_page():
     return {slug: "\n".join(m.value for m in _render(slug).markdown) for slug, _ in pages}
 
 
+def check_every_garment_is_shown_to_the_model() -> str:
+    """The pieces of an outfit go to the image model as pictures, not as words.
+
+    They always did, but only the uploaded photograph counted, so a garment that
+    had been drawn rather than photographed contributed nothing and the model
+    invented it. The generated shot is the better reference anyway: the garment
+    alone on white, where the original usually has a bedroom in it.
+
+    And the ordering function that decides what to drop when there are too many
+    was written, imported, and never called. Both generators used a plain list
+    in item order instead, so which piece got dropped was arbitrary.
+    """
+    from .inventory import Inventory, Item
+    from .outfits import CARRIES_THE_LOOK, REFERENCE_LIMIT, reference_items, reference_photos
+
+    inventory, _ = _seeded()
+
+    # A garment with only a drawn shot must still be shown.
+    drawn = paths.products() / "drawn.png"
+    drawn.parent.mkdir(parents=True, exist_ok=True)
+    from PIL import Image as _Image
+    _Image.new("RGB", (40, 60), (200, 200, 200)).save(drawn, "PNG")
+    only_drawn = Item(name="Drawn only", garment="Shirt", category="Top",
+                      product_photo=str(drawn))
+    assert only_drawn.has_reference, "a garment with only a catalogue shot is invisible"
+    assert only_drawn.reference_photo == drawn, "the catalogue shot is not used"
+
+    # With both, the catalogue shot wins: it is the garment on white and nothing else.
+    shot = paths.photos() / "snap.jpg"
+    shot.parent.mkdir(parents=True, exist_ok=True)
+    _Image.new("RGB", (40, 60), (90, 60, 40)).save(shot, "JPEG")
+    both = Item(name="Both", garment="Shirt", category="Top",
+                photo=str(shot), product_photo=str(drawn))
+    assert both.reference_photo == drawn, "the bedroom photograph beat the catalogue shot"
+
+    # Nothing at all means nothing, never a path that is not there.
+    assert Item(name="Bare", garment="Shirt").reference_photo is None, \
+        "a garment with no picture produced one"
+    assert Item(name="Ghost", garment="Shirt", photo="/nowhere.jpg").reference_photo is None, \
+        "a path that does not exist was offered as a reference"
+
+    # The ones that carry the look go first, and what will not fit is returned
+    # rather than quietly discarded.
+    made = [Item(name=c, garment="Shirt", category=c, product_photo=str(drawn))
+            for c in ("Accessory", "Shoes", "Top", "Outerwear", "Bottom",
+                      "Accessory", "Accessory")]
+    shown, dropped = reference_items(made)
+    assert len(shown) == REFERENCE_LIMIT, f"showed {len(shown)}, not {REFERENCE_LIMIT}"
+    assert [i.category for i in shown[:4]] == ["Outerwear", "Top", "Bottom", "Shoes"], \
+        f"the pieces that carry the look are not first: {[i.category for i in shown]}"
+    assert dropped and all(i.category == "Accessory" for i in dropped), \
+        f"something other than an accessory was dropped: {[i.category for i in dropped]}"
+    assert len(shown) + len(dropped) == len(made), "a garment vanished between the two halves"
+    assert set(CARRIES_THE_LOOK) >= {"Outerwear", "Top", "Bottom", "Shoes"}, \
+        "the ordering no longer covers the pieces that carry a look"
+
+    # Under the limit, nothing is dropped and every piece is shown.
+    few = made[:3]
+    shown, dropped = reference_items(few)
+    assert not dropped and len(shown) == 3, "a small outfit lost a piece"
+    assert reference_photos(few) == [i.reference_photo for i in shown], \
+        "the paths and the items disagree"
+
+    # The function is actually called now, by both generators.
+    source = APP_FILE.read_text()
+    assert "reference_items(items)" in source, "the generator does not use the ordering"
+    assert "reference_photos(items)" in source, "the variation panel does not use the ordering"
+    assert "photos[:4]" not in source, "a generator still re-slices the references itself"
+    assert "for i in items if i.has_photo" not in source, \
+        "a generator still looks only at uploaded photographs"
+    return (f"every piece with a picture is shown, up to {REFERENCE_LIMIT}, "
+            "catalogue shot first, and what will not fit is named")
+
+
 def check_changing_garment_changes_the_form() -> str:
     """Pick a different garment and the form beneath must follow it.
 
@@ -3010,6 +3084,7 @@ CHECKS: tuple[tuple[str, str, Callable[[], str]], ...] = (
     (APP, "Typography is one system, not three", check_typography),
     (APP, "All tabs render empty", check_app_renders_empty),
     (APP, "A rerun leaves you on the same page", check_page_survives_a_rerun),
+    (PROMPTS, "Every garment is shown to the model", check_every_garment_is_shown_to_the_model),
     (APP, "Choosing a garment reshapes the form", check_changing_garment_changes_the_form),
     (APP, "No page is a dead end", check_no_page_is_a_dead_end),
     (APP, "All tabs render with a full wardrobe", check_app_renders_seeded),

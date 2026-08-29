@@ -72,6 +72,7 @@ colours = [
     { name = "Air force", hex = "#5C7B95", group = "Blues" },
     { name = "Mid blue", hex = "#4A6E96", group = "Blues" },
     { name = "Denim", hex = "#3E5C79", group = "Blues" },
+    { name = "Indigo", hex = "#39417A", group = "Blues" },
     { name = "Petrol", hex = "#2E5561", group = "Blues" },
     { name = "Navy", hex = "#26303F", group = "Blues" },
     { name = "Ink", hex = "#1D2430", group = "Blues" },
@@ -80,6 +81,7 @@ colours = [
     { name = "Sage", hex = "#A3AF97", group = "Greens" },
     { name = "Khaki", hex = "#8A8560", group = "Greens" },
     { name = "Moss", hex = "#6F7A4E", group = "Greens" },
+    { name = "Green", hex = "#3F7A4F", group = "Greens" },
     { name = "Olive", hex = "#5F6146", group = "Greens" },
     { name = "Forest", hex = "#2F4032", group = "Greens" },
     { name = "Bottle", hex = "#1F3A2C", group = "Greens" },
@@ -89,19 +91,17 @@ colours = [
     { name = "Tan", hex = "#A9743F", group = "Browns" },
     { name = "Chestnut", hex = "#8B5A2B", group = "Browns" },
     { name = "Tobacco", hex = "#7E5835", group = "Browns" },
+    { name = "Brown", hex = "#6F4E37", group = "Browns" },
     { name = "Chocolate", hex = "#6B4426", group = "Browns" },
     { name = "Espresso", hex = "#3E2A1E", group = "Browns" },
     { name = "Dusty pink", hex = "#C9A29B", group = "Warm accents" },
     { name = "Terracotta", hex = "#B5613F", group = "Warm accents" },
     { name = "Mustard", hex = "#C08A2E", group = "Warm accents" },
+    { name = "Red", hex = "#A62B2B", group = "Warm accents" },
     { name = "Rust", hex = "#8E3B2E", group = "Warm accents" },
     { name = "Burgundy", hex = "#6E2C33", group = "Warm accents" },
     { name = "Oxblood", hex = "#4A1F23", group = "Warm accents" },
     { name = "Multicolour", hex = "#8A7767", group = "Not a single colour" },
-    { name = "Green", hex = "#3F7A4F", group = "Greens" },
-    { name = "Indigo", hex = "#39417A", group = "Blues" },
-    { name = "Brown", hex = "#6F4E37", group = "Browns" },
-    { name = "Red", hex = "#A62B2B", group = "Warm accents" },
 ]
 fits = [
     "",
@@ -112,10 +112,12 @@ fits = [
 ]
 grades = [
     "",
+    "Branded",
     "Dress",
     "Everyday",
     "Heavyweight",
     "Knitted",
+    "Smart",
 ]
 
 [[garments]]

@@ -35,7 +35,8 @@ from wardrobe.inventory import (
     takes_fit, takes_grade,
 )
 from wardrobe.outfits import (
-    Outfit, Outfits, compare, describe_outfit, reference_photos, wearability,
+    Outfit, Outfits, compare, describe_outfit, reference_items, reference_photos,
+    wearability,
 )
 from wardrobe.palette import (
     ACCENT, CATEGORIES as COLOUR_CATEGORIES, FIELD, GROUND, ROLES, SEASONS,
@@ -1285,7 +1286,7 @@ def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
         ui.empty("Pick at least one piece.")
         return
 
-    photos = [Path(i.photo) for i in items if i.has_photo]
+    photos = reference_photos(items)
     prompt = build_outfit_prompt(
         profile, [i.describe() for i in items], shot=shot, background=background,
         principles=principles.as_prompt_block() if use_principles else "",
@@ -1306,7 +1307,7 @@ def variation_panel(profile: Profile, outfit: Outfit, inventory: Inventory,
                 written = generate_images(
                     prompt,
                     out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
-                    reference_images=[portrait, *photos[:4]],
+                    reference_images=[portrait, *photos],
                     count=int(count),
                     settings=Settings.from_env())
             except GEMINI_ERRORS as exc:
@@ -2037,13 +2038,25 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
         ui.empty("Pick at least one piece.")
         return
 
-    photos = [Path(i.photo) for i in items if i.has_photo]
+    shown, dropped = reference_items(items)
+    photos = [i.reference_photo for i in shown]
     missing_now = [i for i in items if not i.owned]
     cost_note = (f"{ui.plural(len(missing_now), 'piece')} still to find"
                  if missing_now else "every piece already owned")
     st.markdown(
-        f'<div class="look-cap">{len(items)} pieces &middot; {len(photos)} with photos '
+        f'<div class="look-cap">{len(items)} pieces &middot; '
+        f'{ui.plural(len(photos), "photograph")} sent as reference '
         f'&middot; {cost_note}</div>', unsafe_allow_html=True)
+    if dropped:
+        st.warning(
+            f"Too many pieces to show the model at once, so it will not see "
+            f"{', '.join(i.name or i.garment for i in dropped)}. Those are "
+            "described in words only, and it will invent them.")
+    no_picture = [i for i in items if not i.has_reference]
+    if no_picture:
+        st.info(
+            f"No photograph of {', '.join(i.name or i.garment for i in no_picture)}, "
+            "so the model is working from the description alone for those.")
 
     ui.eyebrow("The shot")
     c1, c2, c3 = st.columns([2, 2, 1])
@@ -2083,7 +2096,7 @@ def generator_tab(profile: Profile, inventory: Inventory, outfits: Outfits,
                 written = generate_images(
                     prompt,
                     out_prefix=paths.looks() / f"{stamp}-{slug(title)}",
-                    reference_images=[portrait, *photos[:4]],
+                    reference_images=[portrait, *photos],
                     count=int(count),
                     settings=Settings.from_env(),
                 )

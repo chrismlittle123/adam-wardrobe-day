@@ -224,16 +224,28 @@ def describe_outfit(outfit: Outfit, inventory: Inventory) -> str:
     return ". ".join(i.describe() for i in items) + ("." if items else "")
 
 
-def reference_photos(outfit: Outfit, inventory: Inventory, limit: int = 4) -> list[Path]:
-    """Item photos to pass alongside the subject portrait, most specific first.
+REFERENCE_LIMIT = 6
 
-    The model takes only so many references before it starts blending them, so
-    the ones that carry the look (tops, outerwear, shoes) go in ahead of a belt.
+CARRIES_THE_LOOK = {"Outerwear": 0, "Top": 1, "Bottom": 2, "Shoes": 3, "Accessory": 4}
+
+
+def reference_items(items: list[Item], limit: int = REFERENCE_LIMIT) -> tuple[list[Item], list[Item]]:
+    """Which garments get shown to the model, and which do not fit.
+
+    A model takes only so many references before it starts blending them, so the
+    pieces that carry the look go in ahead of a belt. Returns both halves,
+    because dropping a garment silently is how an outfit comes back wearing
+    something nobody chose.
     """
-    order = {"Outerwear": 0, "Top": 1, "Bottom": 2, "Shoes": 3, "Accessory": 4}
-    items = [i for i in inventory.resolve(outfit.item_ids) if i.has_photo]
-    items.sort(key=lambda i: order.get(i.category, 9))
-    return [Path(i.photo) for i in items[:limit]]
+    usable = [i for i in items if i.has_reference]
+    usable.sort(key=lambda i: CARRIES_THE_LOOK.get(i.category, 9))
+    return usable[:limit], usable[limit:]
+
+
+def reference_photos(items: list[Item], limit: int = REFERENCE_LIMIT) -> list[Path]:
+    """Just the paths, most specific first."""
+    shown, _ = reference_items(items, limit)
+    return [i.reference_photo for i in shown]
 
 
 @dataclass
